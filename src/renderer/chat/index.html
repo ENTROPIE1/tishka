@@ -13,12 +13,20 @@
   <body>
     <header class="topbar">
       <span class="topbar-title">Тишка</span>
-      <button id="clear-history" type="button" class="ghost-button">Очистить историю</button>
+      <div class="topbar-actions">
+        <button id="open-settings" type="button" class="ghost-button">Подключения</button>
+        <button id="clear-history" type="button" class="ghost-button">Очистить историю</button>
+      </div>
     </header>
 
     <main id="feed" class="feed" aria-live="polite"></main>
 
     <div id="status" class="status" hidden></div>
+
+    <div id="no-key" class="banner" hidden>
+      <span>Ключ шлюза не задан</span>
+      <button id="open-settings-banner" type="button" class="ghost-button">Открыть подключения</button>
+    </div>
 
     <footer class="composer">
       <textarea

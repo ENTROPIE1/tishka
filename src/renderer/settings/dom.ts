@@ -1,0 +1,62 @@
+export function el<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  className?: string,
+  text?: string
+): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  if (className !== undefined) {
+    node.className = className;
+  }
+  if (text !== undefined) {
+    node.textContent = text;
+  }
+  return node;
+}
+
+export function clear(node: HTMLElement): void {
+  node.replaceChildren();
+}
+
+export function sectionTitle(text: string): HTMLElement {
+  return el('h2', 'section-title', text);
+}
+
+export function button(label: string, className = 'button'): HTMLButtonElement {
+  const node = el('button', className, label);
+  node.type = 'button';
+  return node;
+}
+
+export function textInput(value = '', type = 'text'): HTMLInputElement {
+  const node = el('input', 'text-input');
+  node.type = type;
+  node.value = value;
+  return node;
+}
+
+export function field(label: string, input: HTMLElement, hint?: string): HTMLElement {
+  const wrapper = el('label', 'field');
+  wrapper.append(el('span', 'field-label', label), input);
+  if (hint !== undefined) {
+    wrapper.append(el('span', 'field-hint', hint));
+  }
+  return wrapper;
+}
+
+export function selectInput(options: Array<{ value: string; label: string }>, value: string): HTMLSelectElement {
+  const node = el('select', 'select-input');
+  for (const option of options) {
+    const item = el('option', undefined, option.label);
+    item.value = option.value;
+    node.append(item);
+  }
+  node.value = value;
+  return node;
+}
+
+export function textarea(value = '', placeholder = ''): HTMLTextAreaElement {
+  const node = el('textarea', 'textarea-input');
+  node.value = value;
+  node.placeholder = placeholder;
+  return node;
+}

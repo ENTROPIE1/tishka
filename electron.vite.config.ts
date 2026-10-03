@@ -20,7 +20,10 @@ export default defineConfig({
     root: resolve(__dirname, 'src/renderer'),
     build: {
       rollupOptions: {
-        input: { chat: resolve(__dirname, 'src/renderer/chat/index.html') }
+        input: {
+          chat: resolve(__dirname, 'src/renderer/chat/index.html'),
+          settings: resolve(__dirname, 'src/renderer/settings/index.html')
+        }
       }
     }
   }

@@ -7,6 +7,9 @@ const statusLine = document.getElementById('status') as HTMLElement;
 const input = document.getElementById('input') as HTMLTextAreaElement;
 const sendButton = document.getElementById('send') as HTMLButtonElement;
 const clearButton = document.getElementById('clear-history') as HTMLButtonElement;
+const settingsButton = document.getElementById('open-settings') as HTMLButtonElement;
+const bannerButton = document.getElementById('open-settings-banner') as HTMLButtonElement;
+const noKeyBanner = document.getElementById('no-key') as HTMLElement;
 
 const STICK_BOTTOM_GAP = 48;
 const COPY_FEEDBACK_MS = 1000;
@@ -265,8 +268,31 @@ async function loadHistory(): Promise<void> {
   scrollToBottom();
 }
 
+function initSettingsButtons(): void {
+  const open = (): void => {
+    void window.tishka.openSettings();
+  };
+  settingsButton.addEventListener('click', open);
+  bannerButton.addEventListener('click', open);
+}
+
+async function refreshKeyState(): Promise<void> {
+  try {
+    const view = await window.tishka.config.get();
+    noKeyBanner.hidden = view.gatewayKeySet;
+  } catch {
+    noKeyBanner.hidden = true;
+  }
+}
+
+window.addEventListener('focus', () => {
+  void refreshKeyState();
+});
+
 initEvents();
 initFeed();
 initComposer();
 initClearButton();
+initSettingsButtons();
 void loadHistory();
+void refreshKeyState();

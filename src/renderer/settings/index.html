@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Тишка — подключения</title>
+    <link rel="stylesheet" href="./settings.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="topbar-title">Настройки Тишки</span>
+    </header>
+
+    <main class="settings">
+      <section id="model-section" class="section"></section>
+      <section id="connections-section" class="section"></section>
+      <section id="persona-section" class="section"></section>
+    </main>
+
+    <script type="module" src="./settings.ts"></script>
+  </body>
+</html>

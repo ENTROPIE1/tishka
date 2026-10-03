@@ -63,6 +63,24 @@ body {
   font-weight: 600;
 }
 
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-top: 1px solid var(--border);
+}
+
 .ghost-button {
   padding: 4px 10px;
   font: inherit;

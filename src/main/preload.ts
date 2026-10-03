@@ -1,12 +1,28 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ConnectionDraft } from '../core/connections';
 import type { HistoryEntry } from '../core/history';
-import type { TishkaEvent } from '../core/types';
+import type { McpStatus } from '../core/mcp/manager';
+import type { Config, TishkaEvent } from '../core/types';
+import type {
+  ConfigView,
+  ConnectionPlanResult,
+  ConnectionSaveResult,
+  ConnectionView
+} from './ipc-settings';
 import {
+  CONFIG_GET_CHANNEL,
+  CONFIG_SAVE_CHANNEL,
+  CONNECTIONS_PLAN_CHANNEL,
+  CONNECTIONS_RECONNECT_CHANNEL,
+  CONNECTIONS_REMOVE_CHANNEL,
+  CONNECTIONS_SAVE_CHANNEL,
+  CONNECTIONS_STATUS_CHANNEL,
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
+  OPEN_SETTINGS_CHANNEL,
   SECRETS_DELETE_CHANNEL,
   SECRETS_HAS_CHANNEL,
   SECRETS_NAMES_CHANNEL,
@@ -52,6 +68,34 @@ const api = {
     names(): Promise<string[]> {
       return ipcRenderer.invoke(SECRETS_NAMES_CHANNEL);
     }
+  },
+  config: {
+    get(): Promise<ConfigView> {
+      return ipcRenderer.invoke(CONFIG_GET_CHANNEL);
+    },
+    save(config: Config): Promise<void> {
+      return ipcRenderer.invoke(CONFIG_SAVE_CHANNEL, config);
+    }
+  },
+  connections: {
+    plan(draft: ConnectionDraft): Promise<ConnectionPlanResult> {
+      return ipcRenderer.invoke(CONNECTIONS_PLAN_CHANNEL, draft);
+    },
+    save(draft: ConnectionDraft, previousName?: string): Promise<ConnectionSaveResult> {
+      return ipcRenderer.invoke(CONNECTIONS_SAVE_CHANNEL, draft, previousName);
+    },
+    remove(name: string): Promise<void> {
+      return ipcRenderer.invoke(CONNECTIONS_REMOVE_CHANNEL, name);
+    },
+    status(): Promise<ConnectionView[]> {
+      return ipcRenderer.invoke(CONNECTIONS_STATUS_CHANNEL);
+    },
+    reconnect(name: string): Promise<McpStatus | undefined> {
+      return ipcRenderer.invoke(CONNECTIONS_RECONNECT_CHANNEL, name);
+    }
+  },
+  openSettings(): Promise<void> {
+    return ipcRenderer.invoke(OPEN_SETTINGS_CHANNEL);
   }
 };
 

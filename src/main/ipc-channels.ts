@@ -9,3 +9,12 @@ export const SECRETS_SET_CHANNEL = 'tishka:secrets:set';
 export const SECRETS_HAS_CHANNEL = 'tishka:secrets:has';
 export const SECRETS_DELETE_CHANNEL = 'tishka:secrets:delete';
 export const SECRETS_NAMES_CHANNEL = 'tishka:secrets:names';
+
+export const CONFIG_GET_CHANNEL = 'tishka:config:get';
+export const CONFIG_SAVE_CHANNEL = 'tishka:config:save';
+export const CONNECTIONS_PLAN_CHANNEL = 'tishka:connections:plan';
+export const CONNECTIONS_SAVE_CHANNEL = 'tishka:connections:save';
+export const CONNECTIONS_REMOVE_CHANNEL = 'tishka:connections:remove';
+export const CONNECTIONS_STATUS_CHANNEL = 'tishka:connections:status';
+export const CONNECTIONS_RECONNECT_CHANNEL = 'tishka:connections:reconnect';
+export const OPEN_SETTINGS_CHANNEL = 'tishka:open-settings';

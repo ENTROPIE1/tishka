@@ -1,10 +1,11 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell } from 'electron';
 import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
 import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { registerIpc } from './ipc';
+import { registerSettingsIpc } from './ipc-settings';
 
 const bus = createEventBus();
 let core: TishkaCore | undefined;
@@ -15,6 +16,7 @@ function createWindow(): void {
     height: 600,
     title: 'Тишка',
     backgroundColor: '#f6f6f4',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -22,6 +24,7 @@ function createWindow(): void {
     }
   });
 
+  window.setMenu(null);
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   if (rendererUrl !== undefined) {
     void window.loadURL(`${rendererUrl}/chat/index.html`);
@@ -31,6 +34,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   const dataDir = app.getPath('userData');
   const appRoot = app.isPackaged ? app.getAppPath() : join(__dirname, '..', '..');
   const secrets = createSecretStore(join(dataDir, 'secrets.bin'), electronCrypto);
@@ -48,6 +52,7 @@ app.whenReady().then(() => {
   });
 
   registerIpc(bus, core, secrets);
+  registerSettingsIpc(core, secrets);
 
   core.start().catch((error: unknown) => {
     console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);
