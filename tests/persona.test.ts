@@ -51,9 +51,16 @@ describe('personaPrompt', () => {
   it('содержит правило о речи без цифр и латиницы', () => {
     const prompt = personaPrompt('sometimes');
     expect(prompt).toContain('в say нет цифр, латиницы и сокращений');
-    expect(prompt).toContain('двадцать три двадцать одна');
     expect(prompt).toContain('конфлюенс');
     expect(prompt).toContain('В show цифры и латиница разрешены');
+  });
+
+  it('требует словами и с единицами называть время, даты и количества', () => {
+    const prompt = personaPrompt('sometimes');
+    expect(prompt).toContain('с единицами');
+    expect(prompt).toContain('двадцать три часа тридцать четыре минуты');
+    expect(prompt).toContain('пятое октября');
+    expect(prompt).toContain('три встречи');
   });
 
   it('содержит правило о разделении на say и show', () => {
@@ -61,6 +68,14 @@ describe('personaPrompt', () => {
     expect(prompt).toContain('say не пересказывает show');
     expect(prompt).toContain('панелью text');
     expect(prompt).toContain('панелью list');
+  });
+
+  it('запрещает вводные-обещания в say', () => {
+    const prompt = personaPrompt('sometimes');
+    expect(prompt).toContain('а не обещание');
+    expect(prompt).toContain('«Сейчас расскажу»');
+    expect(prompt).toContain('«Сейчас посмотрю»');
+    expect(prompt).not.toContain('"say": "Сейчас расскажу.');
   });
 
   it('содержит четыре примера ответов', () => {
