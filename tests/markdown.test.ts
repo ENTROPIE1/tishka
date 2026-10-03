@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMarkdown } from '../src/renderer/chat/markdown';
+import { renderMarkdown } from '../src/renderer/shared/markdown';
 
 describe('renderMarkdown', () => {
   it('абзацы разделяются пустой строкой', () => {

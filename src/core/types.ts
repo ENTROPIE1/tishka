@@ -93,6 +93,7 @@ export interface Config {
   voice: { hotkey: string; wakeWords: string[]; sttUrl: string; ttsEngine: 'piper' | 'silero' | 'none' };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
+  pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
 }
 

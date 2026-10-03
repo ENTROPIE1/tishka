@@ -1,45 +1,32 @@
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, globalShortcut, ipcMain, Menu, shell, type Tray } from 'electron';
 import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
+import { saveConfig as persistConfig } from '../core/config';
 import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
+import { openChatWindow } from './chat-window';
+import { OPEN_CHAT_CHANNEL } from './ipc-channels';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
+import { registerPetHotkey } from './pet-hotkey';
+import { registerPetIpc } from './pet-ipc';
+import { createPetTray } from './pet-tray';
+import { createPetWindow, type PetWindow } from './pet-window';
+import { openSettingsWindow } from './settings-window';
 
 const bus = createEventBus();
 let core: TishkaCore | undefined;
+let pet: PetWindow | undefined;
+let tray: Tray | undefined;
 
-function createWindow(): void {
-  const window = new BrowserWindow({
-    width: 760,
-    height: 600,
-    title: 'Тишка',
-    backgroundColor: '#f6f6f4',
-    autoHideMenuBar: true,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-
-  window.setMenu(null);
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (rendererUrl !== undefined) {
-    void window.loadURL(`${rendererUrl}/chat/index.html`);
-  } else {
-    void window.loadFile(join(__dirname, '../renderer/chat/index.html'));
-  }
-}
-
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   const dataDir = app.getPath('userData');
   const appRoot = app.isPackaged ? app.getAppPath() : join(__dirname, '..', '..');
   const secrets = createSecretStore(join(dataDir, 'secrets.bin'), electronCrypto);
 
-  core = createTishkaCore({
+  const tishka = createTishkaCore({
     dataDir,
     presetsDir: join(appRoot, 'presets'),
     appRoot,
@@ -50,29 +37,54 @@ app.whenReady().then(() => {
     showPanel: () => undefined,
     now: () => new Date()
   });
+  core = tishka;
 
-  registerIpc(bus, core, secrets);
-  registerSettingsIpc(core, secrets);
-
-  core.start().catch((error: unknown) => {
-    console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);
+  registerIpc(bus, tishka, secrets);
+  registerSettingsIpc(tishka, secrets);
+  ipcMain.handle(OPEN_CHAT_CHANNEL, () => {
+    openChatWindow();
   });
 
-  createWindow();
+  try {
+    await tishka.start();
+  } catch (error: unknown) {
+    console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);
+  }
+
+  pet = createPetWindow({
+    bus,
+    getConfig: () => tishka.config(),
+    // Позиция пишется в файл напрямую, чтобы перетаскивание не переподключало MCP.
+    savePetX: (x) => persistConfig(dataDir, { ...tishka.config(), pet: { x } })
+  });
+  registerPetIpc(pet);
+
+  tray = createPetTray({
+    wake: () => pet?.wake('name'),
+    openChat: openChatWindow,
+    openSettings: openSettingsWindow,
+    getPetMode: () => tishka.config().petMode,
+    setPetMode: (value) => {
+      void tishka.saveConfig({ ...tishka.config(), petMode: value });
+    },
+    quit: () => app.quit()
+  });
+
+  registerPetHotkey(bus, tishka.config().voice.hotkey, () => pet?.wake('hotkey'));
+
+  openChatWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    openChatWindow();
   });
 });
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+// Приложение живёт в области уведомлений, пока пользователь не выйдет из меню значка.
+app.on('window-all-closed', () => undefined);
 
 app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  pet?.dispose();
+  tray?.destroy();
   void core?.stop();
 });

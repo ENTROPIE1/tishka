@@ -3,6 +3,7 @@ import type { ConnectionDraft } from '../core/connections';
 import type { HistoryEntry } from '../core/history';
 import type { McpStatus } from '../core/mcp/manager';
 import type { Config, TishkaEvent } from '../core/types';
+import type { PetModel } from '../pet/state';
 import type {
   ConfigView,
   ConnectionPlanResult,
@@ -22,8 +23,15 @@ import {
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
+  OPEN_CHAT_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
   OPEN_SETTINGS_CHANNEL,
+  PET_BUSY_CHANNEL,
+  PET_DRAG_CHANNEL,
+  PET_DRAG_END_CHANNEL,
+  PET_INTERACTIVE_CHANNEL,
+  PET_MODEL_CHANNEL,
+  PET_WAKE_CHANNEL,
   SECRETS_DELETE_CHANNEL,
   SECRETS_HAS_CHANNEL,
   SECRETS_NAMES_CHANNEL,
@@ -106,6 +114,35 @@ const api = {
   },
   openSettings(): Promise<void> {
     return ipcRenderer.invoke(OPEN_SETTINGS_CHANNEL);
+  },
+  openChat(): Promise<void> {
+    return ipcRenderer.invoke(OPEN_CHAT_CHANNEL);
+  },
+  onPetModel(listener: (model: PetModel) => void): () => void {
+    const handler = (_event: Electron.IpcRendererEvent, model: PetModel): void => {
+      listener(model);
+    };
+    ipcRenderer.on(PET_MODEL_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(PET_MODEL_CHANNEL, handler);
+    };
+  },
+  pet: {
+    setInteractive(interactive: boolean): void {
+      ipcRenderer.send(PET_INTERACTIVE_CHANNEL, interactive);
+    },
+    setBusy(busy: boolean): void {
+      ipcRenderer.send(PET_BUSY_CHANNEL, busy);
+    },
+    dragBy(deltaX: number): void {
+      ipcRenderer.send(PET_DRAG_CHANNEL, deltaX);
+    },
+    dragEnd(): void {
+      ipcRenderer.send(PET_DRAG_END_CHANNEL);
+    },
+    wake(source: 'name' | 'hotkey' | 'click' | 'trigger'): void {
+      ipcRenderer.send(PET_WAKE_CHANNEL, source);
+    }
   }
 };
 

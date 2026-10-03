@@ -1,6 +1,6 @@
 import type { HistoryEntry } from '../../core/history';
-import type { Panel } from '../../core/types';
-import { renderMarkdown } from './markdown';
+import { panelElement } from '../shared/panels';
+import { renderMarkdown } from '../shared/markdown';
 
 const feed = document.getElementById('feed') as HTMLElement;
 const statusLine = document.getElementById('status') as HTMLElement;
@@ -12,7 +12,6 @@ const bannerButton = document.getElementById('open-settings-banner') as HTMLButt
 const noKeyBanner = document.getElementById('no-key') as HTMLElement;
 
 const STICK_BOTTOM_GAP = 48;
-const COPY_FEEDBACK_MS = 1000;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -32,94 +31,6 @@ function timeLabel(at: string): string {
     return '';
   }
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function fileUrl(path: string): string {
-  const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
-  return encodeURI(`file:///${normalized}`);
-}
-
-function copyTextForPanel(panel: Panel): string {
-  if (panel.kind === 'text') {
-    return panel.markdown;
-  }
-  if (panel.kind === 'list') {
-    const lines: string[] = [];
-    for (const item of panel.items) {
-      lines.push(item.title);
-      if (item.subtitle !== undefined) {
-        lines.push(item.subtitle);
-      }
-      if (item.url !== undefined) {
-        lines.push(item.url);
-      }
-    }
-    return lines.join('\n');
-  }
-  return panel.path;
-}
-
-function cardElement(panel: Panel): HTMLElement {
-  const card = document.createElement('div');
-  card.className = 'card';
-
-  const title = document.createElement('div');
-  title.className = 'card-title';
-  title.textContent = panel.title;
-  card.append(title);
-
-  const body = document.createElement('div');
-  body.className = 'card-body';
-  if (panel.kind === 'text') {
-    body.innerHTML = renderMarkdown(panel.markdown);
-  } else if (panel.kind === 'list') {
-    const list = document.createElement('ul');
-    for (const item of panel.items) {
-      const itemBox = document.createElement('li');
-      const itemTitle = document.createElement('div');
-      itemTitle.className = 'item-title';
-      itemTitle.textContent = item.title;
-      itemBox.append(itemTitle);
-      if (item.subtitle !== undefined && item.subtitle !== '') {
-        const subtitle = document.createElement('div');
-        subtitle.className = 'item-subtitle';
-        subtitle.textContent = item.subtitle;
-        itemBox.append(subtitle);
-      }
-      if (item.url !== undefined && item.url !== '') {
-        const link = document.createElement('a');
-        link.className = 'item-link';
-        link.href = item.url;
-        link.dataset['url'] = item.url;
-        link.textContent = item.url;
-        itemBox.append(link);
-      }
-      list.append(itemBox);
-    }
-    body.append(list);
-  } else {
-    const image = document.createElement('img');
-    image.className = 'card-image';
-    image.src = fileUrl(panel.path);
-    image.alt = panel.title;
-    body.append(image);
-  }
-  card.append(body);
-
-  const copyButton = document.createElement('button');
-  copyButton.type = 'button';
-  copyButton.className = 'card-copy';
-  copyButton.textContent = 'Копировать';
-  copyButton.addEventListener('click', () => {
-    void window.tishka.copyText(copyTextForPanel(panel));
-    copyButton.textContent = 'Скопировано';
-    window.setTimeout(() => {
-      copyButton.textContent = 'Копировать';
-    }, COPY_FEEDBACK_MS);
-  });
-  card.append(copyButton);
-
-  return card;
 }
 
 function messageElement(entry: HistoryEntry): HTMLElement {
@@ -145,7 +56,13 @@ function messageElement(entry: HistoryEntry): HTMLElement {
   }
 
   if (entry.from === 'tishka' && entry.panel !== undefined) {
-    content.append(cardElement(entry.panel));
+    content.append(
+      panelElement(entry.panel, {
+        onCopy: (text) => {
+          void window.tishka.copyText(text);
+        }
+      })
+    );
   }
 
   const time = document.createElement('div');

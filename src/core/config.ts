@@ -22,6 +22,7 @@ export function defaultConfig(): Config {
     },
     mcpServers: [],
     persona: { fyr: 'sometimes' },
+    pet: { x: null },
     petMode: false
   };
 }
@@ -51,6 +52,13 @@ function pickTtsEngine(value: unknown, fallback: TtsEngine): TtsEngine {
 
 function pickFyr(value: unknown, fallback: FyrLevel): FyrLevel {
   return value === 'off' || value === 'sometimes' || value === 'often' ? value : fallback;
+}
+
+function pickPetX(value: unknown, fallback: number | null): number | null {
+  if (value === null) {
+    return null;
+  }
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function optionalStringRecord(value: unknown): Record<string, string> | undefined {
@@ -122,6 +130,7 @@ export function mergeConfig(value: unknown): Config {
   const llm = isRecord(value.llm) ? value.llm : {};
   const voice = isRecord(value.voice) ? value.voice : {};
   const persona = isRecord(value.persona) ? value.persona : {};
+  const pet = isRecord(value.pet) ? value.pet : {};
   return {
     llm: {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
@@ -136,6 +145,7 @@ export function mergeConfig(value: unknown): Config {
     },
     mcpServers: parseMcpServers(value.mcpServers),
     persona: { fyr: pickFyr(persona.fyr, defaults.persona.fyr) },
+    pet: { x: pickPetX(pet.x, defaults.pet.x) },
     petMode: pickBoolean(value.petMode, defaults.petMode)
   };
 }

@@ -33,6 +33,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -225,10 +229,26 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+}
+
+.card-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .card-title {
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .card-body ul {
@@ -258,8 +278,30 @@ body {
   border-radius: 8px;
 }
 
+.card-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.card-close {
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.card-close:hover {
+  color: var(--text);
+}
+
 .card-copy {
-  align-self: flex-end;
   padding: 3px 10px;
   font: inherit;
   font-size: 12px;
