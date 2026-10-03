@@ -1,0 +1,20 @@
+{
+  "format": "tishka-skill/1",
+  "id": "watch-page",
+  "name": "Следи за страницей",
+  "description": "Сообщает, когда версия страницы изменилась",
+  "phrases": [],
+  "trigger": {
+    "type": "watch",
+    "tool": "confluence__get_page_version",
+    "args": { "page_id": "{{inputs.page_id}}" },
+    "everyMinutes": 2,
+    "field": "version"
+  },
+  "inputs": [
+    { "name": "page_id", "description": "Номер страницы", "required": true, "default": "" }
+  ],
+  "steps": [
+    { "id": "say", "say": "Страница обновилась" }
+  ]
+}

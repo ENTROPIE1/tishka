@@ -43,17 +43,7 @@ function minuteKey(skillId: string, date: Date): string {
 
 export function createScheduler(deps: SchedulerDeps): Scheduler {
   let timer: ReturnType<typeof setInterval> | undefined;
-  let chain: Promise<void> = Promise.resolve();
   const firedMinutes = new Set<string>();
-
-  function enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const result = chain.then(task);
-    chain = result.then(
-      () => undefined,
-      () => undefined
-    );
-    return result;
-  }
 
   function emitReminder(reminder: Reminder): void {
     deps.events.emit({ type: 'wake', source: 'trigger' });
@@ -175,9 +165,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       if (timer !== undefined) {
         return;
       }
-      await enqueue(guardedCheck);
+      await deps.state.exclusive(guardedCheck);
       timer = setInterval(() => {
-        void enqueue(guardedCheck);
+        void deps.state.exclusive(guardedCheck);
       }, CHECK_INTERVAL_MS);
     },
 
@@ -189,11 +179,11 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     },
 
     tick(): Promise<void> {
-      return enqueue(() => check());
+      return deps.state.exclusive(() => check());
     },
 
     addReminder(at: string, text: string): Promise<Reminder> {
-      return enqueue(async () => {
+      return deps.state.exclusive(async () => {
         const state = await deps.state.load();
         const reminder: Reminder = { id: randomUUID(), at, text, done: false };
         state.reminders.push(reminder);
@@ -202,15 +192,17 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       });
     },
 
-    async listReminders(): Promise<Reminder[]> {
-      const state = await deps.state.load();
-      return state.reminders
-        .filter((reminder) => !reminder.done)
-        .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+    listReminders(): Promise<Reminder[]> {
+      return deps.state.exclusive(async () => {
+        const state = await deps.state.load();
+        return state.reminders
+          .filter((reminder) => !reminder.done)
+          .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id));
+      });
     },
 
     removeReminder(id: string): Promise<void> {
-      return enqueue(async () => {
+      return deps.state.exclusive(async () => {
         const state = await deps.state.load();
         state.reminders = state.reminders.filter((reminder) => reminder.id !== id);
         await deps.state.save(state);

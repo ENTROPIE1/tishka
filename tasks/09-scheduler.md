@@ -27,10 +27,11 @@ interface TriggerState {
 function createTriggerState(filePath: string): {
   load(): Promise<TriggerState>;      // нет файла или он повреждён → пустое состояние
   save(state: TriggerState): Promise<void>;   // атомарно: временный файл и переименование
+  exclusive<T>(task: () => Promise<T>): Promise<T>;   // общая очередь: задачи выполняются строго по одной
 };
 ```
 
-Файл `triggers.json` лежит в каталоге данных пользователя.
+Файл `triggers.json` лежит в каталоге данных пользователя. С ним работают и расписание, и наблюдения, поэтому каждая последовательность «прочитать, изменить, записать» выполняется внутри `exclusive`: так один модуль не затирает изменения другого.
 
 `src/core/triggers/scheduler.ts`
 

@@ -67,8 +67,19 @@ function parseState(raw: unknown): TriggerState {
 export function createTriggerState(filePath: string): {
   load(): Promise<TriggerState>;
   save(state: TriggerState): Promise<void>;
+  exclusive<T>(task: () => Promise<T>): Promise<T>;
 } {
+  let chain: Promise<unknown> = Promise.resolve();
+
+  function exclusive<T>(task: () => Promise<T>): Promise<T> {
+    const result = chain.then(task);
+    chain = result.catch(() => undefined);
+    return result;
+  }
+
   return {
+    exclusive,
+
     async load(): Promise<TriggerState> {
       let raw: string;
       try {

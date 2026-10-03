@@ -43,13 +43,23 @@ interface Harness {
 }
 
 let dir: string;
+const schedulers: ReturnType<typeof createScheduler>[] = [];
+const states: ReturnType<typeof createTriggerState>[] = [];
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'tishka-triggers-'));
 });
 
 afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
+  for (const scheduler of schedulers) {
+    scheduler.stop();
+  }
+  for (const state of states) {
+    await state.exclusive(async () => undefined);
+  }
+  schedulers.length = 0;
+  states.length = 0;
+  await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 function setup(options: {
@@ -59,6 +69,7 @@ function setup(options: {
 }): Harness {
   const path = join(dir, 'triggers.json');
   const state = createTriggerState(path);
+  states.push(state);
   const bus = createEventBus();
   const events: TishkaEvent[] = [];
   bus.on((event) => events.push(event));
@@ -84,8 +95,11 @@ function setup(options: {
     now: () => current
   };
 
+  const scheduler = createScheduler(deps);
+  schedulers.push(scheduler);
+
   return {
-    scheduler: createScheduler(deps),
+    scheduler,
     events,
     bus,
     runs,
@@ -120,13 +134,16 @@ describe('createScheduler — напоминания', () => {
     const h = setup({ startNow: local(2026, 10, 5, 9, 0) });
     await h.scheduler.addReminder(local(2026, 10, 5, 12, 0).toISOString(), 'Позвонить маме');
 
+    const restartedState = createTriggerState(h.path);
+    states.push(restartedState);
     const restarted = createScheduler({
       skills: { list: async () => [] },
       runner: { run: async (): Promise<RunResult> => ({ ok: true, steps: {} }) },
-      state: createTriggerState(h.path),
+      state: restartedState,
       events: h.bus,
       now: () => local(2026, 10, 5, 9, 0)
     });
+    schedulers.push(restarted);
 
     const reminders = await restarted.listReminders();
     expect(reminders).toHaveLength(1);
@@ -255,6 +272,12 @@ describe('createScheduler — навыки', () => {
       const runs: Skill[] = [];
       let fail = true;
       const memory: TriggerState = { reminders: [], firedOnce: [], watches: {} };
+      const memoryState = {
+        load: async () => memory,
+        save: async () => undefined,
+        exclusive: async <T>(task: () => Promise<T>): Promise<T> => task()
+      };
+      states.push(memoryState);
       const scheduler = createScheduler({
         skills: {
           list: async () => {
@@ -271,13 +294,11 @@ describe('createScheduler — навыки', () => {
             return { ok: true, steps: {} };
           }
         },
-        state: {
-          load: async () => memory,
-          save: async () => undefined
-        },
+        state: memoryState,
         events: bus,
         now: () => local(2026, 10, 5, 10, 0)
       });
+      schedulers.push(scheduler);
 
       await scheduler.start();
       expect(events).toContainEqual({ type: 'error', message: 'нет списка' });
@@ -315,13 +336,16 @@ describe('createScheduler — навыки', () => {
       async () => ({ ok: true, content: 'ок' })
     );
     const runner = createSkillRunner({ registry, ask: vi.fn(), events: bus, now: () => local(2026, 10, 5, 10, 0) });
+    const realState = createTriggerState(join(dir, 'triggers.json'));
+    states.push(realState);
     const scheduler = createScheduler({
       skills: { list: async () => [skill] },
       runner,
-      state: createTriggerState(join(dir, 'triggers.json')),
+      state: realState,
       events: bus,
       now: () => local(2026, 10, 5, 10, 0)
     });
+    schedulers.push(scheduler);
 
     await scheduler.tick();
 
