@@ -1,11 +1,13 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
+import { createTishkaCore, type TishkaCore } from '../core/app';
 import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { registerIpc } from './ipc';
 
 const bus = createEventBus();
+let core: TishkaCore | undefined;
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -28,10 +30,29 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  const secrets = createSecretStore(join(app.getPath('userData'), 'secrets.bin'), electronCrypto);
+  const dataDir = app.getPath('userData');
+  const appRoot = app.isPackaged ? app.getAppPath() : join(__dirname, '..', '..');
+  const secrets = createSecretStore(join(dataDir, 'secrets.bin'), electronCrypto);
+
+  core = createTishkaCore({
+    dataDir,
+    presetsDir: join(appRoot, 'presets'),
+    appRoot,
+    secrets,
+    events: bus,
+    openExternal: (url) => shell.openExternal(url),
+    // Панели приходят в составе ответа, отдельного показа пока не нужно.
+    showPanel: () => undefined,
+    now: () => new Date()
+  });
+
   registerIpc(bus, (text) => {
-    console.debug(`[tishka] user text: ${text}`);
+    void core?.handleUserText(text).catch(() => undefined);
   }, secrets);
+
+  core.start().catch((error: unknown) => {
+    console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);
+  });
 
   createWindow();
 
@@ -46,4 +67,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  void core?.stop();
 });

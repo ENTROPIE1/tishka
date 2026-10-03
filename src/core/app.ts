@@ -1,0 +1,218 @@
+import { join } from 'node:path';
+import { createAgent } from './agent/agent';
+import { defaultConfig, loadConfig } from './config';
+import { createLlmClient } from './llm/client';
+import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
+import { createRouter, type Router } from './router';
+import { createSkillRunner } from './skills/runner';
+import { createSkillStore } from './skills/store';
+import { registerSkillTools } from './skills/tools';
+import { createScheduler, type Scheduler } from './triggers/scheduler';
+import { createTriggerState } from './triggers/state';
+import { registerTriggerTools } from './triggers/tools';
+import { createWatcher, type Watcher } from './triggers/watcher';
+import { registerBuiltinTools } from './tools/builtin';
+import { createToolRegistry } from './tools/registry';
+import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore } from './types';
+
+export interface CoreDeps {
+  dataDir: string;                 // каталог данных пользователя
+  presetsDir: string;              // каталог presets/
+  appRoot: string;                 // корень приложения, от него считаются относительные пути серверов MCP
+  secrets: SecretStore;
+  events: EventBus;
+  openExternal(url: string): Promise<void>;
+  showPanel(panel: Panel): void;
+  now: () => Date;
+  fetch?: typeof fetch;            // для тестов
+}
+
+export interface TishkaCore {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  handleUserText(text: string): Promise<Reply>;
+  config(): Config;
+  mcpStatus(): McpStatus[];
+  reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
+}
+
+const API_KEY_SECRET = 'DKS_API_KEY';
+const DRIVE_PATTERN = /^[A-Za-z]:/;
+const NOT_READY: Reply = { say: 'Я ещё не проснулся, дай мне мгновение', mood: 'confused' };
+const UNEXPECTED: Reply = { say: 'Что-то пошло не так, попробуй ещё раз', mood: 'confused' };
+
+function isAbsoluteArg(value: string): boolean {
+  return value.startsWith('/') || value.startsWith('\\') || DRIVE_PATTERN.test(value);
+}
+
+// Относительные пути в args считаются от appRoot, а node заменяется на встроенный
+// исполняемый файл, чтобы свои серверы работали и без установленного Node.js.
+function prepareMcpServer(server: McpServerConfig, appRoot: string): McpServerConfig {
+  if (server.transport !== 'stdio') {
+    return server;
+  }
+  const args = (server.args ?? []).map((arg) =>
+    arg.startsWith('-') || isAbsoluteArg(arg) ? arg : join(appRoot, arg)
+  );
+  const env: Record<string, string> = { ...(server.env ?? {}) };
+  let command = server.command;
+  if (command.toLowerCase() === 'node') {
+    command = process.execPath;
+    env['ELECTRON_RUN_AS_NODE'] = '1';
+  }
+  const prepared: McpServerConfig = { name: server.name, transport: 'stdio', command, args };
+  if (Object.keys(env).length > 0) {
+    prepared.env = env;
+  }
+  return prepared;
+}
+
+export function createTishkaCore(deps: CoreDeps): TishkaCore {
+  let config: Config = defaultConfig();
+  let router: Router | undefined;
+  let scheduler: Scheduler | undefined;
+  let watcher: Watcher | undefined;
+  let mcp: McpManager | undefined;
+  let mcpTask: Promise<void> | undefined;
+  let started = false;
+  let queue: Promise<unknown> = Promise.resolve();
+
+  async function applyMcpServers(servers: McpServerConfig[]): Promise<void> {
+    if (mcp === undefined || router === undefined) {
+      return;
+    }
+    const wanted = new Set(servers.map((server) => server.name));
+    for (const status of mcp.status()) {
+      if (!wanted.has(status.name)) {
+        await mcp.disconnect(status.name);
+      }
+    }
+    for (const server of servers) {
+      await mcp.reconnect(prepareMcpServer(server, deps.appRoot));
+      await router.refreshSkills();
+    }
+  }
+
+  async function scrubMessage(message: string): Promise<string> {
+    let result = message;
+    for (const name of await deps.secrets.names()) {
+      const value = await deps.secrets.get(name);
+      if (value !== undefined && value !== '') {
+        result = result.split(value).join('***');
+      }
+    }
+    return result;
+  }
+
+  async function processUserText(text: string): Promise<Reply> {
+    deps.events.emit({ type: 'listen.end', text });
+    let reply: Reply;
+    try {
+      reply = router === undefined ? NOT_READY : await router.handle(text);
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : String(error);
+      const message = await scrubMessage(raw);
+      deps.events.emit({ type: 'error', message });
+      reply = UNEXPECTED;
+    }
+    deps.events.emit({ type: 'idle' });
+    return reply;
+  }
+
+  function handleUserText(text: string): Promise<Reply> {
+    if (!started) {
+      return Promise.resolve(NOT_READY);
+    }
+    const task = queue.then(() => processUserText(text));
+    queue = task.catch(() => undefined);
+    return task;
+  }
+
+  async function start(): Promise<void> {
+    if (started) {
+      return;
+    }
+    started = true;
+
+    config = await loadConfig(deps.dataDir);
+
+    const skills = createSkillStore(join(deps.dataDir, 'skills'));
+    await skills.loadPresets(deps.presetsDir);
+
+    const registry = createToolRegistry(deps.events);
+    registerBuiltinTools(registry, {
+      openExternal: deps.openExternal,
+      showPanel: deps.showPanel,
+      now: deps.now
+    });
+
+    const llm = createLlmClient({
+      baseUrl: config.llm.baseUrl,
+      getApiKey: () => deps.secrets.get(API_KEY_SECRET),
+      fetch: deps.fetch
+    });
+    const runner = createSkillRunner({
+      registry,
+      ask: async (prompt) => {
+        const response = await llm.chat({
+          model: config.llm.model,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        return response.text ?? '';
+      },
+      events: deps.events,
+      now: deps.now
+    });
+
+    const state = createTriggerState(join(deps.dataDir, 'triggers.json'));
+    scheduler = createScheduler({ skills, runner, state, events: deps.events, now: deps.now });
+    watcher = createWatcher({ skills, registry, runner, state, events: deps.events, now: deps.now });
+    registerTriggerTools(registry, scheduler, deps.now);
+    registerSkillTools(registry, { store: skills, registry, events: deps.events });
+
+    const agent = createAgent({
+      llm,
+      registry,
+      events: deps.events,
+      getModel: () => config.llm.model,
+      getPersona: () => config.persona,
+      now: deps.now
+    });
+    router = createRouter({ agent, skills, runner, registry, events: deps.events });
+    await router.refreshSkills();
+
+    await scheduler.start();
+    await watcher.start();
+
+    // Подключение серверов MCP не задерживает запуск: идёт в фоне.
+    mcp = createMcpManager({ registry, secrets: deps.secrets });
+    mcpTask = applyMcpServers(config.mcpServers).catch(() => undefined);
+  }
+
+  async function stop(): Promise<void> {
+    scheduler?.stop();
+    watcher?.stop();
+    const task = mcpTask;
+    mcpTask = undefined;
+    if (task !== undefined) {
+      await task;
+    }
+    await mcp?.closeAll();
+  }
+
+  async function reloadConfig(): Promise<void> {
+    config = await loadConfig(deps.dataDir);
+    if (started) {
+      await applyMcpServers(config.mcpServers);
+    }
+  }
+
+  return {
+    start,
+    stop,
+    handleUserText,
+    config: () => config,
+    mcpStatus: () => mcp?.status() ?? [],
+    reloadConfig
+  };
+}
