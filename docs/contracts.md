@@ -155,6 +155,7 @@ interface Config {
   llm: { baseUrl: string; model: string; visionModel: string };
   voice: { hotkey: string; wakeWords: string[]; sttUrl: string; ttsEngine: 'piper' | 'silero' | 'none' };
   mcpServers: McpServerConfig[];
+  persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
   petMode: boolean;
 }
 
