@@ -41,7 +41,7 @@ interface ToolDef {
   name: string;                 // для MCP: "<сервер>__<инструмент>"
   description: string;
   inputSchema: object;          // JSON Schema
-  source: 'builtin' | `mcp:${string}`;
+  source: 'builtin' | 'skill' | `mcp:${string}`;   // 'skill' — навык, доступный агенту как инструмент
   readOnly: boolean;            // false — инструмент что-то меняет
 }
 
