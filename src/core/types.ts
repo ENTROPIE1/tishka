@@ -1,0 +1,100 @@
+export interface ToolDef {
+  name: string;                 // для MCP: "<сервер>__<инструмент>"
+  description: string;
+  inputSchema: object;          // JSON Schema
+  source: 'builtin' | `mcp:${string}`;
+  readOnly: boolean;            // false — инструмент что-то меняет
+}
+
+export interface ToolResult {
+  ok: boolean;
+  content: string;              // текст для модели
+  data?: unknown;               // структурированный результат для шагов навыка
+  error?: string;
+}
+
+export type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
+
+export interface ToolRegistry {
+  register(def: ToolDef, handler: ToolHandler): void;
+  unregisterSource(source: ToolDef['source']): void;
+  list(): ToolDef[];
+  call(name: string, args: Record<string, unknown>): Promise<ToolResult>;
+}
+
+export type Mood = 'neutral' | 'happy' | 'confused';
+
+export type Panel =
+  | { kind: 'list'; title: string; items: { title: string; subtitle?: string; url?: string }[] }
+  | { kind: 'text'; title: string; markdown: string }
+  | { kind: 'image'; title: string; path: string };
+
+export interface Reply {
+  say: string;      // вслух: до двух коротких предложений, без цифр и латиницы
+  show?: Panel;     // подробности в панели и в чате
+  mood?: Mood;
+}
+
+export type TishkaEvent =
+  | { type: 'wake'; source: 'name' | 'hotkey' | 'click' | 'trigger' }
+  | { type: 'listen.start' }
+  | { type: 'listen.end'; text: string }
+  | { type: 'think.start' }
+  | { type: 'tool.start'; tool: string }
+  | { type: 'tool.end'; tool: string; ok: boolean }
+  | { type: 'reply'; reply: Reply }
+  | { type: 'speak.start'; text: string }
+  | { type: 'speak.level'; level: number }   // 0..1
+  | { type: 'speak.end' }
+  | { type: 'notify'; title: string; skillId?: string }
+  | { type: 'skill.saved'; skillId: string }
+  | { type: 'error'; message: string }
+  | { type: 'idle' };
+
+export interface EventBus {
+  emit(event: TishkaEvent): void;
+  on(listener: (event: TishkaEvent) => void): () => void;   // возвращает отписку
+}
+
+export interface Skill {
+  format: 'tishka-skill/1';
+  id: string;                    // латиница, цифры, дефис
+  name: string;                  // «Утро пятницы»
+  description: string;
+  phrases: string[];             // фразы вызова
+  trigger: Trigger;
+  inputs?: SkillInput[];
+  steps: Step[];
+  requires?: string[];           // имена серверов из mcpServers: "confluence", "exchange"
+}
+
+export type Trigger =
+  | { type: 'manual' }
+  | { type: 'schedule'; at?: string; cron?: string }          // at — ISO-время разового запуска
+  | { type: 'watch'; tool: string; args: Record<string, unknown>; everyMinutes: number; field?: string };
+
+export interface SkillInput { name: string; description: string; required: boolean; default?: unknown }
+
+export type Step =
+  | { id: string; tool: string; args: Record<string, unknown> }   // вызов инструмента
+  | { id: string; ask: string }                                   // запрос к модели, результат — текст
+  | { id: string; say: string; show?: Panel };                    // реплика пользователю
+
+export interface SecretStore {
+  set(name: string, value: string): Promise<void>;
+  get(name: string): Promise<string | undefined>;   // только главный процесс
+  has(name: string): Promise<boolean>;
+  delete(name: string): Promise<void>;
+  names(): Promise<string[]>;
+}
+
+export interface Config {
+  llm: { baseUrl: string; model: string; visionModel: string };
+  voice: { hotkey: string; wakeWords: string[]; sttUrl: string; ttsEngine: 'piper' | 'silero' | 'none' };
+  mcpServers: McpServerConfig[];
+  petMode: boolean;
+}
+
+export type McpServerConfig =
+  | { name: string; transport: 'http'; url: string; headers?: Record<string, string> }
+  | { name: string; transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string> };
