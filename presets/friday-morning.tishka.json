@@ -1,0 +1,21 @@
+{
+  "format": "tishka-skill/1",
+  "id": "friday-morning",
+  "name": "Утро пятницы",
+  "description": "Открывает ссылки, нужные для начала пятницы",
+  "phrases": ["утро пятницы", "начинаем пятницу"],
+  "trigger": { "type": "manual" },
+  "steps": [
+    {
+      "id": "open",
+      "tool": "open_urls",
+      "args": {
+        "urls": ["https://example.org/friday", "https://example.org/plan"]
+      }
+    },
+    {
+      "id": "done",
+      "say": "Открыл всё для пятницы"
+    }
+  ]
+}
