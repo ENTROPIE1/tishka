@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { createAgent } from './agent/agent';
 import { defaultConfig, loadConfig } from './config';
+import { createHistory, type HistoryEntry } from './history';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
 import { createRouter, type Router } from './router';
@@ -34,6 +35,8 @@ export interface TishkaCore {
   config(): Config;
   mcpStatus(): McpStatus[];
   reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
+  history(limit?: number): HistoryEntry[];
+  clearHistory(): Promise<void>;
 }
 
 const API_KEY_SECRET = 'DKS_API_KEY';
@@ -76,6 +79,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let mcpTask: Promise<void> | undefined;
   let started = false;
   let queue: Promise<unknown> = Promise.resolve();
+  const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
 
   async function applyMcpServers(servers: McpServerConfig[]): Promise<void> {
     if (mcp === undefined || router === undefined) {
@@ -135,6 +139,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     started = true;
 
     config = await loadConfig(deps.dataDir);
+    await historyStore.start();
 
     const skills = createSkillStore(join(deps.dataDir, 'skills'));
     await skills.loadPresets(deps.presetsDir);
@@ -190,6 +195,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   }
 
   async function stop(): Promise<void> {
+    historyStore.stop();
     scheduler?.stop();
     watcher?.stop();
     const task = mcpTask;
@@ -213,6 +219,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     handleUserText,
     config: () => config,
     mcpStatus: () => mcp?.status() ?? [],
-    reloadConfig
+    reloadConfig,
+    history: (limit?: number) => historyStore.list(limit),
+    clearHistory: () => historyStore.clear()
   };
 }

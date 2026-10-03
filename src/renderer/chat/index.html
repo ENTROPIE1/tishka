@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' file: data:; connect-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Тишка — чат</title>
+    <link rel="stylesheet" href="./chat.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <span class="topbar-title">Тишка</span>
+      <button id="clear-history" type="button" class="ghost-button">Очистить историю</button>
+    </header>
+
+    <main id="feed" class="feed" aria-live="polite"></main>
+
+    <div id="status" class="status" hidden></div>
+
+    <footer class="composer">
+      <textarea
+        id="input"
+        class="composer-input"
+        rows="1"
+        placeholder="Написать Тишке…"
+        autofocus
+      ></textarea>
+      <button id="send" type="button" class="send-button">Отправить</button>
+    </footer>
+
+    <script type="module" src="./chat.ts"></script>
+  </body>
+</html>

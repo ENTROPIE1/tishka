@@ -11,9 +11,10 @@ let core: TishkaCore | undefined;
 
 function createWindow(): void {
   const window = new BrowserWindow({
-    width: 480,
-    height: 360,
+    width: 760,
+    height: 600,
     title: 'Тишка',
+    backgroundColor: '#f6f6f4',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -23,9 +24,9 @@ function createWindow(): void {
 
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   if (rendererUrl !== undefined) {
-    void window.loadURL(rendererUrl);
+    void window.loadURL(`${rendererUrl}/chat/index.html`);
   } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'));
+    void window.loadFile(join(__dirname, '../renderer/chat/index.html'));
   }
 }
 
@@ -46,9 +47,7 @@ app.whenReady().then(() => {
     now: () => new Date()
   });
 
-  registerIpc(bus, (text) => {
-    void core?.handleUserText(text).catch(() => undefined);
-  }, secrets);
+  registerIpc(bus, core, secrets);
 
   core.start().catch((error: unknown) => {
     console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);

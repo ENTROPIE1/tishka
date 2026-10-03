@@ -238,6 +238,23 @@ describe('createTishkaCore', () => {
     expect(firstIdle).toBeLessThan(secondListen);
   });
 
+  it('после handleUserText в history() есть запись пользователя и запись Тишки', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'Привет! Я Тишка.'));
+    const { core } = await setup({ fetch: fetchMock });
+
+    await core.handleUserText('расскажи о себе');
+
+    const entries = core.history();
+    const userIndex = entries.findIndex(
+      (entry) => entry.from === 'user' && entry.text === 'расскажи о себе'
+    );
+    const tishkaIndex = entries.findIndex(
+      (entry) => entry.from === 'tishka' && entry.text === 'Привет! Я Тишка.'
+    );
+    expect(userIndex).toBeGreaterThanOrEqual(0);
+    expect(tishkaIndex).toBeGreaterThan(userIndex);
+  });
+
   it('после stop() таймеры остановлены', async () => {
     const created = new Set<unknown>();
     const cleared = new Set<unknown>();
