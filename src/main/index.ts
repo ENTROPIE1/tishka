@@ -1,6 +1,8 @@
 import { app, BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import { createEventBus } from '../core/events';
+import { electronCrypto } from '../core/secrets/electron-crypto';
+import { createSecretStore } from '../core/secrets/store';
 import { registerIpc } from './ipc';
 
 const bus = createEventBus();
@@ -26,9 +28,10 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  const secrets = createSecretStore(join(app.getPath('userData'), 'secrets.bin'), electronCrypto);
   registerIpc(bus, (text) => {
     console.debug(`[tishka] user text: ${text}`);
-  });
+  }, secrets);
 
   createWindow();
 
