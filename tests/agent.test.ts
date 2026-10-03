@@ -117,7 +117,7 @@ describe('createAgent', () => {
     expect(requests[1].messages.some((m) => m.role === 'tool' && m.content.includes('эхо: раз'))).toBe(true);
   });
 
-  it('модель отвечает текстом — say не длиннее двух предложений, полный текст в show', async () => {
+  it('модель отвечает длинным текстом — say из двух предложений, полный текст в show', async () => {
     const full = 'Первое предложение. Второе предложение. Третье предложение. Четвёртое предложение.';
     const { registry } = makeRegistry();
     const { llm } = makeLlm(() => textResponse(full));
@@ -125,9 +125,19 @@ describe('createAgent', () => {
 
     const answer = await agent.handle('расскажи');
 
-    const spoken = answer.say.split(/[.!?]+/).filter((part) => part.trim().length > 0);
-    expect(spoken.length).toBeLessThanOrEqual(2);
+    expect(answer.say).toBe('Первое предложение. Второе предложение.');
     expect(answer.show).toEqual({ kind: 'text', title: 'Ответ', markdown: full });
+  });
+
+  it('модель отвечает коротким текстом — весь текст в say, панели нет', async () => {
+    const short = 'Сделал, фыр. Что-нибудь ещё?';
+    const { registry } = makeRegistry();
+    const { llm } = makeLlm(() => textResponse(short));
+    const { agent } = makeAgent(llm, registry);
+
+    const answer = await agent.handle('как дела');
+
+    expect(answer).toEqual({ say: short, mood: 'neutral' });
   });
 
   it('модель бесконечно вызывает инструменты — цикл останавливается на восьмом круге', async () => {

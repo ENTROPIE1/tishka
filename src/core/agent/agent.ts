@@ -1,8 +1,10 @@
 import type { ChatMessage, ChatRequest, ChatResponse } from '../llm/client';
 import { LlmError } from '../llm/client';
+import { stepTools } from '../skills/tools';
 import type { EventBus, Mood, Panel, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
 import type { FyrLevel } from './persona';
 import { buildSystemPrompt } from './prompt';
+import { skillGuide } from './skill-guide';
 
 export interface AgentDeps {
   llm: { chat(req: ChatRequest): Promise<ChatResponse> };
@@ -128,7 +130,11 @@ function splitSentences(text: string): string[] {
 
 function replyFromText(text: string): Reply {
   const trimmed = text.trim();
-  const say = splitSentences(trimmed).slice(0, 2).join(' ');
+  const sentences = splitSentences(trimmed);
+  if (sentences.length <= 2) {
+    return { say: trimmed, mood: 'neutral' };
+  }
+  const say = sentences.slice(0, 2).join(' ');
   return { say, show: { kind: 'text', title: 'Ответ', markdown: trimmed }, mood: 'neutral' };
 }
 
@@ -165,7 +171,8 @@ export function createAgent(deps: AgentDeps): Agent {
 
   function refreshSystemMessage(): void {
     const fyr = deps.getPersona?.().fyr ?? 'sometimes';
-    const system: ChatMessage = { role: 'system', content: buildSystemPrompt(deps.now(), fyr) };
+    const guide = skillGuide(stepTools(deps.registry));
+    const system: ChatMessage = { role: 'system', content: buildSystemPrompt(deps.now(), fyr, guide) };
     if (history[0]?.role === 'system') {
       history[0] = system;
     } else {
