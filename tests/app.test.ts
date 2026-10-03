@@ -218,6 +218,26 @@ describe('createTishkaCore', () => {
     expect(authorization).toBe('Bearer env-key-123');
   });
 
+  it('hasGatewayKey: секрет DKS_API_KEY даёт true', async () => {
+    const { core } = await setup({ secrets: { DKS_API_KEY: 'test-key' } });
+
+    await expect(core.hasGatewayKey()).resolves.toBe(true);
+  });
+
+  it('hasGatewayKey: без секрета ключ берётся из переменной окружения', async () => {
+    vi.stubEnv('DKS_API_KEY', 'env-key-123');
+    const { core } = await setup({ secrets: {} });
+
+    await expect(core.hasGatewayKey()).resolves.toBe(true);
+  });
+
+  it('hasGatewayKey: без секрета и переменной окружения false', async () => {
+    vi.stubEnv('DKS_API_KEY', '');
+    const { core } = await setup({ secrets: {} });
+
+    await expect(core.hasGatewayKey()).resolves.toBe(false);
+  });
+
   it('сервер MCP с несуществующей командой даёт статус error, остальное работает', async () => {
     const { core } = await setup({
       config: {

@@ -289,6 +289,10 @@ window.addEventListener('focus', () => {
   void refreshKeyState();
 });
 
+window.tishka.config.onChanged(() => {
+  void refreshKeyState();
+});
+
 initEvents();
 initFeed();
 initComposer();

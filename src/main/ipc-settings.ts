@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type { TishkaCore } from '../core/app';
 import type { McpStatus } from '../core/mcp/manager';
 import type { SecretStore } from '../core/types';
+import { broadcastConfigChanged } from './ipc';
 import {
   CONFIG_GET_CHANNEL,
   CONFIG_SAVE_CHANNEL,
@@ -38,9 +39,12 @@ export type {
 } from './settings-types';
 
 export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore): void {
-  ipcMain.handle(CONFIG_GET_CHANNEL, (): Promise<ConfigView> => configView(core, secrets));
+  ipcMain.handle(CONFIG_GET_CHANNEL, (): Promise<ConfigView> => configView(core));
 
-  ipcMain.handle(CONFIG_SAVE_CHANNEL, (_event, next: unknown) => saveConfigValue(core, next));
+  ipcMain.handle(CONFIG_SAVE_CHANNEL, async (_event, next: unknown) => {
+    await saveConfigValue(core, next);
+    broadcastConfigChanged();
+  });
 
   ipcMain.handle(CONNECTIONS_STATUS_CHANNEL, (): Promise<ConnectionView[]> => statusViews(core, secrets));
 

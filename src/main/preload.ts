@@ -10,6 +10,7 @@ import type {
   ConnectionView
 } from './ipc-settings';
 import {
+  CONFIG_CHANGED_CHANNEL,
   CONFIG_GET_CHANNEL,
   CONFIG_SAVE_CHANNEL,
   CONNECTIONS_PLAN_CHANNEL,
@@ -75,6 +76,15 @@ const api = {
     },
     save(config: Config): Promise<void> {
       return ipcRenderer.invoke(CONFIG_SAVE_CHANNEL, config);
+    },
+    onChanged(listener: () => void): () => void {
+      const handler = (): void => {
+        listener();
+      };
+      ipcRenderer.on(CONFIG_CHANGED_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(CONFIG_CHANGED_CHANNEL, handler);
+      };
     }
   },
   connections: {

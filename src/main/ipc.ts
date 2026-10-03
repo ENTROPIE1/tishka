@@ -2,6 +2,7 @@ import { BrowserWindow, clipboard, ipcMain, shell } from 'electron';
 import type { TishkaCore } from '../core/app';
 import type { EventBus, SecretStore, TishkaEvent } from '../core/types';
 import {
+  CONFIG_CHANGED_CHANNEL,
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
@@ -17,6 +18,13 @@ import {
 export function broadcastEvent(event: TishkaEvent): void {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(EVENT_CHANNEL, event);
+  }
+}
+
+// Сообщает окнам, что настройки или секреты изменились: они перечитывают состояние.
+export function broadcastConfigChanged(): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(CONFIG_CHANGED_CHANNEL);
   }
 }
 
@@ -70,6 +78,7 @@ export function registerIpc(bus: EventBus, core: TishkaCore, secrets: SecretStor
       return;
     }
     await secrets.set(name, value);
+    broadcastConfigChanged();
   });
 
   ipcMain.handle(SECRETS_HAS_CHANNEL, async (_event, name: unknown): Promise<boolean> => {
@@ -84,6 +93,7 @@ export function registerIpc(bus: EventBus, core: TishkaCore, secrets: SecretStor
       return;
     }
     await secrets.delete(name);
+    broadcastConfigChanged();
   });
 
   ipcMain.handle(SECRETS_NAMES_CHANNEL, async (): Promise<string[]> => {

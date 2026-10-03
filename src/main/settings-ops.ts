@@ -15,7 +15,6 @@ import type {
   ConnectionView
 } from './settings-types';
 
-const API_KEY_SECRET = 'DKS_API_KEY';
 const SECRET_REF_PATTERN = /\$\{secret:([^}]+)\}/g;
 
 function secretNamesOf(server: McpServerConfig): string[] {
@@ -126,10 +125,8 @@ function preserveStdioEnv(
   return Object.keys(env).length > 0 ? { ...server, env } : server;
 }
 
-export async function configView(core: TishkaCore, secrets: SecretStore): Promise<ConfigView> {
-  const fromEnv = process.env[API_KEY_SECRET] ?? '';
-  const gatewayKeySet = (await secrets.has(API_KEY_SECRET)) || fromEnv.length > 0;
-  return { config: core.config(), gatewayKeySet };
+export async function configView(core: TishkaCore): Promise<ConfigView> {
+  return { config: core.config(), gatewayKeySet: await core.hasGatewayKey() };
 }
 
 export function statusViews(core: TishkaCore, secrets: SecretStore): Promise<ConnectionView[]> {

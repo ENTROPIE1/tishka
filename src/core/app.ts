@@ -32,6 +32,7 @@ export interface TishkaCore {
   start(): Promise<void>;
   stop(): Promise<void>;
   handleUserText(text: string): Promise<Reply>;
+  hasGatewayKey(): Promise<boolean>;
   config(): Config;
   mcpStatus(): McpStatus[];
   reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
@@ -119,6 +120,10 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     }
     const fromEnv = process.env[API_KEY_SECRET];
     return fromEnv !== undefined && fromEnv.length > 0 ? fromEnv : undefined;
+  }
+
+  async function hasGatewayKey(): Promise<boolean> {
+    return (await gatewayKey()) !== undefined;
   }
 
   async function processUserText(text: string): Promise<Reply> {
@@ -254,6 +259,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     start,
     stop,
     handleUserText,
+    hasGatewayKey,
     config: () => config,
     mcpStatus: () => mcp?.status() ?? [],
     reloadConfig,

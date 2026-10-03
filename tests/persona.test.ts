@@ -63,6 +63,21 @@ describe('personaPrompt', () => {
     expect(prompt).toContain('три встречи');
   });
 
+  it('требует единицы времени и в подтверждениях', () => {
+    const prompt = personaPrompt('sometimes');
+    expect(prompt).toContain('напомню в девять часов тридцать минут');
+    expect(prompt).toContain('в том числе в подтверждениях');
+  });
+
+  it('запрещает произносить номера-идентификаторы как количество', () => {
+    const prompt = personaPrompt('sometimes');
+    expect(prompt).toContain('номер страницы');
+    expect(prompt).toContain('ключ задачи');
+    expect(prompt).toContain('номер версии длиннее двух цифр');
+    expect(prompt).toContain('за этой страницей');
+    expect(prompt).toContain('а сам номер покажи в show');
+  });
+
   it('содержит правило о разделении на say и show', () => {
     const prompt = personaPrompt('sometimes');
     expect(prompt).toContain('say не пересказывает show');
