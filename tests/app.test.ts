@@ -114,6 +114,7 @@ async function setup(options: { fetch?: typeof fetch; secrets?: Record<string, s
 
 afterEach(async () => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   while (pendingCleanup.length > 0) {
     const task = pendingCleanup.pop();
     if (task !== undefined) {
@@ -180,6 +181,7 @@ describe('createTishkaCore', () => {
   });
 
   it('нет ключа DKS_API_KEY — ответ с mood confused и без исключения', async () => {
+    vi.stubEnv('DKS_API_KEY', '');
     const fetchMock = vi.fn<typeof fetch>(async () => choice({ content: 'ок' }));
     const { core } = await setup({ fetch: fetchMock, secrets: {} });
 
@@ -187,6 +189,33 @@ describe('createTishkaCore', () => {
 
     expect(reply.mood).toBe('confused');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('без секрета и переменной окружения Тишка просит добавить ключ в подключениях', async () => {
+    vi.stubEnv('DKS_API_KEY', '');
+    const fetchMock = vi.fn<typeof fetch>(async () => choice({ content: 'ок' }));
+    const { core } = await setup({ fetch: fetchMock, secrets: {} });
+
+    const reply = await core.handleUserText('привет');
+
+    expect(reply.say).toBe('Ключ шлюза не задан, добавь его в подключениях');
+    expect(reply.mood).toBe('confused');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('без секрета, но с переменной окружения DKS_API_KEY ключ берётся из неё', async () => {
+    vi.stubEnv('DKS_API_KEY', 'env-key-123');
+    let authorization: string | undefined;
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      authorization = (init?.headers as Record<string, string>).Authorization;
+      return replyChoice('r1', 'Привет! Я Тишка.');
+    });
+    const { core } = await setup({ fetch: fetchMock, secrets: {} });
+
+    const reply = await core.handleUserText('привет');
+
+    expect(reply.say).toBe('Привет! Я Тишка.');
+    expect(authorization).toBe('Bearer env-key-123');
   });
 
   it('сервер MCP с несуществующей командой даёт статус error, остальное работает', async () => {

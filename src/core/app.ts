@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { createAgent } from './agent/agent';
-import { defaultConfig, loadConfig } from './config';
+import { defaultConfig, loadConfig, saveConfig as persistConfig } from './config';
 import { createHistory, type HistoryEntry } from './history';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
@@ -35,6 +35,8 @@ export interface TishkaCore {
   config(): Config;
   mcpStatus(): McpStatus[];
   reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
+  saveConfig(next: Config): Promise<void>;   // сохранить настройки и применить их
+  reconnect(name: string): Promise<McpStatus | undefined>;   // переподключить один сервер и вернуть его статус
   history(limit?: number): HistoryEntry[];
   clearHistory(): Promise<void>;
 }
@@ -42,6 +44,7 @@ export interface TishkaCore {
 const API_KEY_SECRET = 'DKS_API_KEY';
 const DRIVE_PATTERN = /^[A-Za-z]:/;
 const NOT_READY: Reply = { say: 'Я ещё не проснулся, дай мне мгновение', mood: 'confused' };
+const NO_KEY: Reply = { say: 'Ключ шлюза не задан, добавь его в подключениях', mood: 'confused' };
 const UNEXPECTED: Reply = { say: 'Что-то пошло не так, попробуй ещё раз', mood: 'confused' };
 
 function isAbsoluteArg(value: string): boolean {
@@ -108,11 +111,27 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     return result;
   }
 
+  // Ключ шлюза: секрет DKS_API_KEY, при его отсутствии — переменная окружения.
+  async function gatewayKey(): Promise<string | undefined> {
+    const stored = await deps.secrets.get(API_KEY_SECRET);
+    if (stored !== undefined && stored.length > 0) {
+      return stored;
+    }
+    const fromEnv = process.env[API_KEY_SECRET];
+    return fromEnv !== undefined && fromEnv.length > 0 ? fromEnv : undefined;
+  }
+
   async function processUserText(text: string): Promise<Reply> {
     deps.events.emit({ type: 'listen.end', text });
     let reply: Reply;
     try {
-      reply = router === undefined ? NOT_READY : await router.handle(text);
+      if (router === undefined) {
+        reply = NOT_READY;
+      } else if ((await gatewayKey()) === undefined) {
+        reply = NO_KEY;
+      } else {
+        reply = await router.handle(text);
+      }
     } catch (error) {
       const raw = error instanceof Error ? error.message : String(error);
       const message = await scrubMessage(raw);
@@ -153,7 +172,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
 
     const llm = createLlmClient({
       baseUrl: config.llm.baseUrl,
-      getApiKey: () => deps.secrets.get(API_KEY_SECRET),
+      getApiKey: gatewayKey,
       fetch: deps.fetch
     });
     const runner = createSkillRunner({
@@ -213,6 +232,24 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     }
   }
 
+  async function saveConfig(next: Config): Promise<void> {
+    await persistConfig(deps.dataDir, next);
+    await reloadConfig();
+  }
+
+  async function reconnect(name: string): Promise<McpStatus | undefined> {
+    if (mcp === undefined) {
+      return undefined;
+    }
+    const server = config.mcpServers.find((item) => item.name === name);
+    if (server === undefined) {
+      return undefined;
+    }
+    const status = await mcp.reconnect(prepareMcpServer(server, deps.appRoot));
+    await router?.refreshSkills();
+    return status;
+  }
+
   return {
     start,
     stop,
@@ -220,6 +257,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     config: () => config,
     mcpStatus: () => mcp?.status() ?? [],
     reloadConfig,
+    saveConfig,
+    reconnect,
     history: (limit?: number) => historyStore.list(limit),
     clearHistory: () => historyStore.clear()
   };
