@@ -1,6 +1,7 @@
 import type { ChatMessage, ChatRequest, ChatResponse } from '../llm/client';
 import { LlmError } from '../llm/client';
 import type { EventBus, Mood, Panel, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
+import type { FyrLevel } from './persona';
 import { buildSystemPrompt } from './prompt';
 
 export interface AgentDeps {
@@ -8,6 +9,7 @@ export interface AgentDeps {
   registry: ToolRegistry;
   events: EventBus;
   getModel: () => string;
+  getPersona?: () => { fyr: FyrLevel };
   now: () => Date;
 }
 
@@ -23,14 +25,66 @@ const MAX_TOOL_CONTENT = 6000;
 const TRUNCATED_MARK = '\n[обрезано]';
 const REPLY_TOOL_NAME = 'reply';
 
+const panelSchema = {
+  description: 'Панель с подробностями, ровно один из трёх видов',
+  oneOf: [
+    {
+      type: 'object',
+      description: 'Список',
+      properties: {
+        kind: { type: 'string', enum: ['list'] },
+        title: { type: 'string', description: 'Заголовок списка' },
+        items: {
+          type: 'array',
+          description: 'Элементы списка',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              subtitle: { type: 'string' },
+              url: { type: 'string' }
+            },
+            required: ['title'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['kind', 'title', 'items'],
+      additionalProperties: false
+    },
+    {
+      type: 'object',
+      description: 'Текст в markdown',
+      properties: {
+        kind: { type: 'string', enum: ['text'] },
+        title: { type: 'string', description: 'Заголовок' },
+        markdown: { type: 'string', description: 'Содержание в markdown' }
+      },
+      required: ['kind', 'title', 'markdown'],
+      additionalProperties: false
+    },
+    {
+      type: 'object',
+      description: 'Картинка',
+      properties: {
+        kind: { type: 'string', enum: ['image'] },
+        title: { type: 'string', description: 'Заголовок' },
+        path: { type: 'string', description: 'Путь к файлу картинки' }
+      },
+      required: ['kind', 'title', 'path'],
+      additionalProperties: false
+    }
+  ]
+};
+
 const replyTool: ToolDef = {
   name: REPLY_TOOL_NAME,
   description: 'Завершает работу и передаёт пользователю итоговый ответ.',
   inputSchema: {
     type: 'object',
     properties: {
-      say: { type: 'string', description: 'Короткий ответ вслух, до двух предложений, без цифр и латиницы' },
-      show: { type: 'object', description: 'Панель с подробностями: список, текст или картинка' },
+      say: { type: 'string', description: 'Короткая фраза вслух' },
+      show: panelSchema,
       mood: { type: 'string', enum: ['neutral', 'happy', 'confused'] }
     },
     required: ['say'],
@@ -110,7 +164,8 @@ export function createAgent(deps: AgentDeps): Agent {
   const history: ChatMessage[] = [];
 
   function refreshSystemMessage(): void {
-    const system: ChatMessage = { role: 'system', content: buildSystemPrompt(deps.now()) };
+    const fyr = deps.getPersona?.().fyr ?? 'sometimes';
+    const system: ChatMessage = { role: 'system', content: buildSystemPrompt(deps.now(), fyr) };
     if (history[0]?.role === 'system') {
       history[0] = system;
     } else {

@@ -5,6 +5,7 @@ import type { Config, McpServerConfig } from './types';
 export const CONFIG_FILE = 'config.json';
 
 type TtsEngine = Config['voice']['ttsEngine'];
+type FyrLevel = Config['persona']['fyr'];
 
 export function defaultConfig(): Config {
   return {
@@ -20,6 +21,7 @@ export function defaultConfig(): Config {
       ttsEngine: 'none'
     },
     mcpServers: [],
+    persona: { fyr: 'sometimes' },
     petMode: false
   };
 }
@@ -45,6 +47,10 @@ function pickStringArray(value: unknown, fallback: string[]): string[] {
 
 function pickTtsEngine(value: unknown, fallback: TtsEngine): TtsEngine {
   return value === 'piper' || value === 'silero' || value === 'none' ? value : fallback;
+}
+
+function pickFyr(value: unknown, fallback: FyrLevel): FyrLevel {
+  return value === 'off' || value === 'sometimes' || value === 'often' ? value : fallback;
 }
 
 function optionalStringRecord(value: unknown): Record<string, string> | undefined {
@@ -115,6 +121,7 @@ export function mergeConfig(value: unknown): Config {
   }
   const llm = isRecord(value.llm) ? value.llm : {};
   const voice = isRecord(value.voice) ? value.voice : {};
+  const persona = isRecord(value.persona) ? value.persona : {};
   return {
     llm: {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
@@ -128,6 +135,7 @@ export function mergeConfig(value: unknown): Config {
       ttsEngine: pickTtsEngine(voice.ttsEngine, defaults.voice.ttsEngine)
     },
     mcpServers: parseMcpServers(value.mcpServers),
+    persona: { fyr: pickFyr(persona.fyr, defaults.persona.fyr) },
     petMode: pickBoolean(value.petMode, defaults.petMode)
   };
 }
