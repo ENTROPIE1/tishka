@@ -22,6 +22,8 @@ export interface ExchangeClient {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const NO_ERROR = 'NoError';
+const FAULT_LIMIT = 300;
+const SECRET_PLACEHOLDER = '[скрыто]';
 
 const XML_PARSER = new XMLParser({ removeNSPrefix: true });
 
@@ -41,7 +43,10 @@ export function createExchangeClient(opts: {
         { user: opts.user, password: opts.password },
         post
       );
-      const message = readResponseMessage(response);
+      const message = readResponseMessage(response, {
+        user: opts.user,
+        password: opts.password
+      });
       return asArray(message.RootFolder?.Items?.CalendarItem)
         .map(toMeeting)
         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
@@ -63,12 +68,15 @@ async function postWithTimeout(
   }
 }
 
-function readResponseMessage(response: { status: number; body: string }): RawResponseMessage {
+function readResponseMessage(
+  response: { status: number; body: string },
+  auth: { user: string; password: string }
+): RawResponseMessage {
   if (response.status === 401) {
     throw new Error('Exchange отклонил логин или пароль');
   }
   if (response.status !== 200) {
-    throw new Error(`Exchange вернул статус ${response.status}`);
+    throw new Error(describeStatusError(response, auth));
   }
   let parsed: RawEnvelope;
   try {
@@ -87,6 +95,57 @@ function readResponseMessage(response: { status: number; body: string }): RawRes
     throw new Error(`Exchange вернул код ошибки: ${code}`);
   }
   return message;
+}
+
+function describeStatusError(
+  response: { status: number; body: string },
+  auth: { user: string; password: string }
+): string {
+  const fault = readFault(response.body);
+  const parts: string[] = [];
+  if (fault.text !== '') {
+    parts.push(truncate(sanitizeSecrets(fault.text, auth)));
+  }
+  if (fault.responseCode !== '') {
+    parts.push(`ResponseCode: ${truncate(sanitizeSecrets(fault.responseCode, auth))}`);
+  }
+  if (parts.length === 0) {
+    return `Exchange вернул статус ${response.status}`;
+  }
+  return `Exchange вернул статус ${response.status}: ${parts.join('; ')}`;
+}
+
+function readFault(body: string): { text: string; responseCode: string } {
+  let parsed: RawFaultEnvelope;
+  try {
+    parsed = XML_PARSER.parse(body) as RawFaultEnvelope;
+  } catch {
+    return { text: '', responseCode: '' };
+  }
+  const fault = parsed.Envelope?.Body?.Fault;
+  if (fault === undefined) {
+    return { text: '', responseCode: '' };
+  }
+  return {
+    text: asText(fault.faultstring) || asText(fault.Reason?.Text),
+    responseCode: asText(fault.detail?.ResponseCode) || asText(fault.Detail?.ResponseCode)
+  };
+}
+
+// сначала убираем секреты: обрезка не должна оставить часть пароля в тексте
+function sanitizeSecrets(text: string, auth: { user: string; password: string }): string {
+  let result = text;
+  if (auth.password.length > 0) {
+    result = result.split(auth.password).join(SECRET_PLACEHOLDER);
+  }
+  if (auth.user.length > 0) {
+    result = result.split(auth.user).join(SECRET_PLACEHOLDER);
+  }
+  return result;
+}
+
+function truncate(text: string): string {
+  return text.slice(0, FAULT_LIMIT);
 }
 
 function buildFindItemSoap(from: Date, to: Date): string {
@@ -108,9 +167,9 @@ function buildFindItemSoap(from: Date, to: Date): string {
         </t:AdditionalProperties>
       </m:ItemShape>
       <m:CalendarView StartDate="${from.toISOString()}" EndDate="${to.toISOString()}" />
-      <m:ParentFolderId>
+      <m:ParentFolderIds>
         <t:DistinguishedFolderId Id="calendar" />
-      </m:ParentFolderId>
+      </m:ParentFolderIds>
     </m:FindItem>
   </soap:Body>
 </soap:Envelope>`;
@@ -243,4 +302,15 @@ interface RawEnvelope {
       };
     };
   };
+}
+
+interface RawFault {
+  faultstring?: unknown;
+  Reason?: { Text?: unknown };
+  detail?: { ResponseCode?: unknown };
+  Detail?: { ResponseCode?: unknown };
+}
+
+interface RawFaultEnvelope {
+  Envelope?: { Body?: { Fault?: RawFault } };
 }

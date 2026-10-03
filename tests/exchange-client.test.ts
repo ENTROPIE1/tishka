@@ -72,6 +72,23 @@ function findItemErrorResponse(code: string): string {
 </s:Envelope>`;
 }
 
+function soapFault(params: { faultstring: string; responseCode?: string }): string {
+  const detail =
+    params.responseCode === undefined
+      ? ''
+      : `<e:ResponseCode>${params.responseCode}</e:ResponseCode><e:Message>${params.faultstring}</e:Message>`;
+  return `<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:e="http://schemas.microsoft.com/exchange/services/2006/errors">
+  <s:Body>
+    <s:Fault>
+      <faultcode>s:Sender</faultcode>
+      <faultstring xml:lang="ru-RU">${params.faultstring}</faultstring>
+      <detail>${detail}</detail>
+    </s:Fault>
+  </s:Body>
+</s:Envelope>`;
+}
+
 function calendarItem(params: {
   subject: string;
   start: string;
@@ -213,6 +230,19 @@ describe('createExchangeClient', () => {
     expect(calls[0].soapBody).toContain('FieldURI="calendar:Organizer"');
   });
 
+  it('запрос содержит m:ParentFolderIds, а не одиночный m:ParentFolderId', async () => {
+    const { client, calls } = setup(findItemResponse(''));
+
+    await client.listMeetings(from, to);
+
+    const body = calls[0].soapBody;
+    expect(body).toContain('<m:ParentFolderIds>');
+    expect(body).toContain('<t:DistinguishedFolderId Id="calendar" />');
+    expect(body).not.toMatch(/m:ParentFolderId(?!s)/);
+    expect(body.indexOf('<m:ItemShape>')).toBeLessThan(body.indexOf('<m:CalendarView'));
+    expect(body.indexOf('<m:CalendarView')).toBeLessThan(body.indexOf('<m:ParentFolderIds>'));
+  });
+
   it('401 превращается в ошибку про логин и пароль, пароль не утекает', async () => {
     const { client } = setup('', 401);
 
@@ -241,6 +271,55 @@ describe('createExchangeClient', () => {
 
     expect(error.message).toBe('Почтовый сервер недоступен, проверьте VPN');
     expect(error.message).not.toContain(PASSWORD);
+  });
+
+  it('статус 500 с SOAP Fault раскрывает faultstring и ResponseCode, но не пароль и логин', async () => {
+    const { client } = setup(
+      soapFault({
+        faultstring:
+          "The request failed schema validation: The element 'FindItem' has an invalid child element 'ParentFolderId'.",
+        responseCode: 'ErrorSchemaValidation'
+      }),
+      500
+    );
+
+    const error = await catchError(client.listMeetings(from, to));
+
+    expect(error.message).toBe(
+      "Exchange вернул статус 500: The request failed schema validation: The element 'FindItem' has an invalid child element 'ParentFolderId'.; ResponseCode: ErrorSchemaValidation"
+    );
+    expect(error.message).not.toContain(PASSWORD);
+    expect(error.message).not.toContain(USER);
+  });
+
+  it('длинный faultstring в статусе 500 обрезается до 300 знаков', async () => {
+    const { client } = setup(soapFault({ faultstring: 'X'.repeat(500) }), 500);
+
+    const error = await catchError(client.listMeetings(from, to));
+
+    expect(error.message).toContain('X'.repeat(300));
+    expect(error.message).not.toContain('X'.repeat(301));
+  });
+
+  it('пароль и логин из тела SOAP Fault скрываются', async () => {
+    const { client } = setup(
+      soapFault({ faultstring: `Сбой проверки для ${USER} с паролем ${PASSWORD}` }),
+      500
+    );
+
+    const error = await catchError(client.listMeetings(from, to));
+
+    expect(error.message).toContain('[скрыто]');
+    expect(error.message).not.toContain(PASSWORD);
+    expect(error.message).not.toContain(USER);
+  });
+
+  it('статус 500 без SOAP Fault даёт сообщение только со статусом', async () => {
+    const { client } = setup('<html><body>Internal Server Error</body></html>', 500);
+
+    const error = await catchError(client.listMeetings(from, to));
+
+    expect(error.message).toBe('Exchange вернул статус 500');
   });
 
   it('splitUser выделяет домен из DOMAIN\\user', () => {
