@@ -8,6 +8,8 @@ export interface VoiceControls {
   wakeWords: HTMLInputElement;
   talkTimeout: HTMLInputElement;
   sensitivity: HTMLSelectElement;
+  mode: HTMLSelectElement;
+  sttUrl: HTMLInputElement;
   exe: HTMLInputElement;
   model: HTMLInputElement;
 }
@@ -38,10 +40,12 @@ export async function saveVoice(controls: VoiceControls): Promise<void> {
       wakeWords: parseWords(controls.wakeWords.value, view.config.voice.wakeWords),
       talkTimeoutSec: parseTimeout(controls.talkTimeout.value, view.config.voice.talkTimeoutSec),
       sensitivity: controls.sensitivity.value as VadSensitivity,
+      sttUrl: controls.sttUrl.value.trim(),
       stt: {
         ...view.config.voice.stt,
         exe: controls.exe.value.trim(),
-        model: controls.model.value.trim()
+        model: controls.model.value.trim(),
+        mode: controls.mode.value === 'remote' ? 'remote' : 'local'
       }
     }
   };

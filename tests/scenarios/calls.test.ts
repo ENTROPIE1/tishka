@@ -36,6 +36,8 @@ async function expectAppearance(h: Scenario, call: () => void): Promise<void> {
   expect(h.observations.label()).toBe('слушает');
   expect(h.observations.recording()).toBe(true);
   expect(h.observations.micOn()).toBe(true);
+  // приветствие кончилось: облачко скрыто, запись видна по значку и подписи
+  expect(h.observations.bubble()).toBe('');
   expect(h.observations.composerVisible()).toBe(true);
   expect(h.observations.errors()).toEqual([]);
 }

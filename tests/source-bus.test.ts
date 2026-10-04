@@ -48,4 +48,30 @@ describe('source bus', () => {
     bus.emit({ type: 'idle' });
     expect(events).toEqual(['idle']);
   });
+
+  // Найденный дефект (Н14): озвучка реплики несёт её источник, а не текущее
+  // значение шины.
+  it('событие от имени источника видно слушателям, после — снова ёж', () => {
+    const bus = createSourceBus();
+    const seen: string[] = [];
+    bus.on((event) => {
+      if (event.type === 'speak.start') {
+        seen.push(bus.source());
+      }
+    });
+    bus.emitAs('chat', { type: 'speak.start', text: 'Готово' });
+    expect(seen).toEqual(['chat']);
+    expect(bus.source()).toBe('pet');
+  });
+
+  it('событие от имени другого источника не сбивает источник задачи', async () => {
+    const bus = createSourceBus();
+    let inside: string | undefined;
+    await bus.run('chat', async () => {
+      bus.emitAs('pet', { type: 'idle' });
+      inside = bus.source();
+    });
+    expect(inside).toBe('chat');
+    expect(bus.source()).toBe('pet');
+  });
 });

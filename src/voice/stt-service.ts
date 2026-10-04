@@ -14,7 +14,7 @@ import {
 } from './stt-http';
 
 export type SttStatus = 'off' | 'starting' | 'ready' | 'error';
-export type { TranscribeResult } from './stt-http';
+export type { SttCheckView, TranscribeResult } from './stt-http';
 
 export interface SttServiceOptions {
   getConfig: () => Config['voice'];
@@ -36,6 +36,7 @@ const OUTPUT_LIMIT = 2000;
 const CYRILLIC_ERROR = 'Путь к службе распознавания должен быть без кириллицы';
 export const START_CANCELLED = 'Запуск отменён';
 const NOT_CONFIGURED = 'Распознавание речи не настроено';
+export const REMOTE_UNREACHABLE = 'Служба распознавания не отвечает по адресу';
 
 export function createSttService(options: SttServiceOptions): SttService {
   const spawnFn = options.spawn ?? spawn;
@@ -104,6 +105,18 @@ export function createSttService(options: SttServiceOptions): SttService {
     const exe = config.stt.exe.trim();
     const model = config.stt.model.trim();
     const run = runs.begin();
+
+    // Готовая служба по адресу: состояние определяет проверка, чужой процесс
+    // не запускаем и не останавливаем.
+    if (config.stt.mode === 'remote') {
+      const alive = await probe(fetchFn, config.sttUrl);
+      if (run.cancelled) {
+        return { ok: false, error: START_CANCELLED };
+      }
+      state = alive ? 'ready' : 'off';
+      mark?.('stt.ready', { ok: alive, probe: true });
+      return alive ? { ok: true } : { ok: false, error: REMOTE_UNREACHABLE };
+    }
 
     if (exe === '') {
       const alive = await probe(fetchFn, config.sttUrl);

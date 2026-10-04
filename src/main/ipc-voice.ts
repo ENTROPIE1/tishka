@@ -4,13 +4,15 @@ import {
   VOICE_APPLY_CHANNEL,
   VOICE_CALIBRATION_CHANNEL,
   VOICE_CHECK_CHANNEL,
+  VOICE_CHECK_URL_CHANNEL,
   VOICE_DICTATE_CHANNEL,
   VOICE_STATUS_CHANNEL
 } from './ipc-channels';
-import type { VoiceStateView } from './settings-types';
+import type { SttCheckView, VoiceStateView } from './settings-types';
 
 export interface VoiceIpcDeps {
   stt: SttService;
+  probe(url: string): Promise<SttCheckView>;
   reloadHotkey(hotkey: string): void;
   setCalibration(active: boolean): void;
 }
@@ -59,6 +61,14 @@ export function registerVoiceIpc(deps: VoiceIpcDeps): void {
     const promise = check();
     current = promise;
     return promise;
+  });
+
+  // «Проверить» рядом с адресом готовой службы: отвечает ли и за сколько.
+  ipcMain.handle(VOICE_CHECK_URL_CHANNEL, (_event, url: unknown): Promise<SttCheckView> => {
+    if (typeof url !== 'string' || url.trim() === '') {
+      return Promise.resolve({ ok: false, ms: 0, error: 'Адрес службы не задан' });
+    }
+    return deps.probe(url.trim());
   });
 
   ipcMain.handle(VOICE_APPLY_CHANNEL, (_event, hotkey: unknown) => {

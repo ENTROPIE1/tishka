@@ -35,7 +35,7 @@ describe('defaultConfig', () => {
     expect(config.voice.hotkey).toBe('Control+Alt+Space');
     expect(config.voice.wakeWords).toEqual(['тишка']);
     expect(config.voice.sttUrl).toBe('http://127.0.0.1:8178');
-    expect(config.voice.stt).toEqual({ exe: '', model: '', audioCtx: 768, threads: 4 });
+    expect(config.voice.stt).toEqual({ exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' });
     expect(config.voice.tts).toEqual({ enabled: false, url: 'http://127.0.0.1:8179', volume: 1 });
     expect(config.mcpServers).toEqual([]);
     expect(config.petMode).toBe(false);
@@ -86,6 +86,41 @@ describe('loadConfig', () => {
     mockedReadFile.mockResolvedValueOnce(JSON.stringify({ llm: { api: 'responses' } }) as never);
     const config = await loadConfig(dir);
     expect(config.llm.api).toBe('responses');
+  });
+
+  it('старые настройки без mode: заполненные пути — местная служба', async () => {
+    mockedReadFile.mockResolvedValueOnce(
+      JSON.stringify({ voice: { stt: { exe: 'C:\\w\\whisper.exe', model: 'C:\\w\\model.bin' } } }) as never
+    );
+    const config = await loadConfig(dir);
+    expect(config.voice.stt.mode).toBe('local');
+  });
+
+  it('старые настройки без mode: пустые пути — готовая служба по адресу', async () => {
+    mockedReadFile.mockResolvedValueOnce(
+      JSON.stringify({ voice: { sttUrl: 'http://127.0.0.1:8178' } }) as never
+    );
+    const config = await loadConfig(dir);
+    expect(config.voice.stt.mode).toBe('remote');
+  });
+
+  it('новое поле mode сохраняется, заполненные пути его не перебивают', async () => {
+    mockedReadFile.mockResolvedValueOnce(
+      JSON.stringify({
+        voice: { stt: { exe: 'C:\\w\\whisper.exe', model: 'C:\\w\\model.bin', mode: 'remote' } }
+      }) as never
+    );
+    const config = await loadConfig(dir);
+    expect(config.voice.stt.mode).toBe('remote');
+    expect(config.voice.stt.exe).toBe('C:\\w\\whisper.exe');
+  });
+
+  it('неизвестное значение mode выводится из путей', async () => {
+    mockedReadFile.mockResolvedValueOnce(
+      JSON.stringify({ voice: { stt: { exe: 'C:\\w\\whisper.exe', model: 'C:\\w\\model.bin', mode: 'cloud' } } }) as never
+    );
+    const config = await loadConfig(dir);
+    expect(config.voice.stt.mode).toBe('local');
   });
 
   it('читает tts и игнорирует старое поле ttsEngine', async () => {    mockedReadFile.mockResolvedValueOnce(
