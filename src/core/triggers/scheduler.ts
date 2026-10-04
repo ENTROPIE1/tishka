@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { EventBus, Skill } from '../types';
+import { runTriggered } from '../idle';
 import type { RunResult, SkillRunOptions } from '../skills/runner';
 import { cronMatches, nextCronOccurrence, parseCron, type CronSpec } from './cron';
 import { skillState, type createTriggerState, type Reminder, type TriggerState } from './state';
@@ -45,10 +46,12 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   let timer: ReturnType<typeof setInterval> | undefined;
   const firedMinutes = new Set<string>();
 
-  function emitReminder(reminder: Reminder): void {
-    deps.events.emit({ type: 'wake', source: 'trigger' });
-    deps.events.emit({ type: 'notify', title: reminder.text });
-    deps.events.emit({ type: 'reply', reply: { say: reminder.text } });
+  function emitReminder(reminder: Reminder): Promise<void> {
+    return runTriggered(deps.events, async () => {
+      deps.events.emit({ type: 'wake', source: 'trigger' });
+      deps.events.emit({ type: 'notify', title: reminder.text });
+      deps.events.emit({ type: 'reply', reply: { say: reminder.text } });
+    });
   }
 
   function setNext(state: TriggerState, id: string, value: string | undefined): boolean {
@@ -63,24 +66,26 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     return true;
   }
 
-  async function runSkill(skill: Skill, state: TriggerState): Promise<void> {
-    deps.events.emit({ type: 'wake', source: 'trigger' });
-    const runState = skillState(state, skill.id);
-    runState.lastRunAt = deps.now().toISOString();
-    runState.runCount += 1;
-    try {
-      const result = await deps.runner.run(skill, undefined, { background: true });
-      runState.lastResult = result.ok ? 'ok' : result.error ?? `Навык не выполнен: ${skill.name}`;
-      if (result.ok) {
-        deps.events.emit({ type: 'notify', title: skill.name, skillId: skill.id });
-      } else {
-        deps.events.emit({ type: 'error', message: result.error ?? `Навык не выполнен: ${skill.name}` });
+  function runSkill(skill: Skill, state: TriggerState): Promise<void> {
+    return runTriggered(deps.events, async () => {
+      deps.events.emit({ type: 'wake', source: 'trigger' });
+      const runState = skillState(state, skill.id);
+      runState.lastRunAt = deps.now().toISOString();
+      runState.runCount += 1;
+      try {
+        const result = await deps.runner.run(skill, undefined, { background: true });
+        runState.lastResult = result.ok ? 'ok' : result.error ?? `Навык не выполнен: ${skill.name}`;
+        if (result.ok) {
+          deps.events.emit({ type: 'notify', title: skill.name, skillId: skill.id });
+        } else {
+          deps.events.emit({ type: 'error', message: result.error ?? `Навык не выполнен: ${skill.name}` });
+        }
+      } catch (error) {
+        const message = errorMessage(error);
+        runState.lastResult = message;
+        deps.events.emit({ type: 'error', message });
       }
-    } catch (error) {
-      const message = errorMessage(error);
-      runState.lastResult = message;
-      deps.events.emit({ type: 'error', message });
-    }
+    });
   }
 
   async function processState(state: TriggerState): Promise<void> {
@@ -108,7 +113,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         changed = true;
         continue;
       }
-      emitReminder(reminder);
+      await emitReminder(reminder);
       reminder.done = true;
       changed = true;
     }

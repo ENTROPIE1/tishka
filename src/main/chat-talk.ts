@@ -79,6 +79,9 @@ export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
   });
 
   ipcMain.on(CHAT_TALK_PHRASE_CHANNEL, (_event, value: unknown) => {
+    if (paused) {
+      return;
+    }
     const data = bytes(value);
     if (data !== undefined) {
       deps.flow.handlePhrase(data);

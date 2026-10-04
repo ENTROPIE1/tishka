@@ -1,4 +1,5 @@
 import type { EventBus, Skill, ToolResult, ToolRegistry } from '../types';
+import { runTriggered } from '../idle';
 import type { RunResult } from '../skills/runner';
 import { renderTemplate, type TemplateContext } from '../skills/template';
 import { skillState, type createTriggerState, type TriggerState } from './state';
@@ -188,25 +189,27 @@ export function createWatcher(deps: WatcherDeps): Watcher {
     entry.last = value;
     state.watches[skill.id] = entry;
 
-    deps.events.emit({ type: 'wake', source: 'trigger' });
-    const runState = skillState(state, skill.id);
-    try {
-      const run = await deps.runner.run(skill, { previous, current: value });
-      runState.lastRunAt = deps.now().toISOString();
-      runState.runCount += 1;
-      runState.lastResult = run.ok ? 'ok' : run.error ?? `Навык не выполнен: ${skill.name}`;
-      if (run.ok) {
-        deps.events.emit({ type: 'notify', title: skill.name, skillId: skill.id });
-      } else {
-        deps.events.emit({ type: 'error', message: run.error ?? `Навык не выполнен: ${skill.name}` });
+    await runTriggered(deps.events, async () => {
+      deps.events.emit({ type: 'wake', source: 'trigger' });
+      const runState = skillState(state, skill.id);
+      try {
+        const run = await deps.runner.run(skill, { previous, current: value });
+        runState.lastRunAt = deps.now().toISOString();
+        runState.runCount += 1;
+        runState.lastResult = run.ok ? 'ok' : run.error ?? `Навык не выполнен: ${skill.name}`;
+        if (run.ok) {
+          deps.events.emit({ type: 'notify', title: skill.name, skillId: skill.id });
+        } else {
+          deps.events.emit({ type: 'error', message: run.error ?? `Навык не выполнен: ${skill.name}` });
+        }
+      } catch (error) {
+        const message = errorMessage(error);
+        runState.lastRunAt = deps.now().toISOString();
+        runState.runCount += 1;
+        runState.lastResult = message;
+        deps.events.emit({ type: 'error', message });
       }
-    } catch (error) {
-      const message = errorMessage(error);
-      runState.lastRunAt = deps.now().toISOString();
-      runState.runCount += 1;
-      runState.lastResult = message;
-      deps.events.emit({ type: 'error', message });
-    }
+    });
 
     return { changed: true, value, touched: true };
   }

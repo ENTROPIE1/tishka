@@ -1,4 +1,5 @@
 import type { EventBus, Panel } from '../types';
+import { runTriggered } from '../idle';
 import type { MemoryStore } from './store';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,9 +47,11 @@ export function createMemoryReviewer(deps: MemoryReviewerDeps): MemoryReviewer {
       return;
     }
     await deps.store.setLastReview(now.toISOString());
-    deps.events.emit({ type: 'wake', source: 'trigger' });
-    deps.events.emit({ type: 'notify', title: REVIEW_SAY });
-    deps.events.emit({ type: 'reply', reply: { say: REVIEW_SAY, show: reviewPanel(deps.store) } });
+    await runTriggered(deps.events, async () => {
+      deps.events.emit({ type: 'wake', source: 'trigger' });
+      deps.events.emit({ type: 'notify', title: REVIEW_SAY });
+      deps.events.emit({ type: 'reply', reply: { say: REVIEW_SAY, show: reviewPanel(deps.store) } });
+    });
   }
 
   async function guardedTick(): Promise<void> {

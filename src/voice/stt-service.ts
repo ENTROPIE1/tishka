@@ -6,13 +6,13 @@ import { delayOrWake, reasonFromExit, RunController, type RunToken } from './stt
 import {
   hasForeignChars,
   probe,
+  PROBE_TIMEOUT_MS,
   servicePort,
   transcribeHttp,
   type TranscribeResult
 } from './stt-http';
 
 export type SttStatus = 'off' | 'starting' | 'ready' | 'error';
-
 export type { TranscribeResult } from './stt-http';
 
 export interface SttServiceOptions {
@@ -34,7 +34,7 @@ const READY_TIMEOUT_MS = 30000;
 const POLL_MS = 300;
 const OUTPUT_LIMIT = 2000;
 const CYRILLIC_ERROR = 'Путь к службе распознавания должен быть без кириллицы';
-const CANCELLED = 'Запуск отменён';
+export const START_CANCELLED = 'Запуск отменён';
 const NOT_CONFIGURED = 'Распознавание речи не настроено';
 
 export function createSttService(options: SttServiceOptions): SttService {
@@ -100,21 +100,21 @@ export function createSttService(options: SttServiceOptions): SttService {
   }
   async function waitReady(run: RunToken, url: string): Promise<'ready' | 'cancelled' | 'failed' | 'timeout'> {
     const deadline = Date.now() + READY_TIMEOUT_MS;
-    while (true) {
-      if (run.cancelled) {
-        return 'cancelled';
-      }
-      if (run.failure !== undefined) {
-        return 'failed';
-      }
-      if (await probe(fetchFn, url)) {
-        return 'ready';
-      }
-      if (Date.now() >= deadline) {
+    while (run.failure === undefined && !run.cancelled) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
         return 'timeout';
       }
-      await delayOrWake(run, POLL_MS);
+      if (await probe(fetchFn, url, Math.min(PROBE_TIMEOUT_MS, remaining))) {
+        return 'ready';
+      }
+      const left = deadline - Date.now();
+      if (left <= 0) {
+        return 'timeout';
+      }
+      await delayOrWake(run, Math.min(POLL_MS, left));
     }
+    return run.cancelled ? 'cancelled' : 'failed';
   }
   async function start(): Promise<{ ok: boolean; error?: string }> {
     const config = options.getConfig();
@@ -125,7 +125,7 @@ export function createSttService(options: SttServiceOptions): SttService {
     if (exe === '') {
       const alive = await probe(fetchFn, config.sttUrl);
       if (run.cancelled) {
-        return { ok: false, error: CANCELLED };
+        return { ok: false, error: START_CANCELLED };
       }
       state = alive ? 'ready' : 'off';
       return alive ? { ok: true } : { ok: false, error: NOT_CONFIGURED };
@@ -138,13 +138,13 @@ export function createSttService(options: SttServiceOptions): SttService {
 
     if (await probe(fetchFn, config.sttUrl)) {
       if (run.cancelled) {
-        return { ok: false, error: CANCELLED };
+        return { ok: false, error: START_CANCELLED };
       }
       state = 'ready';
       return { ok: true };
     }
     if (run.cancelled) {
-      return { ok: false, error: CANCELLED };
+      return { ok: false, error: START_CANCELLED };
     }
 
     if (!fileExists(exe)) {
@@ -171,7 +171,7 @@ export function createSttService(options: SttServiceOptions): SttService {
     }
     if (outcome === 'cancelled') {
       killOwnProcess(run.id);
-      return { ok: false, error: CANCELLED };
+      return { ok: false, error: START_CANCELLED };
     }
     killOwnProcess(run.id);
     state = 'error';

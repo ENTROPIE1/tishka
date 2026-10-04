@@ -179,6 +179,7 @@ describe('createWatcher', () => {
     expect(h.runs[0].inputs).toEqual({ previous: 'one', current: 'two' });
     expect(h.events).toContainEqual({ type: 'wake', source: 'trigger' });
     expect(h.events).toContainEqual({ type: 'notify', title: 'Следи', skillId: 'watch-skill' });
+    expect(h.events.at(-1)).toEqual({ type: 'idle' });
   });
 
   it('field берёт поле из data по пути через точку, без field сравнивается content', async () => {

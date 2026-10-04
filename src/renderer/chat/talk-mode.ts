@@ -41,6 +41,7 @@ export function createTalkMode(
 
   let listener: PhraseListener | undefined;
   let conversation = false;
+  let active = false;
   let sensitivity: VadSensitivity = 'normal';
   let threshold: number | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -71,13 +72,13 @@ export function createTalkMode(
 
   function onListenerError(): void {
     stopListener();
-    if (conversation) {
+    if (conversation && active) {
       scheduleRetry();
     }
   }
 
   function startListener(): void {
-    if (listener !== undefined || !conversation) {
+    if (listener !== undefined || !conversation || !active) {
       return;
     }
     clearRetry();
@@ -107,13 +108,11 @@ export function createTalkMode(
     elements.label.textContent = state.conversation ? LISTEN_LABEL : '';
     sensitivity = state.sensitivity;
     threshold = state.threshold ?? undefined;
-    if (state.conversation) {
-      conversation = true;
-      if (listener === undefined) {
-        startListener();
-      }
+    conversation = state.conversation;
+    active = state.active;
+    if (conversation && active) {
+      startListener();
     } else {
-      conversation = false;
       stopListener();
     }
   }

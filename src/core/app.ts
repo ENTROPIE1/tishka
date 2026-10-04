@@ -5,6 +5,7 @@ import { createConversationClock } from './conversation';
 import { createHistory, type HistoryEntry } from './history';
 import { registerHistoryTools } from './history-tool';
 import { checkGateway as runGatewayCheck, type GatewayCheckResult } from './llm/check';
+import { runTriggered } from './idle';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
 import { createMemoryReviewer, type MemoryReviewer } from './memory/review';
@@ -471,15 +472,18 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     },
 
     async run(id: string, inputs?: Record<string, unknown>): Promise<Reply> {
-      if (skillRunner === undefined || skillStore === undefined) {
+      const runner = skillRunner;
+      if (runner === undefined || skillStore === undefined) {
         return NOT_READY;
       }
       const skill = await skillStore.get(id);
       if (skill === undefined) {
         return { say: 'Навык не найден', mood: 'confused' };
       }
-      deps.events.emit({ type: 'wake', source: 'trigger' });
-      const result = await skillRunner.run(skill, inputs);
+      const result = await runTriggered(deps.events, async () => {
+        deps.events.emit({ type: 'wake', source: 'trigger' });
+        return runner.run(skill, inputs);
+      });
       if (result.ok) {
         return result.reply ?? { say: 'Готово!' };
       }
