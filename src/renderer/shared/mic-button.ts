@@ -1,5 +1,6 @@
 import { createVad } from '../../voice/vad';
 import { createRecorder } from './recorder';
+import { createVoiceReadiness } from './voice-readiness';
 
 export interface MicButtonOptions {
   onText(text: string): void;
@@ -13,6 +14,7 @@ export interface MicButton {
   element: HTMLButtonElement;
   isListening(): boolean;
   cancel(): void;
+  dispose(): void;
 }
 
 export const MIC_SVG =
@@ -23,8 +25,6 @@ export const MIC_SVG =
 
 const MAX_RECORD_MS = 60000;
 const SILENCE_MS = 2000;
-const READY_POLL_MS = 1500;
-const READY_POLL_LIMIT = 40;
 
 // Кнопка с микрофоном: запись, распознавание через главный процесс и вставка текста.
 export function createMicButton(options: MicButtonOptions): MicButton {
@@ -37,7 +37,6 @@ export function createMicButton(options: MicButtonOptions): MicButton {
   button.innerHTML = MIC_SVG;
 
   let listening = false;
-  let attempts = 0;
 
   function setListening(value: boolean): void {
     listening = value;
@@ -78,22 +77,12 @@ export function createMicButton(options: MicButtonOptions): MicButton {
       })
   });
 
-  function refresh(): void {
-    void window.tishka.voice
-      .status()
-      .then((view) => {
-        const ready = view.state === 'ready';
-        button.disabled = !ready;
-        button.title = ready ? 'Сказать голосом' : 'Распознавание речи не настроено';
-        if (!ready && attempts < READY_POLL_LIMIT) {
-          attempts += 1;
-          window.setTimeout(refresh, READY_POLL_MS);
-        }
-      })
-      .catch(() => {
-        button.disabled = true;
-      });
-  }
+  const readiness = createVoiceReadiness({
+    onReady(ready): void {
+      button.disabled = !ready;
+      button.title = ready ? 'Сказать голосом' : 'Распознавание речи не настроено';
+    }
+  });
 
   button.addEventListener('click', () => {
     if (listening) {
@@ -111,17 +100,22 @@ export function createMicButton(options: MicButtonOptions): MicButton {
     });
   });
 
-  document.addEventListener('keydown', (event) => {
+  function onKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape' && listening) {
       recorder.cancel();
     }
-  });
+  }
 
-  refresh();
+  document.addEventListener('keydown', onKeydown);
 
   return {
     element: button,
     isListening: () => listening,
-    cancel: () => recorder.cancel()
+    cancel: () => recorder.cancel(),
+    dispose(): void {
+      readiness.dispose();
+      document.removeEventListener('keydown', onKeydown);
+      recorder.cancel();
+    }
   };
 }
