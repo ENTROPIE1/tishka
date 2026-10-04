@@ -27,6 +27,16 @@ export const OPEN_SETTINGS_CHANNEL = 'tishka:open-settings';
 export const OPEN_CHAT_CHANNEL = 'tishka:open-chat';
 export const NAVIGATE_CHANNEL = 'tishka:navigate';
 
+export const SKILL_OVERVIEW_CHANNEL = 'tishka:skills:overview';
+export const SKILL_SAVE_CHANNEL = 'tishka:skills:save';
+export const SKILL_REMOVE_CHANNEL = 'tishka:skills:remove';
+export const SKILL_ENABLED_CHANNEL = 'tishka:skills:enabled';
+export const SKILL_RUN_CHANNEL = 'tishka:skills:run';
+export const SKILL_PRESETS_CHANNEL = 'tishka:skills:presets';
+export const SKILL_INSTALL_CHANNEL = 'tishka:skills:install';
+export const SKILL_IMPORT_CHANNEL = 'tishka:skills:import';
+export const SKILL_EXPORT_CHANNEL = 'tishka:skills:export';
+
 export const MEMORY_LIST_CHANNEL = 'tishka:memory:list';
 export const MEMORY_SEARCH_CHANNEL = 'tishka:memory:search';
 export const MEMORY_UPDATE_CHANNEL = 'tishka:memory:update';

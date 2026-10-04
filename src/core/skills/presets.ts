@@ -15,6 +15,7 @@ export interface PresetInfo {
   installed: boolean;
   valid: boolean;
   errors: string[];
+  skill?: Skill;
 }
 
 export interface PresetStore {
@@ -65,7 +66,7 @@ export async function listPresets(dir: string, store?: PresetStore): Promise<Pre
     const skill = parsed.skill;
     const id = skill?.id ?? parsed.id;
     const installed = store === undefined ? false : (await store.get(id)) !== undefined;
-    presets.push({
+    const info: PresetInfo = {
       id,
       name: skill?.name ?? '',
       description: skill?.description ?? '',
@@ -73,7 +74,11 @@ export async function listPresets(dir: string, store?: PresetStore): Promise<Pre
       installed,
       valid: skill !== undefined,
       errors: parsed.errors
-    });
+    };
+    if (skill !== undefined) {
+      info.skill = skill;
+    }
+    presets.push(info);
   }
   return presets;
 }

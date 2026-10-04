@@ -11,6 +11,7 @@ const HIGHLIGHT_MS = 2000;
 export interface ChatFeed {
   appendEntry(entry: HistoryEntry): void;
   appendAskCard(ask: AskRequest): void;
+  appendSkillCard(skillId: string): void;
   clear(): void;
   fill(entries: HistoryEntry[]): void;
   refill(entries: HistoryEntry[]): void;
@@ -161,6 +162,31 @@ export function createChatFeed(element: HTMLElement): ChatFeed {
     }
   }
 
+  // Карточка о сохранённом навыке: ссылка ведёт на экран автоматизаций и подсвечивает карточку.
+  function appendSkillCard(skillId: string): void {
+    const pinned = isPinnedToBottom();
+    const row = document.createElement('div');
+    row.className = 'msg msg-system';
+    const content = document.createElement('div');
+    content.className = 'msg-content';
+    const text = document.createElement('div');
+    text.className = 'msg-text';
+    text.textContent = 'Навык сохранён';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'button button-secondary';
+    open.textContent = 'Открыть в автоматизациях';
+    open.addEventListener('click', () => {
+      document.dispatchEvent(new CustomEvent('tishka:navigate', { detail: { screen: 'automations', skillId } }));
+    });
+    content.append(text, open);
+    row.append(content);
+    element.append(row);
+    if (pinned) {
+      scrollToBottom();
+    }
+  }
+
   function clear(): void {
     element.replaceChildren();
   }
@@ -197,5 +223,5 @@ export function createChatFeed(element: HTMLElement): ChatFeed {
     }, HIGHLIGHT_MS);
   }
 
-  return { appendEntry, appendAskCard, clear, fill, refill, scrollTo, highlight };
+  return { appendEntry, appendAskCard, appendSkillCard, clear, fill, refill, scrollTo, highlight };
 }

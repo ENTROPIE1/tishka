@@ -10,6 +10,7 @@ import { createSttService, type SttService } from '../voice/stt-service';
 import { openMainWindow } from './chat-window';
 import { registerChatTalk, type ChatTalk } from './chat-talk';
 import { OPEN_CHAT_CHANNEL, PET_SPEAK_DONE_CHANNEL } from './ipc-channels';
+import { registerAutomationIpc } from './ipc-automations';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
 import { registerSpeechIpc } from './ipc-speech';
@@ -96,6 +97,7 @@ app.whenReady().then(async () => {
   core = tishka;
 
   registerIpc(bus, tishka, secrets);
+  registerAutomationIpc(tishka);
   registerSettingsIpc(tishka, secrets, {
     // Голос перезапускается сам, если изменились программа, модель или адрес.
     onConfigSaved: (previous, next) => {

@@ -206,6 +206,18 @@ describe('validateSkill', () => {
   it('отклоняет поле token', () => {
     expect(errorText(baseSkill({ token: 'значение' })).join('\n')).toContain('token');
   });
+
+  it('enabled false сохраняется, без поля навык включён', () => {
+    const off = validateSkill(baseSkill({ enabled: false }));
+    expect(off.ok).toBe(true);
+    if (off.ok) {
+      expect(off.skill.enabled).toBe(false);
+    }
+    const on = validateSkill(baseSkill());
+    if (on.ok) {
+      expect(on.skill.enabled).toBeUndefined();
+    }
+  });
 });
 
 describe('createSkillStore', () => {

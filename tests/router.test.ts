@@ -65,6 +65,14 @@ describe('syncSkillTools', () => {
     expect(def?.description).toContain('утро пятницы');
   });
 
+  it('выключенный навык не становится инструментом агента', () => {
+    const registry = createToolRegistry(createEventBus());
+
+    syncSkillTools(registry, [makeSkill('off', ['выкл'], { enabled: false })], { run: runnerReturning('ок') });
+
+    expect(registry.list()).toEqual([]);
+  });
+
   it('повторный вызов не оставляет инструментов удалённых навыков', () => {
     const registry = createToolRegistry(createEventBus());
     const runner = { run: runnerReturning('ок') };

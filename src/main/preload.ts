@@ -1,9 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { InstallPresetResult, SaveSkillResult } from '../core/app';
 import type { ConnectionDraft } from '../core/connections';
 import type { HistoryEntry } from '../core/history';
 import type { McpStatus } from '../core/mcp/manager';
 import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
-import type { Config, TishkaEvent } from '../core/types';
+import type { PresetInfo } from '../core/skills/presets';
+import type { SkillOverview } from '../core/skills/overview';
+import type { Config, Reply, Skill, TishkaEvent } from '../core/types';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
 import type { ChatTalkState, WakeState } from '../voice/wake';
@@ -17,6 +20,7 @@ import type {
   ConnectionView,
   VoiceStateView
 } from './ipc-settings';
+import type { ExportSkillResult, ImportSkillResult } from './ipc-automations';
 import {
   CHAT_TALK_ESCAPE_CHANNEL,
   CHAT_TALK_KEYBOARD_CHANNEL,
@@ -71,6 +75,15 @@ import {
   SECRETS_HAS_CHANNEL,
   SECRETS_NAMES_CHANNEL,
   SECRETS_SET_CHANNEL,
+  SKILL_ENABLED_CHANNEL,
+  SKILL_EXPORT_CHANNEL,
+  SKILL_IMPORT_CHANNEL,
+  SKILL_INSTALL_CHANNEL,
+  SKILL_OVERVIEW_CHANNEL,
+  SKILL_PRESETS_CHANNEL,
+  SKILL_REMOVE_CHANNEL,
+  SKILL_RUN_CHANNEL,
+  SKILL_SAVE_CHANNEL,
   USER_TEXT_CHANNEL,
   VOICE_APPLY_CHANNEL,
   VOICE_CHECK_CHANNEL,
@@ -166,6 +179,35 @@ const api = {
     },
     reconnect(name: string): Promise<McpStatus | undefined> {
       return ipcRenderer.invoke(CONNECTIONS_RECONNECT_CHANNEL, name);
+    }
+  },
+  automations: {
+    overview(): Promise<SkillOverview[]> {
+      return ipcRenderer.invoke(SKILL_OVERVIEW_CHANNEL);
+    },
+    save(skill: Skill): Promise<SaveSkillResult> {
+      return ipcRenderer.invoke(SKILL_SAVE_CHANNEL, skill);
+    },
+    remove(id: string): Promise<boolean> {
+      return ipcRenderer.invoke(SKILL_REMOVE_CHANNEL, id);
+    },
+    setEnabled(id: string, enabled: boolean): Promise<boolean> {
+      return ipcRenderer.invoke(SKILL_ENABLED_CHANNEL, id, enabled);
+    },
+    run(id: string, inputs?: Record<string, unknown>): Promise<Reply> {
+      return ipcRenderer.invoke(SKILL_RUN_CHANNEL, id, inputs);
+    },
+    presets(): Promise<PresetInfo[]> {
+      return ipcRenderer.invoke(SKILL_PRESETS_CHANNEL);
+    },
+    installPreset(id: string, overwrite?: boolean): Promise<InstallPresetResult> {
+      return ipcRenderer.invoke(SKILL_INSTALL_CHANNEL, id, overwrite === true);
+    },
+    importFile(): Promise<ImportSkillResult> {
+      return ipcRenderer.invoke(SKILL_IMPORT_CHANNEL);
+    },
+    exportFile(id: string): Promise<ExportSkillResult> {
+      return ipcRenderer.invoke(SKILL_EXPORT_CHANNEL, id);
     }
   },
   openSettings(): Promise<void> {

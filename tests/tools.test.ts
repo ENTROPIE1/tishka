@@ -107,6 +107,26 @@ describe('ToolRegistry', () => {
     ]);
   });
 
+  it('фоновый вызов не шлёт tool.start и tool.end, шлёт background.tick', async () => {
+    const bus = createEventBus();
+    const registry = createToolRegistry(bus);
+    const events: TishkaEvent[] = [];
+    bus.on((event) => events.push(event));
+
+    let called = false;
+    registry.register(echo, async () => {
+      called = true;
+      return { ok: true, content: 'готово' };
+    });
+
+    await expect(registry.call('echo', { text: 'x' }, { background: true })).resolves.toEqual({
+      ok: true,
+      content: 'готово'
+    });
+    expect(called).toBe(true);
+    expect(events).toEqual([{ type: 'background.tick', tool: 'echo' }]);
+  });
+
   it('unregisterSource убирает только инструменты этого источника', async () => {
     const registry = createToolRegistry(createEventBus());
     const mcp: ToolDef = { ...echo, name: 'confluence__get_page', source: 'mcp:confluence' };

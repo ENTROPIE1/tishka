@@ -1,4 +1,4 @@
-import type { EventBus, ToolDef, ToolHandler, ToolRegistry, ToolResult } from '../types';
+import type { EventBus, ToolCallOptions, ToolDef, ToolHandler, ToolRegistry, ToolResult } from '../types';
 
 function missingRequiredField(schema: object, args: Record<string, unknown>): string | undefined {
   const required = (schema as { required?: unknown }).required;
@@ -37,7 +37,7 @@ export function createToolRegistry(bus: EventBus): ToolRegistry {
     list(): ToolDef[] {
       return [...tools.values()].map((entry) => entry.def);
     },
-    async call(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+    async call(name: string, args: Record<string, unknown>, opts?: ToolCallOptions): Promise<ToolResult> {
       const entry = tools.get(name);
       if (entry === undefined) {
         return { ok: false, content: '', error: `Неизвестный инструмент: ${name}` };
@@ -48,7 +48,12 @@ export function createToolRegistry(bus: EventBus): ToolRegistry {
         return { ok: false, content: '', error: `Не указано обязательное поле: ${missing}` };
       }
 
-      bus.emit({ type: 'tool.start', tool: name });
+      const background = opts?.background === true;
+      if (background) {
+        bus.emit({ type: 'background.tick', tool: name });
+      } else {
+        bus.emit({ type: 'tool.start', tool: name });
+      }
 
       let result: ToolResult;
       try {
@@ -57,7 +62,9 @@ export function createToolRegistry(bus: EventBus): ToolRegistry {
         result = { ok: false, content: '', error: errorMessage(error) };
       }
 
-      bus.emit({ type: 'tool.end', tool: name, ok: result.ok });
+      if (!background) {
+        bus.emit({ type: 'tool.end', tool: name, ok: result.ok });
+      }
       return result;
     }
   };

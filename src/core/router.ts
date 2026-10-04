@@ -32,7 +32,8 @@ export function createRouter(deps: RouterDeps): Router {
   });
 
   async function handle(userText: string): Promise<Reply> {
-    const skill = matchSkill(userText, await deps.skills.list());
+    const enabled = (await deps.skills.list()).filter((item) => item.enabled !== false);
+    const skill = matchSkill(userText, enabled);
     if (skill === undefined || !runsWithoutInputs(skill)) {
       return deps.agent.handle(userText);
     }

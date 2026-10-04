@@ -71,6 +71,9 @@ function initEvents(): void {
       case 'notify':
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;
+      case 'skill.saved':
+        view.appendSkillCard(event.skillId);
+        break;
       case 'error':
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.message });
         clearStatus();

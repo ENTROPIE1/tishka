@@ -1,6 +1,13 @@
-export type ScreenName = 'chat' | 'connections' | 'memory' | 'voice' | 'persona';
+export type ScreenName = 'chat' | 'connections' | 'memory' | 'voice' | 'persona' | 'automations';
 
-export const SCREEN_NAMES: readonly ScreenName[] = ['chat', 'connections', 'memory', 'voice', 'persona'];
+export const SCREEN_NAMES: readonly ScreenName[] = [
+  'chat',
+  'connections',
+  'memory',
+  'voice',
+  'persona',
+  'automations'
+];
 
 export function isScreenName(value: unknown): value is ScreenName {
   return typeof value === 'string' && (SCREEN_NAMES as readonly string[]).includes(value);

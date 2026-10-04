@@ -16,8 +16,12 @@ export interface SkillRunnerDeps {
   now: () => Date;
 }
 
+export interface SkillRunOptions {
+  background?: boolean;          // true — вызовы инструментов идут без tool.start и tool.end
+}
+
 export interface SkillRunner {
-  run(skill: Skill, inputs?: Record<string, unknown>): Promise<RunResult>;
+  run(skill: Skill, inputs?: Record<string, unknown>, opts?: SkillRunOptions): Promise<RunResult>;
 }
 
 function errorMessage(error: unknown): string {
@@ -69,7 +73,11 @@ export function createSkillRunner(deps: SkillRunnerDeps): SkillRunner {
     return { ok: false, failedStep, error, steps };
   }
 
-  async function run(skill: Skill, inputs?: Record<string, unknown>): Promise<RunResult> {
+  async function run(
+    skill: Skill,
+    inputs?: Record<string, unknown>,
+    opts?: SkillRunOptions
+  ): Promise<RunResult> {
     const resolved = resolveInputs(skill, inputs);
     if (!resolved.ok) {
       return { ok: false, error: resolved.error, steps: {} };
@@ -84,7 +92,10 @@ export function createSkillRunner(deps: SkillRunnerDeps): SkillRunner {
       try {
         if ('tool' in step) {
           const args = renderTemplate(step.args, ctx) as Record<string, unknown>;
-          const result = await deps.registry.call(step.tool, args);
+          const result =
+            opts?.background === true
+              ? await deps.registry.call(step.tool, args, { background: true })
+              : await deps.registry.call(step.tool, args);
           if (!result.ok) {
             return fail(step.id, result.error ?? result.content, steps);
           }

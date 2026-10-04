@@ -5,7 +5,7 @@ import { NAVIGATE_CHANNEL } from './ipc-channels';
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 640;
 
-export type MainScreen = 'chat' | 'connections' | 'memory' | 'voice' | 'persona';
+export type MainScreen = 'chat' | 'connections' | 'memory' | 'voice' | 'persona' | 'automations';
 
 let mainWindow: BrowserWindow | undefined;
 

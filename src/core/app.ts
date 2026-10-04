@@ -10,10 +10,12 @@ import { createMemoryReviewer, type MemoryReviewer } from './memory/review';
 import { createMemoryStore, type MemoryRecord, type MemoryStore, type UpdateMemoryPatch } from './memory/store';
 import { registerMemoryTools } from './memory/tools';
 import { createRouter, type Router } from './router';
-import { registerPresetTools } from './skills/presets';
-import { createSkillRunner } from './skills/runner';
-import { createSkillStore } from './skills/store';
-import { registerSkillTools } from './skills/tools';
+import { createSkillOverview, registerOverviewTools, type SkillOverview, type SkillOverviewService } from './skills/overview';
+import { installPreset, listPresets, registerPresetTools, type PresetInfo } from './skills/presets';
+import { createSkillRunner, type SkillRunner } from './skills/runner';
+import { createSkillStore, SkillValidationError } from './skills/store';
+import { registerSkillTools, stepTools } from './skills/tools';
+import type { ValidationResult } from './skills/validate';
 import { createScheduler, type Scheduler } from './triggers/scheduler';
 import { createTriggerState } from './triggers/state';
 import { registerTriggerTools } from './triggers/tools';
@@ -21,7 +23,7 @@ import { createWatcher, type Watcher } from './triggers/watcher';
 import { registerBuiltinTools } from './tools/builtin';
 import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
-import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore } from './types';
+import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore, Skill } from './types';
 import { createVisionLook, type CaptureResult, type ScreenTarget } from './vision/look';
 
 export interface CoreDeps {
@@ -37,6 +39,21 @@ export interface CoreDeps {
   captureScreen?(target: ScreenTarget): Promise<CaptureResult>;   // снимок экрана из главного процесса
 }
 
+export type SaveSkillResult = { ok: true } | { ok: false; errors: string[] };
+export type InstallPresetResult = { ok: true } | { ok: false; error: string };
+
+export interface SkillService {
+  overview(): Promise<SkillOverview[]>;
+  save(skill: Skill): Promise<SaveSkillResult>;
+  remove(id: string): Promise<boolean>;
+  setEnabled(id: string, enabled: boolean): Promise<boolean>;
+  run(id: string, inputs?: Record<string, unknown>): Promise<Reply>;
+  presets(): Promise<PresetInfo[]>;
+  installPreset(id: string, overwrite?: boolean): Promise<InstallPresetResult>;
+  previewImport(path: string): Promise<ValidationResult>;
+  export(id: string, targetPath: string): Promise<void>;
+}
+
 export interface TishkaCore {
   start(): Promise<void>;
   stop(): Promise<void>;
@@ -47,6 +64,7 @@ export interface TishkaCore {
   reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
   saveConfig(next: Config): Promise<void>;   // сохранить настройки и применить их
   reconnect(name: string): Promise<McpStatus | undefined>;   // переподключить один сервер и вернуть его статус
+  skills: SkillService;
   history(limit?: number): HistoryEntry[];
   historySearch(query: string, limit?: number): HistoryEntry[];
   newConversation(): void;         // очищает контекст агента и ставит разделитель в истории
@@ -103,6 +121,9 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let agent: Agent | undefined;
   let started = false;
   let queue: Promise<unknown> = Promise.resolve();
+  let skillStore: ReturnType<typeof createSkillStore> | undefined;
+  let skillRunner: SkillRunner | undefined;
+  let skillOverview: SkillOverviewService | undefined;
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
   const conversation = createConversationClock();
 
@@ -202,6 +223,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     await historyStore.start();
 
     const skills = createSkillStore(join(deps.dataDir, 'skills'));
+    skillStore = skills;
     await skills.loadPresets(deps.presetsDir);
 
     const registry = createToolRegistry(deps.events);
@@ -258,6 +280,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       events: deps.events,
       now: deps.now
     });
+    skillRunner = runner;
 
     const state = createTriggerState(join(deps.dataDir, 'triggers.json'));
     scheduler = createScheduler({ skills, runner, state, events: deps.events, now: deps.now });
@@ -265,6 +288,9 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     registerTriggerTools(registry, scheduler, deps.now);
     registerSkillTools(registry, { store: skills, registry, events: deps.events });
     registerPresetTools(registry, { presetsDir: deps.presetsDir, store: skills, events: deps.events });
+    const overview = createSkillOverview({ store: skills, state, tools: () => stepTools(registry) });
+    skillOverview = overview;
+    registerOverviewTools(registry, overview);
 
     agent = createAgent({
       llm,
@@ -329,6 +355,98 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     return status;
   }
 
+  const skillService: SkillService = {
+    async overview(): Promise<SkillOverview[]> {
+      return skillOverview === undefined ? [] : skillOverview.list();
+    },
+
+    async save(skill: Skill): Promise<SaveSkillResult> {
+      if (skillStore === undefined) {
+        return { ok: false, errors: ['Ядро не запущено'] };
+      }
+      try {
+        await skillStore.save(skill);
+      } catch (error) {
+        if (error instanceof SkillValidationError) {
+          return { ok: false, errors: error.errors };
+        }
+        throw error;
+      }
+      deps.events.emit({ type: 'skill.saved', skillId: skill.id });
+      return { ok: true };
+    },
+
+    async remove(id: string): Promise<boolean> {
+      if (skillStore === undefined) {
+        return false;
+      }
+      await skillStore.remove(id);
+      deps.events.emit({ type: 'skill.removed', skillId: id });
+      return true;
+    },
+
+    async setEnabled(id: string, enabled: boolean): Promise<boolean> {
+      if (skillStore === undefined) {
+        return false;
+      }
+      const skill = await skillStore.get(id);
+      if (skill === undefined) {
+        return false;
+      }
+      await skillStore.save({ ...skill, enabled });
+      deps.events.emit({ type: 'skill.saved', skillId: id });
+      return true;
+    },
+
+    async run(id: string, inputs?: Record<string, unknown>): Promise<Reply> {
+      if (skillRunner === undefined || skillStore === undefined) {
+        return NOT_READY;
+      }
+      const skill = await skillStore.get(id);
+      if (skill === undefined) {
+        return { say: 'Навык не найден', mood: 'confused' };
+      }
+      deps.events.emit({ type: 'wake', source: 'trigger' });
+      const result = await skillRunner.run(skill, inputs);
+      if (result.ok) {
+        return result.reply ?? { say: 'Готово!' };
+      }
+      return { say: result.error ?? 'Не получилось выполнить навык', mood: 'confused' };
+    },
+
+    async presets(): Promise<PresetInfo[]> {
+      if (skillStore === undefined) {
+        return [];
+      }
+      return listPresets(deps.presetsDir, skillStore);
+    },
+
+    async installPreset(id: string, overwrite?: boolean): Promise<InstallPresetResult> {
+      if (skillStore === undefined) {
+        return { ok: false, error: 'Ядро не запущено' };
+      }
+      const result = await installPreset(deps.presetsDir, id, skillStore, { overwrite: overwrite === true });
+      if (result.ok) {
+        deps.events.emit({ type: 'skill.saved', skillId: id });
+      }
+      return result;
+    },
+
+    async previewImport(path: string): Promise<ValidationResult> {
+      if (skillStore === undefined) {
+        return { ok: false, errors: ['Ядро не запущено'] };
+      }
+      return skillStore.previewFile(path);
+    },
+
+    async export(id: string, targetPath: string): Promise<void> {
+      if (skillStore === undefined) {
+        throw new Error('Ядро не запущено');
+      }
+      await skillStore.exportFile(id, targetPath);
+    }
+  };
+
   return {
     start,
     stop,
@@ -339,6 +457,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     reloadConfig,
     saveConfig,
     reconnect,
+    skills: skillService,
     history: (limit?: number) => historyStore.list(limit),
     historySearch: (query: string, limit?: number) => historyStore.search(query, limit),
     newConversation,
