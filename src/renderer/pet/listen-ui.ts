@@ -1,24 +1,17 @@
 import { createRecorder } from '../shared/recorder';
 import { createVad } from '../../voice/vad';
 
-export const LISTEN_SAY = 'Слушаю…';
-
 export interface BubbleSay {
-  modelSay?: string;      // текст ответа или приветствия, пришедший из ядра
+  modelSay?: string;      // текст ответа, приветствия или статуса, пришедший из ядра
   state: string;
-  listening: boolean;     // идёт запись по вызову или кнопке
-  conversation: boolean;  // включён режим разговора
   error?: string;
 }
 
-// Что показывать в облачке: текст приветствия или ответа важнее «Слушаю…»,
-// а «Слушаю…» — только пока действительно идёт запись.
+// Облачко — для слов Тишки: ответ, приветствие, статус или ошибка.
+// Состояние записи показывают значок микрофона и подпись под ежом, не облачко.
 export function bubbleSay(input: BubbleSay): string {
   if (input.modelSay !== undefined && input.modelSay !== '') {
     return input.modelSay;
-  }
-  if (input.listening || input.conversation) {
-    return LISTEN_SAY;
   }
   return input.state === 'confused' ? (input.error ?? '') : '';
 }
@@ -27,17 +20,19 @@ export interface ListenUi {
   isListening(): boolean;
   escape(): void;
   setError(message: string): void;
-  setConversation(on: boolean): void;
   say(modelSay: string | undefined, state: string): string;
 }
 
-// Индикатор записи, кнопка микрофона и связь с главным процессом.
-export function createListenUi(onStart: () => void, getThreshold?: () => number | null): ListenUi {
+// Разовая запись строки, кнопка микрофона и связь с главным процессом.
+// О начале и конце записи сообщает onListeningChange: значок и полоска уровня.
+export function createListenUi(
+  onListeningChange: (listening: boolean) => void,
+  getThreshold?: () => number | null
+): ListenUi {
   const level = document.getElementById('level') as HTMLElement;
   const levelFill = document.getElementById('level-fill') as HTMLElement;
   const mic = document.getElementById('mic') as HTMLElement;
   let listening = false;
-  let conversation = false;
   let error = '';
 
   function setListening(value: boolean): void {
@@ -46,6 +41,7 @@ export function createListenUi(onStart: () => void, getThreshold?: () => number 
     if (!value) {
       levelFill.style.width = '0%';
     }
+    onListeningChange(value);
   }
 
   const recorder = createRecorder({
@@ -73,7 +69,6 @@ export function createListenUi(onStart: () => void, getThreshold?: () => number 
   window.tishka.pet.onListenCommand((command) => {
     if (command === 'start') {
       setListening(true);
-      onStart();
       void recorder.start();
     } else if (command === 'stop') {
       recorder.stop();
@@ -90,14 +85,11 @@ export function createListenUi(onStart: () => void, getThreshold?: () => number 
     setError(message: string): void {
       error = message;
     },
-    setConversation(on): void {
-      conversation = on;
-    },
     say(modelSay, state): string {
       if (state !== 'confused') {
         error = '';
       }
-      return bubbleSay({ modelSay, state, listening, conversation, error });
+      return bubbleSay({ modelSay, state, error });
     }
   };
 }

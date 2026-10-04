@@ -80,6 +80,7 @@ export function createPetFacade(deps: PetFacadeDeps): PetWindow {
       return lifecycle.isVisible();
     },
     reload(): void {},
+    onPageLoaded(): void {},
     dispose(): void {
       lifecycle.dispose();
     }

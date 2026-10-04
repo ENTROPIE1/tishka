@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CANNED } from '../../src/voice/canned';
-import { LISTEN_SAY } from '../../src/renderer/pet/listen-ui';
 import { prepareForSpeech } from '../../src/voice/speech-text';
 import { createScenario, type Scenario } from './harness';
 
@@ -31,7 +30,7 @@ describe('Сценарий 1. Запуск при запускающейся с�
     expect(h.observations.errors()).toEqual([]);
   });
 
-  it('служба готова: запись включилась один раз, «Слушаю…» только после приветствия', async () => {
+  it('служба готова: запись включилась один раз, после приветствия облачко скрыто', async () => {
     scenario = createScenario({ sttStatus: 'starting' });
     const h = scenario;
     h.startApp();
@@ -41,19 +40,22 @@ describe('Сценарий 1. Запуск при запускающейся с�
 
     expect(h.observations.micOn()).toBe(true);
     expect(h.observations.commands().filter((command) => command === 'conversation-on')).toHaveLength(1);
-    // приветствие ещё звучит: «Слушаю…» не показывается вместо него
+    // приветствие ещё звучит: в облачке его текст, не «Слушаю…»
     expect(h.observations.bubble()).toBe(CANNED.neutral);
 
-    await h.wait(350);
-    expect(h.observations.bubble()).toBe(LISTEN_SAY);
+    await h.wait(1000);
+    // приветствие кончилось: облачко скрыто, запись видна по значку и подписи
+    expect(h.observations.bubble()).toBe('');
+    expect(h.observations.micOn()).toBe(true);
     expect(h.observations.recording()).toBe(true);
+    expect(h.observations.label()).toBe('слушает');
     expect(h.observations.errors()).toEqual([]);
   });
 });
 
 // Сценарий 2 (Д22): запуск при готовой службе, приветствие звучит и показано одинаково.
 describe('Сценарий 2. Запуск при готовой службе распознавания', () => {
-  it('приветствие и облачко совпадают дословно', async () => {
+  it('приветствие и облачко совпадают дословно, после речи облачко скрыто', async () => {
     scenario = createScenario({ sttStatus: 'ready' });
     const h = scenario;
 
@@ -65,8 +67,11 @@ describe('Сценарий 2. Запуск при готовой службе р
     expect(h.observations.spoken()).toContain(prepareForSpeech(CANNED.greeting));
     expect(h.observations.label()).toBe('говорит');
 
-    await h.wait(350);
-    expect(h.observations.bubble()).toBe(LISTEN_SAY);
+    await h.wait(1000);
+    // облачко погасло вместе с приветствием, запись видна по значку и подписи
+    expect(h.observations.bubble()).toBe('');
+    expect(h.observations.micOn()).toBe(true);
     expect(h.observations.recording()).toBe(true);
+    expect(h.observations.label()).toBe('слушает');
   });
 });

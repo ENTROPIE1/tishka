@@ -159,7 +159,7 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       if (model.greeting === true) return model;
       return quiet && isAway(model) ? model : show(model, 'talking', now);
     case 'speak.end':
-      // Конец приветствия: в облачке и подписи снова запись — «Слушаю…».
+      // Конец приветствия: облачко гаснет, подпись снова про запись.
       if (model.greeting === true) return endGreeting(model);
       return isAway(model) ? model : settle(model, now);
     case 'notify': {

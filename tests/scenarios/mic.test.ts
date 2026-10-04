@@ -19,6 +19,9 @@ describe('Сценарий 6. Щелчок по микрофону', () => {
     await h.wait(1000);
     expect(h.observations.micOn()).toBe(true);
     expect(h.observations.recording()).toBe(true);
+    expect(h.observations.label()).toBe('слушает');
+    // приветствие кончилось: облачко скрыто, запись видна по значку и подписи
+    expect(h.observations.bubble()).toBe('');
 
     h.micClick();
     expect(h.observations.micOn()).toBe(false);

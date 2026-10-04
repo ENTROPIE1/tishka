@@ -1,37 +1,50 @@
 import { describe, expect, it } from 'vitest';
-import { bubbleSay, LISTEN_SAY } from '../src/renderer/pet/listen-ui';
+import { bubbleSay } from '../src/renderer/pet/listen-ui';
 import { CANNED } from '../src/voice/canned';
+import type { PetState } from '../src/pet/state';
 
-describe('bubbleSay: облачко согласовано с речью', () => {
-  it('неготовое распознавание: нейтральное приветствие вместо «Слушаю…»', () => {
-    const text = bubbleSay({ modelSay: CANNED.neutral, state: 'listening', listening: true, conversation: false });
-    expect(text).toBe(CANNED.neutral);
-    expect(text).not.toBe(LISTEN_SAY);
+const STATES: PetState[] = [
+  'hidden',
+  'appear',
+  'idle',
+  'listening',
+  'thinking',
+  'working',
+  'talking',
+  'notify',
+  'happy',
+  'confused',
+  'leave',
+  'sleep'
+];
+
+describe('bubbleSay: облачко только для слов Тишки', () => {
+  it('ни при каких входах не показывает надпись «Слушаю…»', () => {
+    for (const state of STATES) {
+      for (const modelSay of [undefined, '', 'Готово', CANNED.greeting]) {
+        for (const error of [undefined, '', 'беда']) {
+          const text = bubbleSay({ modelSay, state, error });
+          expect(text, `${state}, ${modelSay ?? '—'}, ${error ?? '—'}`).not.toBe('Слушаю…');
+        }
+      }
+    }
   });
 
-  it('готовая запись: пока звучит приветствие — оно, после речи — «Слушаю…»', () => {
-    expect(
-      bubbleSay({ modelSay: CANNED.greeting, state: 'listening', listening: true, conversation: false })
-    ).toBe(CANNED.greeting);
-    expect(bubbleSay({ state: 'listening', listening: true, conversation: false })).toBe(LISTEN_SAY);
+  it('ответ, приветствие и статус важнее прочего', () => {
+    expect(bubbleSay({ modelSay: CANNED.greeting, state: 'listening' })).toBe(CANNED.greeting);
+    expect(bubbleSay({ modelSay: 'Готово', state: 'talking' })).toBe('Готово');
+    expect(bubbleSay({ modelSay: CANNED.neutral, state: 'appear' })).toBe(CANNED.neutral);
   });
 
-  it('речь выключена: при появлении показываем приветствие', () => {
-    expect(
-      bubbleSay({ modelSay: CANNED.greeting, state: 'listening', listening: false, conversation: false })
-    ).toBe(CANNED.greeting);
-  });
-
-  it('без записи и без речи облачко пустое', () => {
-    expect(bubbleSay({ state: 'idle', listening: false, conversation: false })).toBe('');
-  });
-
-  it('ответ важнее «Слушаю…»: показываем текст ответа', () => {
-    expect(bubbleSay({ modelSay: 'Готово', state: 'talking', listening: true, conversation: false })).toBe('Готово');
+  it('после конца приветствия облачко пустое, в каком бы состоянии ёж ни был', () => {
+    expect(bubbleSay({ state: 'listening' })).toBe('');
+    expect(bubbleSay({ state: 'appear' })).toBe('');
+    expect(bubbleSay({ state: 'talking' })).toBe('');
+    expect(bubbleSay({ modelSay: '', state: 'listening' })).toBe('');
   });
 
   it('ошибка показывается только в состоянии «не понял»', () => {
-    expect(bubbleSay({ state: 'confused', listening: false, conversation: false, error: 'беда' })).toBe('беда');
-    expect(bubbleSay({ state: 'idle', listening: false, conversation: false, error: 'беда' })).toBe('');
+    expect(bubbleSay({ state: 'confused', error: 'беда' })).toBe('беда');
+    expect(bubbleSay({ state: 'idle', error: 'беда' })).toBe('');
   });
 });
