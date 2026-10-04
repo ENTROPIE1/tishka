@@ -24,6 +24,7 @@ export interface PhraseListenerOptions {
 export interface PhraseListener {
   start(): Promise<boolean>;
   stop(): void;
+  pause?(active: boolean): void;
 }
 
 interface PreRollFrame {
@@ -50,6 +51,7 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
   let capturing = false;
   let phraseFrames: Float32Array[] = [];
   let phraseStartMs = 0;
+  let paused = false;
 
   function makeVad(): Vad {
     return createVad({
@@ -98,7 +100,7 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
   }
 
   function handleFrame(frame: Float32Array, sampleRate: number): void {
-    if (!active || vad === undefined) {
+    if (!active || vad === undefined || paused) {
       return;
     }
     sourceRate = sampleRate;
@@ -170,5 +172,23 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     capture.stop();
   }
 
-  return { start, stop };
+  // Идущая запись отбрасывается без распознавания: при паузе сбрасываем и
+  // накопленные кадры, и состояние детектора речи. Микрофон при этом открыт.
+  function pause(value: boolean): void {
+    if (paused === value) {
+      return;
+    }
+    paused = value;
+    if (value) {
+      capturing = false;
+      phraseFrames = [];
+      preRoll = [];
+      preRollMs = 0;
+      if (active) {
+        vad = makeVad();
+      }
+    }
+  }
+
+  return { start, stop, pause };
 }

@@ -3,6 +3,9 @@ import type { VadSensitivity } from '../../voice/vad';
 
 const MIC_RETRY_MS = 30000;
 const MIC_ERROR = 'Не слышу микрофон';
+// После отпускания ежа запись молчит ещё секунду: щелчок мыши и стук стола
+// успевают утихнуть, случайное слово не попадает на распознавание.
+export const DRAG_RESUME_MS = 1000;
 
 export interface WakeListenerDeps {
   onConversation?(on: boolean): void;
@@ -12,6 +15,9 @@ export interface WakeListenerDeps {
 
 export interface WakeListener {
   setActive(active: boolean): void;
+  setPaused(value: boolean): void;
+  beginDrag(): void;
+  endDrag(): void;
   dispose(): void;
 }
 
@@ -29,6 +35,20 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let threshold: number | undefined;
   let listener: PhraseListener | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let paused = false;
+  let dragPaused = false;
+  let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function clearResume(): void {
+    if (resumeTimer !== undefined) {
+      clearTimeout(resumeTimer);
+      resumeTimer = undefined;
+    }
+  }
+
+  function applyPause(): void {
+    listener?.pause?.(paused || dragPaused);
+  }
 
   function clearRetry(): void {
     if (retryTimer !== undefined) {
@@ -73,6 +93,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       onError
     };
     listener = deps.createListener !== undefined ? deps.createListener(options) : createPhraseListener(options);
+    listener.pause?.(paused || dragPaused);
     void listener.start();
   }
 
@@ -138,8 +159,29 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       applyActive();
       applyUi();
     },
+    setPaused(value): void {
+      paused = value;
+      applyPause();
+    },
+    beginDrag(): void {
+      clearResume();
+      dragPaused = true;
+      applyPause();
+    },
+    endDrag(): void {
+      if (!dragPaused) {
+        return;
+      }
+      clearResume();
+      resumeTimer = setTimeout(() => {
+        resumeTimer = undefined;
+        dragPaused = false;
+        applyPause();
+      }, DRAG_RESUME_MS);
+    },
     dispose(): void {
       active = false;
+      clearResume();
       stopListener();
     }
   };

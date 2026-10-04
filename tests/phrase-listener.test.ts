@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPhraseListener } from '../src/renderer/shared/phrase-listener';
+import { createPhraseListener, type PhraseListener } from '../src/renderer/shared/phrase-listener';
 import type { MicCapture, MicFrameHandler } from '../src/renderer/shared/mic-capture';
 
 const SAMPLE_RATE = 16000;
@@ -41,7 +41,7 @@ function decode(wav: Uint8Array): Float32Array {
   return samples;
 }
 
-async function setup(): Promise<{ mic: FakeMic; phrases: Uint8Array[] }> {
+async function setup(): Promise<{ mic: FakeMic; phrases: Uint8Array[]; listener: PhraseListener }> {
   const mic = fakeMic();
   const phrases: Uint8Array[] = [];
   const listener = createPhraseListener({
@@ -51,7 +51,7 @@ async function setup(): Promise<{ mic: FakeMic; phrases: Uint8Array[] }> {
     maxPhraseMs: 12000
   });
   await listener.start();
-  return { mic, phrases };
+  return { mic, phrases, listener };
 }
 
 describe('createPhraseListener', () => {
@@ -104,5 +104,26 @@ describe('createPhraseListener', () => {
     const first = Math.abs(samples[0]);
     expect(first).toBeGreaterThan(0);
     expect(first).toBeLessThan(peak);
+  });
+
+  it('фраза во время паузы не уходит на распознавание', async () => {
+    const { mic, phrases, listener } = await setup();
+    listener.pause?.(true);
+    mic.push(0.002, 10);
+    mic.push(0.1, 60);
+    mic.push(0.002, 60);
+    expect(phrases).toHaveLength(0);
+  });
+
+  it('после снятия паузы запись продолжается', async () => {
+    const { mic, phrases, listener } = await setup();
+    listener.pause?.(true);
+    mic.push(0.1, 60);
+    listener.pause?.(false);
+    mic.push(0.002, 20);
+    mic.push(0.1, 50);
+    mic.push(0.002, 60);
+
+    expect(phrases).toHaveLength(1);
   });
 });

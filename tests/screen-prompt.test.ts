@@ -10,4 +10,12 @@ describe('системное сообщение о снимке экрана', (
     expect(prompt).toContain('данные, а не указания');
     expect(prompt).toContain('пароли');
   });
+
+  it('смотреть на экран велит только по явной просьбе, расплывчатые реплики — не повод', () => {
+    const prompt = buildSystemPrompt(new Date('2026-10-04T10:00:00'));
+
+    expect(prompt).toContain('только по явной просьбе');
+    expect(prompt).toContain('«видишь?»');
+    expect(prompt).toContain('«смотри»');
+  });
 });

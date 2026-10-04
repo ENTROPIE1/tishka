@@ -8,6 +8,11 @@ const REQUEST_TIMEOUT_MS = 30000;
 export const PROBE_TIMEOUT_MS = 3000;
 const NON_ASCII = /[^\x00-\x7F]/;
 
+// Вероятность отсутствия речи в сегменте выше этого порога — фраза шумная.
+const NO_SPEECH_MAX = 0.6;
+// Средняя уверенность сегментов (exp(avg_logprob)) ниже этого порога — результат ненадёжен.
+const MIN_CONFIDENCE = 0.35;
+
 export function resolveBaseUrl(url: string): string {
   return url.replace(/\/+$/, '');
 }
@@ -76,6 +81,74 @@ export async function probe(
   }
 }
 
+function readNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+// Подробный ответ службы (verbose_json) несёт сегменты с вероятностью отсутствия
+// речи и средней логарифмической вероятностью. Если этих полей нет, доверяем
+// результату как раньше: отсеивать нечего.
+export function isUnreliable(data: Record<string, unknown>): boolean {
+  const segments = Array.isArray(data.segments) ? data.segments : [];
+  const noSpeech: number[] = [];
+  const logProbs: number[] = [];
+  for (const segment of segments) {
+    if (!isRecord(segment)) {
+      continue;
+    }
+    const probability = readNumber(segment.no_speech_prob);
+    if (probability !== undefined) {
+      noSpeech.push(probability);
+    }
+    const logProb = readNumber(segment.avg_logprob);
+    if (logProb !== undefined) {
+      logProbs.push(logProb);
+    }
+  }
+  if (noSpeech.length === 0 && logProbs.length === 0) {
+    return false;
+  }
+  const maxNoSpeech = noSpeech.length > 0 ? Math.max(...noSpeech) : 0;
+  const confidence =
+    logProbs.length > 0 ? Math.exp(logProbs.reduce((sum, value) => sum + value, 0) / logProbs.length) : 1;
+  return maxNoSpeech >= NO_SPEECH_MAX || confidence < MIN_CONFIDENCE;
+}
+
+type SendOutcome =
+  | { kind: 'ok'; data: unknown }
+  | { kind: 'unsupported' }
+  | { kind: 'error'; status: number };
+
+function buildForm(bytes: Uint8Array, prompt: string | undefined, verbose: boolean): FormData {
+  const form = new FormData();
+  form.append('file', new Blob([bytes.buffer as ArrayBuffer], { type: 'audio/wav' }), 'audio.wav');
+  form.append('response_format', verbose ? 'verbose_json' : 'json');
+  if (prompt !== undefined && prompt !== '') {
+    form.append('prompt', prompt);
+  }
+  return form;
+}
+
+async function send(
+  fetchFn: typeof fetch,
+  url: string,
+  bytes: Uint8Array,
+  prompt: string | undefined,
+  verbose: boolean,
+  signal: AbortSignal
+): Promise<SendOutcome> {
+  const response = await fetchFn(inferenceUrl(url), {
+    method: 'POST',
+    body: buildForm(bytes, prompt, verbose),
+    signal
+  });
+  if (response.ok) {
+    return { kind: 'ok', data: await response.json() };
+  }
+  // Служба может не поддерживать подробный ответ — повторим с обычным форматом.
+  return verbose ? { kind: 'unsupported' } : { kind: 'error', status: response.status };
+}
+
 export async function transcribeHttp(
   fetchFn: typeof fetch,
   url: string,
@@ -85,13 +158,6 @@ export async function transcribeHttp(
 ): Promise<TranscribeResult> {
   const bytes = new Uint8Array(wav.length);
   bytes.set(wav);
-  const form = new FormData();
-  form.append('file', new Blob([bytes.buffer], { type: 'audio/wav' }), 'audio.wav');
-  form.append('response_format', 'json');
-  if (prompt !== undefined && prompt !== '') {
-    form.append('prompt', prompt);
-  }
-
   const startedAt = Date.now();
   const size = wav.length;
   mark?.('stt.request.start', { bytes: size });
@@ -99,19 +165,22 @@ export async function transcribeHttp(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetchFn(inferenceUrl(url), {
-      method: 'POST',
-      body: form,
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      mark?.('stt.request.end', { ok: false, code: response.status, bytes: size, ms: Date.now() - startedAt });
-      return { ok: false, error: `Служба распознавания ответила с ошибкой ${response.status}` };
+    let outcome = await send(fetchFn, url, bytes, prompt, true, controller.signal);
+    if (outcome.kind === 'unsupported') {
+      outcome = await send(fetchFn, url, bytes, prompt, false, controller.signal);
     }
-    const data: unknown = await response.json();
+    if (outcome.kind !== 'ok') {
+      if (outcome.kind === 'error') {
+        mark?.('stt.request.end', { ok: false, code: outcome.status, bytes: size, ms: Date.now() - startedAt });
+        return { ok: false, error: `Служба распознавания ответила с ошибкой ${outcome.status}` };
+      }
+      mark?.('stt.request.end', { ok: false, bytes: size, ms: Date.now() - startedAt });
+      return { ok: false, error: 'Не удалось обратиться к службе распознавания' };
+    }
+    const data = outcome.data;
     const raw = isRecord(data) && typeof data.text === 'string' ? data.text : '';
     const text = cleanTranscript(raw);
-    if (text === '') {
+    if (text === '' || (isRecord(data) && isUnreliable(data))) {
       mark?.('stt.request.end', { ok: false, bytes: size, chars: 0, ms: Date.now() - startedAt });
       return { ok: false, error: 'Не расслышал' };
     }

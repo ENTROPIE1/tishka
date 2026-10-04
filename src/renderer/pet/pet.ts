@@ -61,7 +61,7 @@ const speaker = createSpeaker({
 });
 const petCard = createPetCard({ element: cardHost, refreshBusy });
 const listen = createListenUi(() => updateBubble(), micThreshold);
-createWakeListener({
+const wakeListener = createWakeListener({
   onConversation: (on) => {
     listen.setConversation(on);
     composer.setListening(on);
@@ -148,6 +148,7 @@ function initCharacter(): void {
     dragging = true;
     dragMoved = false;
     dragLastX = event.screenX;
+    wakeListener.beginDrag();
     interactivity.set(true);
     event.preventDefault();
   });
@@ -174,6 +175,7 @@ function initPointer(): void {
     }
     dragging = false;
     window.tishka.pet.dragEnd();
+    wakeListener.endDrag();
     if (!dragMoved) {
       openComposer();
     }
