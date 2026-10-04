@@ -3,6 +3,7 @@ export type TranscribeResult =
   | { ok: false; error: string };
 
 const REQUEST_TIMEOUT_MS = 30000;
+export const PROBE_TIMEOUT_MS = 3000;
 const NON_ASCII = /[^\x00-\x7F]/;
 
 export function resolveBaseUrl(url: string): string {
@@ -42,12 +43,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-export async function probe(fetchFn: typeof fetch, url: string): Promise<boolean> {
+// Проверка доступности службы с коротким пределом времени: зависший запрос
+// не задерживает общий срок готовности.
+export async function probe(
+  fetchFn: typeof fetch,
+  url: string,
+  timeoutMs: number = PROBE_TIMEOUT_MS
+): Promise<boolean> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const response = await fetchFn(`${resolveBaseUrl(url)}/`, { method: 'GET' });
-    return response.ok;
-  } catch {
-    return false;
+    const request = fetchFn(`${resolveBaseUrl(url)}/`, {
+      method: 'GET',
+      signal: controller.signal
+    }).then(
+      (response) => response.ok,
+      () => false
+    );
+    const expired = new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        resolve(false);
+      }, timeoutMs);
+    });
+    return await Promise.race([request, expired]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
   }
 }
 
