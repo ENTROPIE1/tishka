@@ -58,3 +58,94 @@ describe('createSpeechOutput: приветствие и уведомление',
     expect(spokenTexts(events)).toContain(prepareForSpeech(CANNED.greeting));
   });
 });
+
+type Mode = 'ok' | 'rejected' | 'unreachable';
+
+function errors(events: TishkaEvent[]): string[] {
+  return events.filter((event) => event.type === 'error').map((event) => event.message);
+}
+
+function harness(): {
+  bus: ReturnType<typeof createEventBus>;
+  events: TishkaEvent[];
+  mode: { kind: Mode };
+  calls: { count: number };
+  clock: { now: number };
+} {
+  const bus = createEventBus();
+  const events: TishkaEvent[] = [];
+  const mode = { kind: 'ok' as Mode };
+  const calls = { count: 0 };
+  const clock = { now: 0 };
+  const fetchMock = (async () => {
+    calls.count += 1;
+    if (mode.kind === 'unreachable') {
+      throw new Error('ECONNREFUSED');
+    }
+    if (mode.kind === 'rejected') {
+      return new Response('{}', { status: 500 });
+    }
+    return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+  }) as unknown as typeof fetch;
+  createSpeechOutput({
+    bus,
+    getConfig: () => config(),
+    play: () => Promise.resolve(),
+    fetch: fetchMock,
+    now: () => clock.now
+  });
+  bus.on((event) => events.push(event));
+  return { bus, events, mode, calls, clock };
+}
+
+async function settle(): Promise<void> {
+  for (let index = 0; index < 50; index += 1) {
+    await Promise.resolve();
+  }
+}
+
+describe('createSpeechOutput: устойчивость синтеза', () => {
+  it('ошибка 500 на одной реплике не глушит следующую', async () => {
+    const h = harness();
+    h.mode.kind = 'rejected';
+    h.bus.emit({ type: 'reply', reply: { say: 'Первая реплика' } });
+    await settle();
+
+    h.mode.kind = 'ok';
+    h.bus.emit({ type: 'reply', reply: { say: 'Вторая реплика' } });
+    await settle();
+
+    expect(spokenTexts(h.events)).not.toContain(prepareForSpeech('Первая реплика'));
+    expect(spokenTexts(h.events)).toContain(prepareForSpeech('Вторая реплика'));
+    expect(errors(h.events)).toHaveLength(0);
+    expect(h.calls.count).toBe(2);
+  });
+
+  it('обрыв: пауза 15 секунд, сообщение, восстановление и повторный уход', async () => {
+    const h = harness();
+    h.mode.kind = 'unreachable';
+    h.bus.emit({ type: 'reply', reply: { say: 'Раз реплика' } });
+    await settle();
+    expect(errors(h.events)).toHaveLength(1);
+    expect(h.calls.count).toBe(1);
+
+    h.clock.now = 14000;
+    h.bus.emit({ type: 'reply', reply: { say: 'Два реплика' } });
+    await settle();
+    expect(h.calls.count).toBe(1);
+
+    h.clock.now = 20000;
+    h.mode.kind = 'ok';
+    h.bus.emit({ type: 'reply', reply: { say: 'Три реплика' } });
+    await settle();
+    expect(h.calls.count).toBe(2);
+    expect(spokenTexts(h.events)).toContain(prepareForSpeech('Три реплика'));
+    expect(errors(h.events)).toHaveLength(1);
+
+    h.mode.kind = 'unreachable';
+    h.clock.now = 100000;
+    h.bus.emit({ type: 'reply', reply: { say: 'Четыре реплика' } });
+    await settle();
+    expect(errors(h.events)).toHaveLength(2);
+  });
+});

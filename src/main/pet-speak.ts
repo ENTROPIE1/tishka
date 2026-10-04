@@ -20,7 +20,7 @@ export interface SpeechOutput {
   dispose(): void;
 }
 
-const AVAILABILITY_RETRY_MS = 60000;
+const AVAILABILITY_RETRY_MS = 15000;
 const EXAMPLE_TEXT = 'Привет, я Тишка. Сейчас девять часов тридцать минут.';
 const STOP_WORD = /(^|[\s.,!?])стоп(?=[\s.,!?]|$)/i;
 
@@ -35,7 +35,6 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
   });
   let unavailable = false;
   let nextProbeAt = 0;
-  let reported = false;
   let stopToken = 0;
   let chain: Promise<void> = Promise.resolve();
 
@@ -53,21 +52,23 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     return createTtsClient({ url: deps.getConfig().voice.tts.url, fetch: deps.fetch });
   }
 
-  async function wavFor(text: string, prepared: string): Promise<Uint8Array | undefined> {
+  async function wavFor(text: string, prepared: string, force: boolean): Promise<Uint8Array | undefined> {
     const cached = cache.get(text);
     if (cached !== undefined) {
       return cached;
     }
-    if (unavailable && now() < nextProbeAt) {
+    if (!force && unavailable && now() < nextProbeAt) {
       return undefined;
     }
     const result = await client().synthesize(prepared);
     if (!result.ok) {
-      unavailable = true;
-      nextProbeAt = now() + AVAILABILITY_RETRY_MS;
-      if (!reported) {
-        reported = true;
-        deps.bus.emit({ type: 'error', message: 'Голос недоступен, говорю текстом' });
+      // Ошибка на конкретный текст голос не глушит: следующая реплика синтезируется как обычно.
+      if (result.kind === 'unreachable') {
+        if (!unavailable) {
+          unavailable = true;
+          deps.bus.emit({ type: 'error', message: 'Голос недоступен, говорю текстом' });
+        }
+        nextProbeAt = now() + AVAILABILITY_RETRY_MS;
       }
       return undefined;
     }
@@ -91,7 +92,7 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
       return;
     }
     const token = stopToken;
-    const wav = await wavFor(trimmed, prepared);
+    const wav = await wavFor(trimmed, prepared, force);
     if (wav === undefined || token !== stopToken) {
       return;
     }
@@ -147,7 +148,7 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
       for (const text of CANNED_TEXTS) {
         const prepared = prepareForSpeech(text);
         if (prepared !== '') {
-          void wavFor(text, prepared).catch(() => undefined);
+          void wavFor(text, prepared, false).catch(() => undefined);
         }
       }
     },
