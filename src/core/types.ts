@@ -99,7 +99,7 @@ export interface SecretStore {
 }
 
 export interface Config {
-  llm: { baseUrl: string; model: string; visionModel: string };
+  llm: { baseUrl: string; model: string; visionModel: string; api: 'chat' | 'responses' };   // api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses)
   voice: {
     hotkey: string;
     wakeWords: string[];

@@ -160,7 +160,7 @@ interface SecretStore {
 }
 
 interface Config {
-  llm: { baseUrl: string; model: string; visionModel: string };
+  llm: { baseUrl: string; model: string; visionModel: string; api: 'chat' | 'responses' };   // api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses, формат OpenAI Responses)
   voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number }; tts: { enabled: boolean; url: string; volume: number } };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
@@ -195,6 +195,6 @@ type McpServerConfig =
 
 ## Модель
 
-Шлюз совместим с OpenAI API (`/chat/completions`). Адрес и имена моделей берутся из `Config.llm`, ключ из `SecretStore` (`DKS_API_KEY`). В тестах и скриптах проверки ключ читается из переменной окружения `DKS_API_KEY`.
+Шлюз совместим с OpenAI API (`/chat/completions`). Адрес и имена моделей берутся из `Config.llm`, ключ из `SecretStore` (`DKS_API_KEY`). В тестах и скриптах проверки ключ читается из переменной окружения `DKS_API_KEY`. При `llm.api === 'responses'` клиент отправляет запросы в формате OpenAI Responses (`POST <адрес>/responses`) и приводит ответы к тому же внутреннему виду; остальной код о формате не знает. Неизвестное значение `llm.api` читается как `'chat'`.
 
-Проверка шлюза без сохранения настроек — канал `tishka:config:check-gateway`. Принимает `{ baseUrl: string; model: string; key?: string }`, ключ из поля важнее сохранённого. Возвращает `{ ok: boolean; models: string[]; error?: string; ms: number }`. Ключ в окно не возвращается. Адрес нормализуется: пробелы по краям и завершающие `/` убираются, хвост `/chat/completions` отбрасывается, адрес без `http://` или `https://` — ошибка.
+Проверка шлюза без сохранения настроек — канал `tishka:config:check-gateway`. Принимает `{ baseUrl: string; model: string; key?: string; api?: 'chat' | 'responses' }`, ключ из поля важнее сохранённого, неизвестный формат читается как `'chat'`. Возвращает `{ ok: boolean; models: string[]; error?: string; ms: number }`. Ключ в окно не возвращается. Адрес нормализуется: пробелы по краям и завершающие `/` убираются, хвост `/chat/completions` отбрасывается, адрес без `http://` или `https://` — ошибка.

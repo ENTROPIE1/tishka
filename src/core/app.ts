@@ -65,7 +65,7 @@ export interface TishkaCore {
   stop(): Promise<void>;
   handleUserText(text: string): Promise<Reply>;
   hasGatewayKey(): Promise<boolean>;
-  checkGateway(input: { baseUrl: string; model: string; key?: string }): Promise<GatewayCheckResult>;
+  checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult>;
   config(): Config;
   mcpStatus(): McpStatus[];
   reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
@@ -201,6 +201,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     baseUrl: string;
     model: string;
     key?: string;
+    api?: string;
   }): Promise<GatewayCheckResult> {
     const explicit = typeof input.key === 'string' ? input.key.trim() : '';
     const apiKey = explicit !== '' ? explicit : await gatewayKey();
@@ -208,7 +209,12 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       return { ok: false, models: [], error: 'Ключ шлюза не задан', ms: 0 };
     }
     return runGatewayCheck(
-      { baseUrl: input.baseUrl, model: input.model, apiKey },
+      {
+        baseUrl: input.baseUrl,
+        model: input.model,
+        apiKey,
+        api: input.api === 'responses' ? 'responses' : 'chat'
+      },
       { fetch: deps.fetch }
     );
   }
@@ -308,6 +314,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     const llm = createLlmClient({
       baseUrl: () => config.llm.baseUrl,
       getApiKey: gatewayKey,
+      api: () => config.llm.api,
       fetch: deps.fetch
     });
 

@@ -153,4 +153,26 @@ describe('настройки действуют без перезапуска', 
 
     expect(models[1]).toBe('DKS-Vision-2');
   });
+
+  it('смена llm.api переводит запросы в формат Responses без перезапуска', async () => {
+    const urls: string[] = [];
+    const fetchMock = vi.fn<typeof fetch>(async (url) => {
+      urls.push(String(url));
+      return new Response(
+        JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: 'Готово' }] }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+    const { core } = await setupCore({ fetch: fetchMock });
+
+    await core.handleUserText('первый');
+    await core.saveConfig({
+      ...core.config(),
+      llm: { ...core.config().llm, api: 'responses' }
+    });
+    await core.handleUserText('второй');
+
+    expect(urls[0]).toContain('/chat/completions');
+    expect(urls[1].endsWith('/responses')).toBe(true);
+  });
 });
