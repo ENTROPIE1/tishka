@@ -4,3 +4,4 @@ out/
 .env
 .env.*
 *.log
+__pycache__/
