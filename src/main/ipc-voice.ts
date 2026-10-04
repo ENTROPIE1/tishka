@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import type { SttService, TranscribeResult } from '../voice/stt-service';
+import { START_CANCELLED, type SttService, type TranscribeResult } from '../voice/stt-service';
 import {
   VOICE_APPLY_CHANNEL,
   VOICE_CALIBRATION_CHANNEL,
@@ -38,14 +38,27 @@ export function registerVoiceIpc(deps: VoiceIpcDeps): void {
   });
 
   // «Проверить»: перезапускает службу распознавания и отдаёт её состояние.
-  ipcMain.handle(VOICE_CHECK_CHANNEL, async (): Promise<VoiceStateView> => {
+  // Если запуск вытеснен новым, отдаём итог нового, а не «Запуск отменён».
+  let generation = 0;
+  let current: Promise<VoiceStateView> | undefined;
+  async function check(): Promise<VoiceStateView> {
+    generation += 1;
+    const mine = generation;
     deps.stt.stop();
     const result = await deps.stt.start();
+    if (result.error === START_CANCELLED && mine !== generation && current !== undefined) {
+      return current;
+    }
     const view: VoiceStateView = { state: deps.stt.status() };
     if (result.error !== undefined) {
       view.error = result.error;
     }
     return view;
+  }
+  ipcMain.handle(VOICE_CHECK_CHANNEL, (): Promise<VoiceStateView> => {
+    const promise = check();
+    current = promise;
+    return promise;
   });
 
   ipcMain.handle(VOICE_APPLY_CHANNEL, (_event, hotkey: unknown) => {
