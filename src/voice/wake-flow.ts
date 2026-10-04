@@ -2,6 +2,7 @@ import type { Config, EventBus } from '../core/types';
 import type { SttStatus, TranscribeResult } from './stt-service';
 import { NOT_READY_MESSAGE, planToggle } from './talk-toggle';
 import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
+import { createPhraseQueue, routeStaleText, type StaleTextDeps } from './stale-phrase';
 
 export type WakeCommand = 'listen' | 'conversation-on' | 'conversation-off';
 
@@ -48,10 +49,8 @@ const SOON_MS = 5000;
 export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   let conversation = false;
   let owner: TalkSurface | null = null;
-  let recognizing = false;
   let answering = false;
   let soon = false;
-  let pending: Uint8Array | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let soonTimer: ReturnType<typeof setTimeout> | undefined;
   let lastErrorAt = -Infinity;
@@ -114,10 +113,19 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     deps.onWaitingChange?.();
   }
 
+  // Обращение без просьбы: показать запись и слушать дальше.
+  function startListen(): void {
+    deps.bus.emit({ type: 'listen.start' });
+    deps.sendCommand('listen');
+  }
+
+  // Включение разговора: ждущая фраза сказана при выключенном режиме и
+  // отбрасывается, идущее распознавание помечается устаревшим.
   function enableConversation(by: TalkSurface = 'pet'): void {
     conversation = true;
     owner = by;
     waiting = null;
+    queue.conversationEnabled();
     deps.sendCommand('conversation-on');
     armTimer();
   }
@@ -162,10 +170,13 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     }
   }
 
+  // Выключение разговора: сказанное при включённом режиме и не распознанное
+  // устаревает — в ядро оно не уйдёт.
   function disableConversation(hide: boolean, by?: TalkSurface): void {
     const surface = by ?? owner;
     conversation = false;
     owner = null;
+    queue.conversationDisabled();
     clearTimer();
     deps.sendCommand('conversation-off');
     // Скрывается только окно-питомец: уход по тишине или просьбе в чате
@@ -208,15 +219,14 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       if (conversation) {
         return;
       }
-      deps.bus.emit({ type: 'listen.start' });
-      deps.sendCommand('listen');
+      startListen();
       return;
     }
     if (isDismiss(match.rest, deps.getVoice().wakeWords)) {
       dismiss();
       return;
     }
-    deps.bus.emit({ type: 'listen.start' });
+    startListen();
     answering = true;
     if (!conversation && !suppressed) {
       enableConversation();
@@ -230,64 +240,58 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       });
   }
 
-  function routeText(text: string): void {
-    if (conversation) {
-      routeConversation(text);
-    } else {
-      routeWake(text);
-    }
-  }
-
-  // Возвращает true, если фраза — событие для человека и стоит заводить таймер.
-  async function transcribe(wav: Uint8Array): Promise<boolean> {
-    const result = await deps.stt.transcribe(wav, wakePrompt(deps.getVoice().wakeWords, deps.memoryName?.()));
+  // Текст направляется по состоянию разговора на момент фразы: сказанное при
+  // другом состоянии проверяется только на имя и репликой не становится.
+  function onResult(result: TranscribeResult, stale: boolean): void {
     if (result.ok) {
-      routeText(result.text);
-      return true;
+      if (stale) {
+        routeStaleText(staleDeps, result.text);
+      } else if (conversation) {
+        routeConversation(result.text);
+      } else {
+        routeWake(result.text);
+      }
+      armTimer();
+      return;
     }
     // Пустой или шумовой отклик распознавания человеку не показываем:
     // запись сработала на стук клавиш, прослушивание продолжается.
     if (result.empty === true) {
-      return false;
+      return;
     }
     if (result.error !== 'Не расслышал') {
       reportError(result.error);
     } else {
       deps.onMissedSpeech?.();
     }
-    return true;
+    armTimer();
   }
 
-  function handlePhrase(wav: Uint8Array): void {
-    const voice = deps.getVoice();
-    if (!conversation && !voice.wakeEnabled) {
-      return;
-    }
+  // Фраза распознаётся, пока включён разговор или прослушивание имени,
+  // и человек в этот момент не получает ответ.
+  function acceptPhrase(): boolean {
     if (answering) {
-      return;
+      return false;
     }
-    if (recognizing) {
-      pending = wav;
-      return;
-    }
-    recognizing = true;
-    void transcribe(wav)
-      .then((heard) => {
-        // Ложное срабатывание (пустой отклик) не продлевает тишину разговора.
-        // Во время ответа armTimer ничего не делает — таймер заведёт его конец.
-        if (heard) {
-          armTimer();
-        }
-      })
-      .finally(() => {
-        recognizing = false;
-        const next = pending;
-        pending = undefined;
-        if (next !== undefined) {
-          handlePhrase(next);
-        }
-      });
+    return conversation || deps.getVoice().wakeEnabled;
   }
+
+  function transcribe(wav: Uint8Array): Promise<TranscribeResult> {
+    return deps.stt.transcribe(wav, wakePrompt(deps.getVoice().wakeWords, deps.memoryName?.()));
+  }
+
+  const staleDeps: StaleTextDeps = {
+    bus: deps.bus,
+    wakeWords: () => deps.getVoice().wakeWords,
+    inConversation: () => conversation,
+    startListen
+  };
+
+  const queue = createPhraseQueue({
+    accept: acceptPhrase,
+    transcribe,
+    onResult
+  });
 
   const unsubscribe = deps.bus.on((event) => {
     if (event.type === 'wake') {
@@ -296,7 +300,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   });
 
   return {
-    handlePhrase,
+    handlePhrase: (wav) => queue.add(wav),
     isConversation: () => conversation,
     conversationOwner: () => owner,
     isLeavingSoon: () => soon,
@@ -377,7 +381,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     stop(): void {
       clearTimer();
       waiting = null;
-      pending = undefined;
+      queue.dropPending();
       unsubscribe();
     }
   };
