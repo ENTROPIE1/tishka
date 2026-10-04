@@ -1,12 +1,12 @@
 import type { Config } from '../../core/types';
 import type { TtsHealth } from '../../voice/tts-client';
-import { button, clear, el, field, runWithFeedback, sectionTitle, textInput } from './dom';
+import { button, checkboxField, clear, el, field, runWithFeedback, sectionTitle, textInput, type SettingsSection } from './dom';
 
 const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
 const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
 const SAY_LABELS = { busy: 'Говорю…', done: 'Готово', error: 'Ошибка' };
 
-export function mountSpeechSection(root: HTMLElement): void {
+export function mountSpeechSection(root: HTMLElement): SettingsSection {
   clear(root);
   root.append(sectionTitle('Речь вслух'));
 
@@ -24,7 +24,7 @@ export function mountSpeechSection(root: HTMLElement): void {
   const messages = el('div', 'messages');
 
   root.append(
-    field('Говорить вслух', enabled, 'Реплики Тишки произносит служба синтеза; текст карточек остаётся на экране'),
+    checkboxField('Говорить вслух', enabled, 'Реплики Тишки произносит служба синтеза; текст карточек остаётся на экране'),
     field('Адрес службы синтеза', url, 'Например, http://127.0.0.1:8179'),
     field('Громкость', volume, 'От 0 до 1'),
     field('Состояние службы', state)
@@ -129,4 +129,6 @@ export function mountSpeechSection(root: HTMLElement): void {
     () => refreshHealth(),
     (error: unknown) => show(error instanceof Error ? error.message : String(error))
   );
+
+  return { refresh: () => void refresh() };
 }

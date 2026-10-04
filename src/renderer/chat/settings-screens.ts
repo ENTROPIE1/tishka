@@ -21,11 +21,11 @@ function section(id: string): HTMLElement {
 export function mountSettingsScreens(): Partial<Record<ScreenName, SettingsSection>> {
   const voiceSection = section('voice-section');
   const voice = mountVoiceSection(voiceSection);
-  // Раздел речи идёт под разделом голоса, не меняя его файл.
+  // Раздел речи идёт под разделом голоса и перечитывается вместе с ним.
   const speechSection = voiceSection.ownerDocument.createElement('section');
   speechSection.className = 'section';
   voiceSection.after(speechSection);
-  mountSpeechSection(speechSection);
+  const speech = mountSpeechSection(speechSection);
   const connectionsSection = section('connections-section');
   const webSection = connectionsSection.ownerDocument.createElement('section');
   webSection.className = 'section';
@@ -37,7 +37,7 @@ export function mountSettingsScreens(): Partial<Record<ScreenName, SettingsSecti
       mountWebSection(webSection)
     ]),
     memory: mountMemorySection(section('memory-section')),
-    voice,
+    voice: combineSections([voice, speech]),
     persona: mountPersonaSection(section('persona-section'))
   };
 }

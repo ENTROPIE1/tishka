@@ -101,7 +101,7 @@ type TishkaEvent =
   | { type: 'speak.end' }
   | { type: 'notify'; title: string; skillId?: string }
   | { type: 'background.tick'; tool: string }
-  | { type: 'skill.saved'; skillId: string }
+  | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'skill.removed'; skillId: string }
   | { type: 'error'; message: string }
   | { type: 'idle' };

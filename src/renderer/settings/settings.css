@@ -64,8 +64,34 @@
 .field {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
   margin-bottom: 12px;
+}
+
+.voice-group {
+  margin-bottom: 16px;
+}
+
+.group-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.check-row .checkbox-input {
+  flex: none;
+}
+
+.check-label {
+  font-size: 13px;
 }
 
 .field-label {
@@ -160,6 +186,13 @@
   border: 1px solid var(--border);
 }
 
+/* Подпись и значок внутри кнопки не рисуют свой фон, рамку и отступы. */
+.button > span:not(.spinner) {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
 .spinner {
   display: inline-block;
   width: 12px;
@@ -238,11 +271,23 @@
 }
 
 .state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   border-radius: 6px;
   padding: 1px 7px;
   background: var(--surface-soft);
   color: var(--muted);
+}
+
+.state::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .state-connected {
@@ -299,6 +344,19 @@
 .empty {
   color: var(--muted);
   font-size: 13px;
+}
+
+.mic-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.mic-controls .field {
+  flex: 1 1 240px;
+  margin-bottom: 0;
 }
 
 .mic-check {

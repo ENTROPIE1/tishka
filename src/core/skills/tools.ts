@@ -139,7 +139,7 @@ export function registerSkillTools(registry: ToolRegistry, deps: SkillToolsDeps)
       return validationFailed(result.errors);
     }
     await deps.store.save(result.skill);
-    deps.events.emit({ type: 'skill.saved', skillId: result.skill.id });
+    deps.events.emit({ type: 'skill.saved', skillId: result.skill.id, source: 'dialog' });
     return ok(`Навык сохранён: ${result.skill.name}`, result.skill);
   });
 

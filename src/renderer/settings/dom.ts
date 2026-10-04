@@ -97,6 +97,18 @@ export function field(label: string, input: HTMLElement, hint?: string): HTMLEle
   return wrapper;
 }
 
+// Флажок слева, подпись справа в одной строке, пояснение под ними.
+export function checkboxField(label: string, input: HTMLElement, hint?: string): HTMLElement {
+  const wrapper = el('label', 'field check-field');
+  const row = el('span', 'check-row');
+  row.append(input, el('span', 'check-label', label));
+  wrapper.append(row);
+  if (hint !== undefined) {
+    wrapper.append(el('span', 'field-hint', hint));
+  }
+  return wrapper;
+}
+
 export function selectInput(options: Array<{ value: string; label: string }>, value: string): HTMLSelectElement {
   const node = el('select', 'select-input');
   for (const option of options) {

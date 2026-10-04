@@ -18,6 +18,14 @@ const DICTIONARY: Record<string, string> = {
   id: 'ай-ди'
 };
 
+// Винительный падеж для слов словаря, оканчивающихся на «а».
+const ACCUSATIVE_FORMS: Record<string, string> = {
+  'джира': 'джиру'
+};
+
+// После этих слов латиница словаря идёт в винительном падеже: «открой джиру».
+const ACCUSATIVE_TRIGGERS = new Set(['и', 'в', 'из', 'открой', 'проверь', 'посмотри', 'покажи', 'обнови', 'запусти']);
+
 const DIGRAPHS: Array<[string, string]> = [
   ['sh', 'ш'],
   ['ch', 'ч'],
@@ -92,10 +100,22 @@ const LETTER_NAMES: Record<string, string> = {
 
 const LATIN_WORD = /[A-Za-z]+(?:['’.-][A-Za-z]+)*/g;
 
-function translateWord(raw: string): string {
+// Последнее слово перед латиницей: по нему выбирается падеж.
+function previousWord(before: string): string {
+  const match = before.match(/([А-Яа-яЁёA-Za-z]+)[^А-Яа-яЁёA-Za-z]*$/);
+  return match === null ? '' : match[1].toLowerCase();
+}
+
+function translateWord(raw: string, prev: string): string {
   const key = raw.toLowerCase().replace(/[’]/g, "'");
   const known = DICTIONARY[key];
   if (known !== undefined) {
+    if (ACCUSATIVE_TRIGGERS.has(prev)) {
+      const accusative = ACCUSATIVE_FORMS[known];
+      if (accusative !== undefined) {
+        return accusative;
+      }
+    }
     return known;
   }
   const letters = key.replace(/[^a-z]/g, '');
@@ -113,5 +133,5 @@ function translateWord(raw: string): string {
 }
 
 export function prepareLatin(text: string): string {
-  return text.replace(LATIN_WORD, (word: string) => translateWord(word));
+  return text.replace(LATIN_WORD, (word: string, offset: number) => translateWord(word, previousWord(text.slice(0, offset))));
 }

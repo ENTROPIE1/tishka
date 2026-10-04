@@ -376,7 +376,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
         }
         throw error;
       }
-      deps.events.emit({ type: 'skill.saved', skillId: skill.id });
+      deps.events.emit({ type: 'skill.saved', skillId: skill.id, source: 'screen' });
       return { ok: true };
     },
 
@@ -398,7 +398,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
         return false;
       }
       await skillStore.save({ ...skill, enabled });
-      deps.events.emit({ type: 'skill.saved', skillId: id });
+      deps.events.emit({ type: 'skill.saved', skillId: id, source: 'screen' });
       return true;
     },
 
@@ -431,7 +431,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       }
       const result = await installPreset(deps.presetsDir, id, skillStore, { overwrite: overwrite === true });
       if (result.ok) {
-        deps.events.emit({ type: 'skill.saved', skillId: id });
+        deps.events.emit({ type: 'skill.saved', skillId: id, source: 'screen' });
       }
       return result;
     },

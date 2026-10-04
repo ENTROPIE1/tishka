@@ -57,9 +57,15 @@ describe('prepareForSpeech: латиница', () => {
   it('словарь и аббревиатуры', () => {
     const result = prepareForSpeech('Открой Confluence и Jira');
     expect(result).not.toMatch(/[A-Za-z]/);
-    expect(result).toBe('Открой конфлюенс и джира');
+    expect(result).toBe('Открой конфлюенс и джиру');
     expect(prepareForSpeech('VPN')).toBe('ВИ-ПИ-ЭН');
     expect(prepareForSpeech('API')).toBe('а-пи-ай');
+  });
+
+  it('слово на «а» склоняется после глагола и «и», иначе именительный', () => {
+    expect(prepareForSpeech('Открой Confluence и Jira')).toBe('Открой конфлюенс и джиру');
+    expect(prepareForSpeech('Проверь Jira')).toBe('Проверь джиру');
+    expect(prepareForSpeech('Jira недоступна')).toBe('джира недоступна');
   });
 
   it('незнакомое слово транслитерируется', () => {

@@ -124,7 +124,7 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       return enter(base, 'notify', now);
     }
     case 'skill.saved':
-      return enter(model, 'happy', now, ['idle']);
+      return event.source === 'dialog' ? enter(model, 'happy', now, ['idle']) : model;
     case 'error':
       return enter(model, 'confused', now);
     case 'idle':

@@ -166,7 +166,7 @@ export function registerPresetTools(registry: ToolRegistry, deps: PresetToolsDep
     if (!result.ok) {
       return fail(result.error);
     }
-    deps.events.emit({ type: 'skill.saved', skillId: id.trim() });
+    deps.events.emit({ type: 'skill.saved', skillId: id.trim(), source: 'dialog' });
     return ok(`Навык установлен: ${id.trim()}`);
   });
 }

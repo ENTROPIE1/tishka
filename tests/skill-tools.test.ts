@@ -95,7 +95,7 @@ describe('save_skill', () => {
     expect(result.ok).toBe(true);
     expect(result.content).toContain('Навык сохранён: Утренние ссылки');
     expect(store.saved.has('morning-links')).toBe(true);
-    expect(savedEvents(events)).toEqual([{ type: 'skill.saved', skillId: 'morning-links' }]);
+    expect(savedEvents(events)).toEqual([{ type: 'skill.saved', skillId: 'morning-links', source: 'dialog' }]);
   });
 
   it('неизвестный инструмент в шаге: ok false, ошибка в content, навыка и события нет', async () => {
@@ -149,8 +149,8 @@ describe('save_skill', () => {
     expect(store.saved.size).toBe(1);
     expect(store.saved.get('morning-links')?.name).toBe('Ссылки на утро');
     expect(savedEvents(events)).toEqual([
-      { type: 'skill.saved', skillId: 'morning-links' },
-      { type: 'skill.saved', skillId: 'morning-links' }
+      { type: 'skill.saved', skillId: 'morning-links', source: 'dialog' },
+      { type: 'skill.saved', skillId: 'morning-links', source: 'dialog' }
     ]);
   });
 

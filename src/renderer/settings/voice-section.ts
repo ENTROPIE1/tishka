@@ -1,9 +1,8 @@
-import type { Config } from '../../core/types';
 import type { VoiceStateView } from '../../main/ipc-settings';
 import type { VadSensitivity } from '../../voice/vad';
-import { createMicCheck } from '../shared/mic-check';
 import {
   button,
+  checkboxField,
   clear,
   el,
   field,
@@ -13,6 +12,8 @@ import {
   textInput,
   type SettingsSection
 } from './dom';
+import { createMicTestPanel } from './mic-test-panel';
+import { saveVoice } from './voice-save';
 
 const STATE_LABELS: Record<VoiceStateView['state'], string> = {
   off: 'не настроена',
@@ -28,56 +29,73 @@ const SENSITIVITY_OPTIONS = [
 ];
 
 const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
-const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
+const CHECK_LABELS = { busy: 'Перезапускаю…', done: 'Готово', error: 'Ошибка' };
 const POLL_MS = 1000;
-const MIC_CHECK_MS = 5000;
+
+function group(title: string, ...children: HTMLElement[]): HTMLElement {
+  const box = el('div', 'voice-group');
+  box.append(el('h3', 'group-title', title), ...children);
+  return box;
+}
 
 export function mountVoiceSection(root: HTMLElement): SettingsSection {
   clear(root);
   root.append(sectionTitle('Голос'));
 
   const hotkey = textInput();
-  const exe = textInput();
-  const model = textInput();
   const wakeEnabled = el('input', 'checkbox-input');
   wakeEnabled.type = 'checkbox';
   const wakeWords = textInput();
   const talkTimeout = textInput('', 'number');
   const sensitivity = selectInput(SENSITIVITY_OPTIONS, 'normal');
+  const exe = textInput();
+  const model = textInput();
   const state = el('span', 'state state-off', STATE_LABELS.off);
+  const check = button('Перезапустить службу', 'button button-secondary');
   const save = button('Сохранить');
-  const check = button('Проверить', 'button button-secondary');
   const messages = el('div', 'messages');
 
-  const checkMic = button('Проверить микрофон', 'button button-secondary');
-  const micFill = el('div', 'level-fill');
-  const micMark = el('div', 'level-mark');
-  const micLevel = el('div', 'level');
-  micLevel.append(micFill, micMark);
-  const micLabel = el('span', 'field-hint', '');
-  const micText = el('div', 'mic-check-text', '');
-  const micBox = el('div', 'mic-check');
-  micBox.append(micLevel, micLabel, micText);
-
-  root.append(
-    field('Горячая клавиша', hotkey, 'Например, Control+Alt+Space'),
-    field(
-      'Откликаться на имя',
-      wakeEnabled,
-      'Микрофон слушается постоянно, речь распознаётся на этом компьютере и никуда не передаётся; фразы без имени сразу отбрасываются'
-    ),
-    field('Имена', wakeWords, 'Через запятую, например: тишка, ёжик'),
-    field('Уходить после тишины, секунд', talkTimeout),
+  const micTest = createMicTestPanel({
+    sensitivity: () => sensitivity.value as VadSensitivity,
+    dictate: (wav) => window.tishka.voice.dictate(wav),
+    showError: (message) => show(message)
+  });
+  const micControls = el('div', 'mic-controls');
+  micControls.append(
     field('Чувствительность микрофона', sensitivity, 'Насколько тихую речь слышать; если Тишка отвечает «Не расслышал», поднимите'),
+    micTest.controls
+  );
+
+  const service = group(
+    'Служба распознавания',
     field('Программа распознавания', exe, 'Путь к whisper-server без кириллицы; пусто — служба не запускается'),
     field('Модель распознавания', model),
     field('Состояние службы', state)
   );
+  const serviceActions = el('div', 'row');
+  serviceActions.append(check);
+  service.append(serviceActions);
+
   const actions = el('div', 'row');
-  actions.append(save, check);
-  const micActions = el('div', 'row');
-  micActions.append(checkMic);
-  root.append(actions, micActions, micBox, messages);
+  actions.append(save);
+
+  root.append(
+    group(
+      'Как звать Тишку',
+      field('Горячая клавиша', hotkey, 'Например, Control+Alt+Space'),
+      checkboxField(
+        'Откликаться на имя',
+        wakeEnabled,
+        'Микрофон слушается постоянно, речь распознаётся на этом компьютере и никуда не передаётся; фразы без имени сразу отбрасываются'
+      ),
+      field('Имена', wakeWords, 'Через запятую, например: тишка, ёжик'),
+      field('Уходить после тишины, секунд', talkTimeout)
+    ),
+    group('Микрофон', micControls, micTest.box),
+    service,
+    actions,
+    messages
+  );
 
   function show(error?: string): void {
     clear(messages);
@@ -136,41 +154,10 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     await watchStatus();
   }
 
-  function parseWords(value: string, fallback: string[]): string[] {
-    const words = value
-      .split(',')
-      .map((word) => word.trim())
-      .filter((word) => word !== '');
-    return words.length > 0 ? words : fallback;
-  }
-
-  function parseTimeout(value: string, fallback: number): number {
-    const number = Number(value);
-    return Number.isFinite(number) && number > 0 ? Math.round(number) : fallback;
-  }
-
   save.addEventListener('click', () => {
     void runWithFeedback(save, SAVE_LABELS, async () => {
       try {
-        const view = await window.tishka.config.get();
-        const next: Config = {
-          ...view.config,
-          voice: {
-            ...view.config.voice,
-            hotkey: hotkey.value.trim(),
-            wakeEnabled: wakeEnabled.checked,
-            wakeWords: parseWords(wakeWords.value, view.config.voice.wakeWords),
-            talkTimeoutSec: parseTimeout(talkTimeout.value, view.config.voice.talkTimeoutSec),
-            sensitivity: sensitivity.value as VadSensitivity,
-            stt: {
-              ...view.config.voice.stt,
-              exe: exe.value.trim(),
-              model: model.value.trim()
-            }
-          }
-        };
-        await window.tishka.config.save(next);
-        await window.tishka.voice.apply(next.voice.hotkey);
+        await saveVoice({ hotkey, wakeEnabled, wakeWords, talkTimeout, sensitivity, exe, model });
         show();
         messages.append(el('div', 'message-ok', 'Настройки голоса сохранены'));
         watchLeft = 10;
@@ -191,43 +178,6 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
         throw error;
       }
     });
-  });
-
-  checkMic.addEventListener('click', () => {
-    checkMic.disabled = true;
-    micFill.style.width = '0%';
-    micLabel.textContent = 'Слушаю…';
-    micText.textContent = '';
-    const checkRun = createMicCheck(
-      {
-        onProgress(level, heard): void {
-          micFill.style.width = `${Math.round(level * 100)}%`;
-          micLabel.textContent = heard ? 'слышу речь' : 'тихо';
-        },
-        onDone(result): void {
-          checkMic.disabled = false;
-          if (result.error !== undefined) {
-            show(result.error);
-            return;
-          }
-          if (result.wav === undefined) {
-            micLabel.textContent = 'тихо';
-            micText.textContent = 'Речь не услышана';
-            return;
-          }
-          void window.tishka.voice
-            .dictate(result.wav)
-            .then((outcome) => {
-              micText.textContent = outcome.ok ? outcome.text : outcome.error;
-            })
-            .catch((error: unknown) => {
-              show(error instanceof Error ? error.message : String(error));
-            });
-        }
-      },
-      { durationMs: MIC_CHECK_MS, sensitivity: sensitivity.value as VadSensitivity }
-    );
-    checkRun.start();
   });
 
   void refresh();

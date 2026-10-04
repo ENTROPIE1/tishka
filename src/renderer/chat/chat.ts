@@ -1,5 +1,6 @@
 import { createChatFeed } from './feed';
 import { initAppShell } from './navigation';
+import { appendSkillSaveCard } from './skill-card';
 import { createTalkMode, type TalkMode } from './talk-mode';
 import { mountChatToolbar } from './toolbar';
 
@@ -72,7 +73,7 @@ function initEvents(): void {
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;
       case 'skill.saved':
-        view.appendSkillCard(event.skillId);
+        appendSkillSaveCard(view, event);
         break;
       case 'error':
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.message });
