@@ -104,6 +104,10 @@
   color: var(--muted);
 }
 
+.model-warning {
+  color: var(--danger);
+}
+
 .text-input,
 .select-input,
 .textarea-input {

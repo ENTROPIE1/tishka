@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import type { TishkaCore } from '../core/app';
+import type { GatewayCheckResult } from '../core/llm/check';
 import type { McpStatus } from '../core/mcp/manager';
 import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { Config, SecretStore } from '../core/types';
@@ -12,6 +13,7 @@ import {
   CONNECTIONS_REMOVE_CHANNEL,
   CONNECTIONS_SAVE_CHANNEL,
   CONNECTIONS_STATUS_CHANNEL,
+  GATEWAY_CHECK_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
   MEMORY_LIST_CHANNEL,
   MEMORY_REMOVE_CHANNEL,
@@ -21,6 +23,7 @@ import {
 } from './ipc-channels';
 import { openMainWindow } from './chat-window';
 import {
+  checkGatewayValue,
   configView,
   planDraft,
   reconnectConnection,
@@ -82,6 +85,10 @@ export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore, hook
     broadcastConfigChanged();
     hooks?.onConfigSaved?.(previous, core.config());
   });
+
+  ipcMain.handle(GATEWAY_CHECK_CHANNEL, (_event, value: unknown): Promise<GatewayCheckResult> =>
+    checkGatewayValue(core, value)
+  );
 
   ipcMain.handle(CONNECTIONS_STATUS_CHANNEL, (): Promise<ConnectionView[]> => statusViews(core, secrets));
 

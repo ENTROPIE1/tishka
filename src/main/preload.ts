@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { InstallPresetResult, SaveSkillResult } from '../core/app';
 import type { ConnectionDraft } from '../core/connections';
 import type { HistoryEntry } from '../core/history';
+import type { GatewayCheckResult } from '../core/llm/check';
 import type { McpStatus } from '../core/mcp/manager';
 import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { PresetInfo } from '../core/skills/presets';
@@ -40,6 +41,7 @@ import {
   COPY_RICH_CHANNEL,
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
+  GATEWAY_CHECK_CHANNEL,
   OPEN_IMAGE_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
@@ -156,6 +158,9 @@ const api = {
     },
     save(config: Config): Promise<void> {
       return ipcRenderer.invoke(CONFIG_SAVE_CHANNEL, config);
+    },
+    checkGateway(input: { baseUrl: string; model: string; key?: string }): Promise<GatewayCheckResult> {
+      return ipcRenderer.invoke(GATEWAY_CHECK_CHANNEL, input);
     },
     onChanged(listener: () => void): () => void {
       const handler = (): void => {

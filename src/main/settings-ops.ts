@@ -7,6 +7,7 @@ import {
   type ConnectionDraft,
   type ConnectionTemplate
 } from '../core/connections';
+import type { GatewayCheckResult } from '../core/llm/check';
 import type { McpStatus } from '../core/mcp/manager';
 import type { Config, McpServerConfig, SecretStore } from '../core/types';
 import type {
@@ -133,6 +134,19 @@ export async function configView(core: TishkaCore): Promise<ConfigView> {
 
 export function statusViews(core: TishkaCore, secrets: SecretStore): Promise<ConnectionView[]> {
   return connectionViews(core, secrets);
+}
+
+// Ключ из поля не возвращается в окно: он уходит только в проверку ядра.
+export function checkGatewayValue(core: TishkaCore, value: unknown): Promise<GatewayCheckResult> {
+  const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+  const input: { baseUrl: string; model: string; key?: string } = {
+    baseUrl: typeof record['baseUrl'] === 'string' ? record['baseUrl'] : '',
+    model: typeof record['model'] === 'string' ? record['model'] : ''
+  };
+  if (typeof record['key'] === 'string' && record['key'] !== '') {
+    input.key = record['key'];
+  }
+  return core.checkGateway(input);
 }
 
 export function planDraft(core: TishkaCore, value: unknown): ConnectionPlanResult {

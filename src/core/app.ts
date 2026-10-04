@@ -4,6 +4,7 @@ import { defaultConfig, loadConfig, saveConfig as persistConfig } from './config
 import { createConversationClock } from './conversation';
 import { createHistory, type HistoryEntry } from './history';
 import { registerHistoryTools } from './history-tool';
+import { checkGateway as runGatewayCheck, type GatewayCheckResult } from './llm/check';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
 import { createMemoryReviewer, type MemoryReviewer } from './memory/review';
@@ -63,6 +64,7 @@ export interface TishkaCore {
   stop(): Promise<void>;
   handleUserText(text: string): Promise<Reply>;
   hasGatewayKey(): Promise<boolean>;
+  checkGateway(input: { baseUrl: string; model: string; key?: string }): Promise<GatewayCheckResult>;
   config(): Config;
   mcpStatus(): McpStatus[];
   reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
@@ -191,6 +193,23 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
 
   async function hasGatewayKey(): Promise<boolean> {
     return (await gatewayKey()) !== undefined;
+  }
+
+  // Проверка шлюза не сохраняет настройки. Ключ из поля важнее сохранённого.
+  async function checkGateway(input: {
+    baseUrl: string;
+    model: string;
+    key?: string;
+  }): Promise<GatewayCheckResult> {
+    const explicit = typeof input.key === 'string' ? input.key.trim() : '';
+    const apiKey = explicit !== '' ? explicit : await gatewayKey();
+    if (apiKey === undefined) {
+      return { ok: false, models: [], error: 'Ключ шлюза не задан', ms: 0 };
+    }
+    return runGatewayCheck(
+      { baseUrl: input.baseUrl, model: input.model, apiKey },
+      { fetch: deps.fetch }
+    );
   }
 
   async function processUserText(text: string): Promise<Reply> {
@@ -505,6 +524,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     stop,
     handleUserText,
     hasGatewayKey,
+    checkGateway,
     config: () => config,
     mcpStatus: () => mcp?.status() ?? [],
     reloadConfig,

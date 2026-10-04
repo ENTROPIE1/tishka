@@ -196,3 +196,5 @@ type McpServerConfig =
 ## Модель
 
 Шлюз совместим с OpenAI API (`/chat/completions`). Адрес и имена моделей берутся из `Config.llm`, ключ из `SecretStore` (`DKS_API_KEY`). В тестах и скриптах проверки ключ читается из переменной окружения `DKS_API_KEY`.
+
+Проверка шлюза без сохранения настроек — канал `tishka:config:check-gateway`. Принимает `{ baseUrl: string; model: string; key?: string }`, ключ из поля важнее сохранённого. Возвращает `{ ok: boolean; models: string[]; error?: string; ms: number }`. Ключ в окно не возвращается. Адрес нормализуется: пробелы по краям и завершающие `/` убираются, хвост `/chat/completions` отбрасывается, адрес без `http://` или `https://` — ошибка.
