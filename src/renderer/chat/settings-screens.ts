@@ -5,6 +5,7 @@ import { mountModelSection } from '../settings/model-section';
 import { mountPersonaSection } from '../settings/persona-section';
 import { mountSpeechSection } from '../settings/speech-section';
 import { mountVoiceSection } from '../settings/voice-section';
+import { mountWebSection } from '../settings/web-section';
 import type { ScreenName } from './shell';
 
 function section(id: string): HTMLElement {
@@ -25,10 +26,15 @@ export function mountSettingsScreens(): Partial<Record<ScreenName, SettingsSecti
   speechSection.className = 'section';
   voiceSection.after(speechSection);
   mountSpeechSection(speechSection);
+  const connectionsSection = section('connections-section');
+  const webSection = connectionsSection.ownerDocument.createElement('section');
+  webSection.className = 'section';
+  connectionsSection.after(webSection);
   return {
     connections: combineSections([
       mountModelSection(section('model-section')),
-      mountConnectionsSection(section('connections-section'))
+      mountConnectionsSection(connectionsSection),
+      mountWebSection(webSection)
     ]),
     memory: mountMemorySection(section('memory-section')),
     voice,

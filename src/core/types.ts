@@ -115,6 +115,7 @@ export interface Config {
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран
+  web: { enabled: boolean };      // разрешено ли читать страницы из интернета
 }
 
 export type McpServerConfig =

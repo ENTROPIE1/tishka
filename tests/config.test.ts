@@ -38,6 +38,7 @@ describe('defaultConfig', () => {
     expect(config.voice.tts).toEqual({ enabled: false, url: 'http://127.0.0.1:8179', volume: 1 });
     expect(config.mcpServers).toEqual([]);
     expect(config.petMode).toBe(false);
+    expect(config.web).toEqual({ enabled: true });
   });
 });
 
@@ -62,8 +63,13 @@ describe('loadConfig', () => {
     expect(config.petMode).toBe(true);
   });
 
-  it('читает tts и игнорирует старое поле ttsEngine', async () => {
-    mockedReadFile.mockResolvedValueOnce(
+  it('читает переключатель чтения страниц', async () => {
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({ web: { enabled: false } }) as never);
+    const config = await loadConfig(dir);
+    expect(config.web).toEqual({ enabled: false });
+  });
+
+  it('читает tts и игнорирует старое поле ttsEngine', async () => {    mockedReadFile.mockResolvedValueOnce(
       JSON.stringify({ voice: { ttsEngine: 'silero', tts: { enabled: true, url: 'http://1.2.3.4:9000', volume: 0.5 } } }) as never
     );
     const config = await loadConfig(dir);
