@@ -24,9 +24,21 @@ export interface PetModel {
   replies?: number;              // сколько раз приходил ответ; признак новой реплики
 }
 
+export type TalkSource = 'chat' | 'pet';
+
 export interface PetOpts {
   petMode: boolean;
   busy?: boolean;                // открыта карточка или пользователь вводит текст
+  source?: TalkSource;           // 'chat' — реплика из окна чата основного окна
+}
+
+// Из чата ёж не показывает ни облачка, ни карточки, ни появления — ответ уже в чате.
+function isQuiet(opts: PetOpts): boolean {
+  return opts.source === 'chat';
+}
+
+function isAway(model: PetModel): boolean {
+  return model.state === 'hidden' || model.state === 'sleep';
 }
 
 const APPEAR_MS = 900;
@@ -37,8 +49,7 @@ const TALK_PER_CHAR_MS = 60;
 const TALK_MAX_MS = 12000;
 const IDLE_LEAVE_MS = 30000;
 const IDLE_SLEEP_MS = 300000;
-// thinking и working не могут длиться дольше: молчание фоновой проверки не должно
-// навсегда оставлять Тишку «думающим».
+// thinking и working не могут длиться дольше: молчание проверки не оставит Тишку «думающим».
 const BUSY_LIMIT_MS = 90_000;
 
 export function initialPet(now: number): PetModel {
@@ -48,15 +59,9 @@ export function initialPet(now: number): PetModel {
 function enter(model: PetModel, state: PetState, now: number, queue: PetState[] = []): PetModel {
   const next: PetModel = { state, since: now, queue, replies: model.replies ?? 0 };
   if (state !== 'hidden') {
-    if (model.say !== undefined) {
-      next.say = model.say;
-    }
-    if (model.panel !== undefined) {
-      next.panel = model.panel;
-    }
-    if (model.ask !== undefined) {
-      next.ask = model.ask;
-    }
+    if (model.say !== undefined) next.say = model.say;
+    if (model.panel !== undefined) next.panel = model.panel;
+    if (model.ask !== undefined) next.ask = model.ask;
   }
   return next;
 }
@@ -72,41 +77,44 @@ function advance(model: PetModel, now: number): PetModel {
 // Состояния, во время которых уведомление ждёт своей очереди, а не перебивает текущее.
 const BUSY_STATES: PetState[] = ['appear', 'listening', 'thinking', 'working', 'talking', 'happy', 'confused'];
 
-function isGone(model: PetModel): boolean {
-  return model.state === 'hidden' || model.state === 'sleep';
-}
-
-// Любое событие, которое показывает ёжика, проходит через появление. Из скрытого
-// состояния и сна — состояние appear с нужным следом; во время появления событие
-// заменяет очередь, не срывая начатую анимацию. Так повод не важен: путь один.
+// Любое событие, которое показывает ёжика, проходит через появление: из скрытого
+// состояния и сна — appear с нужным следом, во время appear — очередь.
 function show(model: PetModel, target: PetState, now: number, rest: PetState[] = []): PetModel {
   if (model.state === 'appear') {
     return { ...model, queue: [target, ...rest] };
   }
-  if (isGone(model)) {
+  if (isAway(model)) {
     return enter(model, 'appear', now, [target, ...rest]);
   }
   return enter(model, target, now, rest);
 }
 
 export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: PetOpts): PetModel {
-  void opts;
+  const quiet = isQuiet(opts);
   switch (event.type) {
     case 'wake':
       return show(model, 'listening', now);
     case 'listen.start':
       return show(model, 'listening', now);
     case 'listen.end':
-      return show(model, 'thinking', now);
+      return quiet && isAway(model) ? model : show(model, 'thinking', now);
     case 'think.start':
-      return show(model, 'thinking', now);
+      return quiet && isAway(model) ? model : show(model, 'thinking', now);
     case 'tool.start':
-      return show(model, 'working', now);
+      return quiet && isAway(model) ? model : show(model, 'working', now);
     case 'tool.end':
-      return show(model, 'thinking', now);
+      return quiet && isAway(model) ? model : show(model, 'thinking', now);
     case 'status':
       return { ...model, say: event.text };
     case 'reply': {
+      if (quiet) {
+        const replies = (model.replies ?? 0) + 1;
+        if (isAway(model)) {
+          return { ...model, replies };
+        }
+        // Без облачка и карточки — только смена состояния.
+        return enter({ since: now, queue: [], state: model.state, replies }, 'talking', now);
+      }
       // Новый ответ заменяет прежнюю карточку: показывается либо результат, либо ввод.
       const base: PetModel = {
         // Во время появления не сбиваем его отсчёт — ответ встанет в очередь.
@@ -131,9 +139,9 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       return show(base, 'talking', now);
     }
     case 'speak.start':
-      return show(model, 'talking', now);
+      return quiet && isAway(model) ? model : show(model, 'talking', now);
     case 'speak.end':
-      return isGone(model) ? model : enter(model, 'idle', now);
+      return isAway(model) ? model : enter(model, 'idle', now);
     case 'notify': {
       if (BUSY_STATES.includes(model.state)) {
         return { ...model, queue: [...model.queue, 'notify'] };
@@ -144,10 +152,10 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
     case 'skill.saved':
       return event.source === 'dialog' ? show(model, 'happy', now, ['idle']) : model;
     case 'error':
-      return show(model, 'confused', now);
+      return quiet && isAway(model) ? model : show(model, 'confused', now);
     case 'idle':
       // Простой вне разговора не поднимает окно: скрытый ёж остаётся скрытым.
-      return isGone(model) || model.state === 'talking' ? model : enter(model, 'idle', now);
+      return isAway(model) || model.state === 'talking' ? model : enter(model, 'idle', now);
     default:
       return model;
   }
