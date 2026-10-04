@@ -1,5 +1,6 @@
 import type { Config, EventBus } from '../core/types';
 import type { TranscribeResult } from './stt-service';
+import { NOT_READY_MESSAGE, planToggle } from './talk-toggle';
 import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
 
 export type WakeCommand = 'listen' | 'conversation-on' | 'conversation-off';
@@ -109,6 +110,10 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     if (source === 'trigger') {
       return;
     }
+    if (source === 'name' && suppressed) {
+      // Реплика в том же появлении: разговор сам не включается до конца появления.
+      return;
+    }
     suppressed = false;
     if (source === 'hotkey') {
       // Горячую клавишу переключает вызывающий: это явное действие.
@@ -129,6 +134,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     // выключает разговор, но не прячет питомца.
     if (hide && surface === 'pet') {
       deps.hide();
+      // Появление закончилось: запрет на автоматическое включение больше не нужен.
+      suppressed = false;
     }
   }
 
@@ -173,7 +180,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     }
     deps.bus.emit({ type: 'listen.start' });
     answering = true;
-    if (!conversation) {
+    if (!conversation && !suppressed) {
       enableConversation();
     }
     void deps.core
@@ -248,14 +255,22 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     isLeavingSoon: () => soon,
     reportError,
     toggleConversation(by: TalkSurface = 'pet'): void {
-      if (conversation && owner === by) {
+      const plan = planToggle(
+        { conversation, owner, suppressed, ready: deps.isReady?.() ?? true },
+        by
+      );
+      suppressed = plan.suppressed;
+      if (plan.action === 'disable') {
         disableConversation(false);
-        if (by === 'pet') {
-          suppressed = true;
-        }
-      } else if (!(by === 'pet' && suppressed)) {
-        enableConversation(by);
+        return;
       }
+      if (plan.action === 'not-ready') {
+        // Щелчок не молчит: окно узнаёт причину и остаётся выключенным.
+        reportError(NOT_READY_MESSAGE);
+        deps.sendCommand('conversation-off');
+        return;
+      }
+      enableConversation(by);
     },
     enableConversation,
     disableConversation,
