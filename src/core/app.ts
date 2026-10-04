@@ -30,6 +30,7 @@ import { registerWebTools } from './tools/web';
 import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore, Skill } from './types';
 import { isCancelled } from './cancel';
 import { CANCELLED_REPLY, createTurnQueue } from './turn-queue';
+import { STOPPED_TITLE } from './stopped';
 import type { WebReader } from './web/types';
 import { createVisionLook, type CaptureResult, type ScreenTarget } from './vision/look';
 import type { TimingMark } from '../main/timing-log';
@@ -68,7 +69,7 @@ export interface TishkaCore {
   start(): Promise<void>;
   stop(): Promise<void>;
   handleUserText(text: string): Promise<Reply>;
-  cancel(): void;                  // прервать текущую работу и очистить очередь
+  cancel(source?: StopSource): void;   // прервать текущую работу и очистить очередь
   hasGatewayKey(): Promise<boolean>;
   checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult>;
   config(): Config;
@@ -89,12 +90,15 @@ export interface TishkaCore {
   memoryClear(): Promise<void>;
 }
 
+// Откуда пришла остановка: из окна чата строка видна только в ленте чата,
+// из окна ежа — уведомлением, как раньше.
+export type StopSource = 'chat' | 'pet';
+
 const API_KEY_SECRET = 'DKS_API_KEY';
 const DRIVE_PATTERN = /^[A-Za-z]:/;
 const NOT_READY: Reply = { say: 'Я ещё не проснулся, дай мне мгновение', mood: 'confused' };
 const NO_KEY: Reply = { say: 'Ключ шлюза не задан, добавь его в подключениях', mood: 'confused' };
 const UNEXPECTED: Reply = { say: 'Что-то пошло не так, попробуй ещё раз', mood: 'confused' };
-const STOPPED_TITLE = 'Остановлено';
 
 function isAbsoluteArg(value: string): boolean {
   return value.startsWith('/') || value.startsWith('\\') || DRIVE_PATTERN.test(value);
@@ -139,6 +143,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let skillOverview: SkillOverviewService | undefined;
   let webTools: ToolGroup | undefined;
   let screenTools: ToolGroup | undefined;
+  let stopSource: StopSource = 'pet';
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
   const conversation = createConversationClock();
   const turns = createTurnQueue({
@@ -229,6 +234,16 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     );
   }
 
+  // Строка остановки: из окна чата — событие статуса, которое ёж не показывает,
+  // скрытого ежа оно не поднимает; из окна ежа — уведомление, как раньше.
+  function emitStopped(): void {
+    if (stopSource === 'chat') {
+      deps.events.emit({ type: 'status', text: STOPPED_TITLE });
+      return;
+    }
+    deps.events.emit({ type: 'notify', title: STOPPED_TITLE });
+  }
+
   async function processUserText(text: string, signal: AbortSignal): Promise<Reply> {
     const now = deps.now();
     if (conversation.userTurn(now)) {
@@ -246,7 +261,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       }
     } catch (error) {
       if (isCancelled(error, signal)) {
-        deps.events.emit({ type: 'notify', title: STOPPED_TITLE });
+        emitStopped();
         deps.events.emit({ type: 'idle' });
         return CANCELLED_REPLY;
       }
@@ -267,8 +282,10 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   }
 
   // Остановка текущей работы: ход прерывается сигналом в запросах, очередь
-  // очищается, окна получают событие простоя.
-  function cancel(): void {
+  // очищается, окна получают событие простоя. Источник решает, как окна
+  // показывают служебную строку.
+  function cancel(source?: StopSource): void {
+    stopSource = source ?? 'pet';
     if (!turns.cancel()) {
       deps.events.emit({ type: 'idle' });
       return;
@@ -277,7 +294,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       // Выполняющийся ход завершится сам и пришлёт «Остановлено» с простоем.
       return;
     }
-    deps.events.emit({ type: 'notify', title: STOPPED_TITLE });
+    emitStopped();
     deps.events.emit({ type: 'idle' });
   }
 

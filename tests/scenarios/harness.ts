@@ -9,6 +9,7 @@ import type { PetActivation } from '../../src/main/pet-activation';
 import type { Mover } from '../../src/main/pet-motion';
 import type { PetPlacement } from '../../src/main/pet-placement';
 import { defaultPetX, petLayout } from '../../src/pet/layout';
+import { STOPPED_TITLE } from '../../src/core/stopped';
 import { createFakeCore, createFakeStt, createFakeTts } from './edges';
 import { createWindowEdge, WORK_AREA } from './window-edge';
 import { createPetFacade } from './pet-facade';
@@ -165,6 +166,12 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       void bus.run('chat', () => core.handleUserText(text)).catch(() => undefined);
     },
     notifyFromSkill: (title: string): void => bus.emit({ type: 'notify', title }),
+    // Ядро сообщает об остановке из окна чата событием статуса, а не уведомлением:
+    // строка видна в ленте чата, скрытого ежа не поднимает.
+    stopFromChat(): void {
+      bus.emit({ type: 'status', text: STOPPED_TITLE });
+      bus.emit({ type: 'idle' });
+    },
     voiceReady(): void {
       stt.setStatus('ready');
       flow.noteReady();

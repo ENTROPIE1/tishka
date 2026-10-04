@@ -104,6 +104,36 @@ describe('очередь ходов и остановка', () => {
     expect(events.at(-1)?.type).toBe('idle');
   });
 
+  it('отмена из окна чата шлёт строку остановки событием статуса, а не уведомлением', async () => {
+    const { fetch: fetchMock } = hangingFetch();
+    const { core, events } = await setupCore({ fetch: fetchMock });
+
+    const turn = core.handleUserText('думай долго');
+    await waitFor(() => fetchMock.mock.calls.length === 1);
+    core.cancel('chat');
+
+    const reply = await turn;
+
+    expect(reply.say).toBe('Остановлено');
+    expect(events.some((event) => event.type === 'status' && event.text === 'Остановлено')).toBe(true);
+    expect(events.some((event) => event.type === 'notify')).toBe(false);
+    expect(events.at(-1)?.type).toBe('idle');
+  });
+
+  it('отмена из окна ежа по-прежнему шлёт уведомление', async () => {
+    const { fetch: fetchMock } = hangingFetch();
+    const { core, events } = await setupCore({ fetch: fetchMock });
+
+    const turn = core.handleUserText('думай долго');
+    await waitFor(() => fetchMock.mock.calls.length === 1);
+    core.cancel('pet');
+
+    const reply = await turn;
+
+    expect(reply.say).toBe('Остановлено');
+    expect(events.some((event) => event.type === 'notify' && event.title === 'Остановлено')).toBe(true);
+  });
+
   it('отмена очищает очередь: ждущая реплика не выполняется', async () => {
     const { fetch: fetchMock, release } = hangingFetch();
     const { core } = await setupCore({ fetch: fetchMock });

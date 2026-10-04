@@ -16,7 +16,7 @@ function makeConfig(): Config {
       sensitivity: 'normal',
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: '',
-      stt: { exe: '', model: '', audioCtx: 0, threads: 0 },
+      stt: { exe: '', model: '', audioCtx: 0, threads: 0, mode: 'remote' },
       tts: { enabled: false, url: '', volume: 1 }
     },
     mcpServers: [],

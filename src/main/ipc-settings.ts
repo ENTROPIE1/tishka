@@ -45,6 +45,7 @@ export type {
   ConnectionSaveResult,
   ConnectionSecretView,
   ConnectionView,
+  SttCheckView,
   VoiceStateView
 } from './settings-types';
 

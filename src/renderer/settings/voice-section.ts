@@ -8,6 +8,7 @@ import {
   field,
   runWithFeedback,
   sectionTitle,
+  selectInput,
   textInput,
   type SettingsSection
 } from './dom';
@@ -23,6 +24,11 @@ const STATE_LABELS: Record<VoiceStateView['state'], string> = {
 
 const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
 const CHECK_LABELS = { busy: 'Перезапускаю…', done: 'Готово', error: 'Ошибка' };
+const CHECK_URL_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
+const MODE_OPTIONS = [
+  { value: 'local', label: 'Запускать на этом компьютере' },
+  { value: 'remote', label: 'Готовая служба по адресу' }
+];
 const POLL_MS = 1000;
 
 function group(title: string, ...children: HTMLElement[]): HTMLElement {
@@ -42,10 +48,14 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   talkByDefault.type = 'checkbox';
   const wakeWords = textInput();
   const talkTimeout = textInput('', 'number');
+  const mode = selectInput(MODE_OPTIONS, 'local');
+  mode.classList.add('stt-mode');
   const exe = textInput();
   const model = textInput();
+  const sttUrl = textInput();
   const state = el('span', 'state state-off', STATE_LABELS.off);
   const check = button('Перезапустить службу', 'button button-secondary');
+  const checkUrl = button('Проверить', 'button button-secondary');
   const save = button('Сохранить');
   const messages = el('div', 'messages');
 
@@ -66,10 +76,22 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   });
   const sensitivity = micGroup.sensitivity;
 
+  const localFields = el('div', 'voice-group-fields local-fields');
+  localFields.append(
+    field('Программа распознавания', exe, 'Путь к whisper-server без кириллицы; пусто — служба не запускается'),
+    field('Модель распознавания', model)
+  );
+  const remoteFields = el('div', 'voice-group-fields remote-fields');
+  remoteFields.append(field('Адрес службы', sttUrl, 'Например, http://127.0.0.1:8178'));
+  const remoteActions = el('div', 'row');
+  remoteActions.append(checkUrl);
+  remoteFields.append(remoteActions);
+
   const service = group(
     'Служба распознавания',
-    field('Программа распознавания', exe, 'Путь к whisper-server без кириллицы; пусто — служба не запускается'),
-    field('Модель распознавания', model),
+    field('Где запускать', mode),
+    localFields,
+    remoteFields,
     field('Состояние службы', state)
   );
   const serviceActions = el('div', 'row');
@@ -102,10 +124,28 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     messages
   );
 
-  function show(error?: string): void {
+  function isRemote(): boolean {
+    return mode.value === 'remote';
+  }
+
+  // Поля местной службы и адреса готовой показываются по очереди: выбранный
+  // вариант определяет, что используется, но значения другого не стираются.
+  function applyMode(): void {
+    const remote = isRemote();
+    localFields.hidden = remote;
+    remoteFields.hidden = !remote;
+    check.hidden = remote;
+  }
+
+  mode.addEventListener('change', applyMode);
+
+  function show(error?: string, ok?: string): void {
     clear(messages);
     if (error !== undefined) {
       messages.append(el('div', 'message-error', error));
+    }
+    if (ok !== undefined) {
+      messages.append(el('div', 'message-ok', ok));
     }
   }
 
@@ -156,8 +196,11 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     talkTimeout.value = String(view.config.voice.talkTimeoutSec);
     sensitivity.value = view.config.voice.sensitivity;
     mic = view.config.voice.mic;
+    mode.value = view.config.voice.stt.mode;
     exe.value = view.config.voice.stt.exe;
     model.value = view.config.voice.stt.model;
+    sttUrl.value = view.config.voice.sttUrl;
+    applyMode();
     micGroup.refresh();
     await watchStatus();
   }
@@ -165,7 +208,18 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   save.addEventListener('click', () => {
     void runWithFeedback(save, SAVE_LABELS, async () => {
       try {
-        await saveVoice({ hotkey, wakeEnabled, talkByDefault, wakeWords, talkTimeout, sensitivity, exe, model });
+        await saveVoice({
+          hotkey,
+          wakeEnabled,
+          talkByDefault,
+          wakeWords,
+          talkTimeout,
+          sensitivity,
+          mode,
+          sttUrl,
+          exe,
+          model
+        });
         show();
         messages.append(el('div', 'message-ok', 'Настройки голоса сохранены'));
         watchLeft = 10;
@@ -185,6 +239,18 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
         show(error instanceof Error ? error.message : String(error));
         throw error;
       }
+    });
+  });
+
+  checkUrl.addEventListener('click', () => {
+    void runWithFeedback(checkUrl, CHECK_URL_LABELS, async () => {
+      const result = await window.tishka.voice.checkUrl(sttUrl.value.trim());
+      if (!result.ok) {
+        const error = result.error ?? 'Служба не отвечает';
+        show(error);
+        throw new Error(error);
+      }
+      show(undefined, `Служба отвечает, ${result.ms} мс`);
     });
   });
 

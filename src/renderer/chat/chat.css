@@ -431,6 +431,13 @@ body {
   cursor: default;
 }
 
+/* Активный вид переключателя: Тишка сейчас смотрит на экран, нажатие останавливает. */
+.screen-look-button.active {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .mic-button {
   display: flex;
   align-items: center;

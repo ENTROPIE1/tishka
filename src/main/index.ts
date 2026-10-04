@@ -2,7 +2,6 @@ import { app, globalShortcut, ipcMain, Menu, Notification, shell } from 'electro
 import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
 import { saveConfig as persistConfig } from '../core/config';
-import type { Config } from '../core/types';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { createSttService, START_CANCELLED, type SttService } from '../voice/stt-service';
@@ -32,7 +31,9 @@ import { openStandWindow } from './stand-window';
 import { runStartup } from './startup';
 import { createTimingLog, mark, setTimingLog, TIMING_LOG_NAME } from './timing-log';
 import { createWebReader, type WebReaderHandle } from './web-reader';
+import { restartVoiceIfNeeded } from './voice-restart';
 import { createWakeFlow } from '../voice/wake-flow';
+import { checkSttUrl } from '../voice/stt-http';
 import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
 
 const bus = createSourceBus();
@@ -68,12 +69,6 @@ if (!singleInstance) {
   app.on('second-instance', () => {
     openMainWindow();
   });
-}
-
-function voiceRestartNeeded(previous: Config, next: Config): boolean {
-  const before = previous.voice;
-  const after = next.voice;
-  return before.sttUrl !== after.sttUrl || before.stt.exe !== after.stt.exe || before.stt.model !== after.stt.model;
 }
 
 app.whenReady().then(async () => {
@@ -122,9 +117,8 @@ app.whenReady().then(async () => {
   registerSettingsIpc(tishka, secrets, {
     // Голос перезапускается сам, если изменились программа, модель или адрес.
     onConfigSaved: (previous, next) => {
-      if (stt !== undefined && voiceRestartNeeded(previous, next)) {
-        stt.stop();
-        void stt.start().catch(() => undefined);
+      if (stt !== undefined) {
+        restartVoiceIfNeeded(stt, previous, next);
       }
       if (previous.app.autostart !== next.app.autostart) {
         app.setLoginItemSettings(loginItemSettings(next.app.autostart));
@@ -284,6 +278,7 @@ app.whenReady().then(async () => {
   mark('hotkey.registered');
   registerVoiceIpc({
     stt: sttService,
+    probe: (url) => checkSttUrl(fetch, url),
     reloadHotkey: (hotkey) => hotkeyRegistrar.set(hotkey, toggleConversationByHotkey),
     setCalibration: (active) => {
       petWake?.setPaused(active);

@@ -65,8 +65,10 @@ export function registerIpc(bus: SourceBus, core: TishkaCore, secrets: SecretSto
   });
 
   // Остановка доступна любому окну: чат и окно ежа используют один канал.
-  ipcMain.on(CANCEL_CHANNEL, () => {
-    core.cancel();
+  // Источник решает, как окна показывают служебную строку об остановке.
+  ipcMain.on(CANCEL_CHANNEL, (event) => {
+    const sender = BrowserWindow.fromWebContents(event.sender);
+    core.cancel(sender !== null && isMainWindow(sender) ? 'chat' : 'pet');
   });
 
   ipcMain.handle(HISTORY_CHANNEL, (_event, limit: unknown) => {

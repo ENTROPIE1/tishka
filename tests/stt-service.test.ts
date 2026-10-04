@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { REMOTE_UNREACHABLE } from '../src/voice/stt-service';
 import { configWith, makeChild, okResponse, service, voice } from './stt-test-helpers';
 
 afterEach(() => {
@@ -52,9 +53,39 @@ describe('createSttService.start', () => {
     });
     const stt = service(() => voice(), spawn, fetchMock);
 
-    await expect(stt.start()).resolves.toEqual({ ok: false, error: 'Распознавание речи не настроено' });
+    await expect(stt.start()).resolves.toEqual({ ok: false, error: REMOTE_UNREACHABLE });
     expect(spawn).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(stt.status()).toBe('off');
+  });
+
+  it('режим remote: даже с заполненными путями процесс не запускается', async () => {
+    const spawn = vi.fn(() => makeChild().child);
+    const fetchMock = vi.fn(async () => okResponse());
+    const stt = service(
+      () => voice({ stt: { exe: 'C:\\w\\whisper.exe', model: 'model.bin', audioCtx: 768, threads: 4, mode: 'remote' } }),
+      spawn,
+      fetchMock
+    );
+
+    await expect(stt.start()).resolves.toEqual({ ok: true });
+    expect(spawn).not.toHaveBeenCalled();
+    expect(stt.status()).toBe('ready');
+  });
+
+  it('режим remote: служба не отвечает — off и причина', async () => {
+    const spawn = vi.fn(() => makeChild().child);
+    const fetchMock = vi.fn(async () => {
+      throw new Error('connection refused');
+    });
+    const stt = service(
+      () => voice({ stt: { exe: 'C:\\w\\whisper.exe', model: 'model.bin', audioCtx: 768, threads: 4, mode: 'remote' } }),
+      spawn,
+      fetchMock
+    );
+
+    await expect(stt.start()).resolves.toEqual({ ok: false, error: REMOTE_UNREACHABLE });
+    expect(spawn).not.toHaveBeenCalled();
     expect(stt.status()).toBe('off');
   });
 

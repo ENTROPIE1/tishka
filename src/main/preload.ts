@@ -5,6 +5,7 @@ import type { HistoryEntry } from '../core/history';
 import type { GatewayCheckResult } from '../core/llm/check';
 import type { McpStatus } from '../core/mcp/manager';
 import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
+import { nextScreenLooking } from '../core/screen-look';
 import type { PresetInfo } from '../core/skills/presets';
 import type { SkillOverview } from '../core/skills/overview';
 import type { Config, Reply, Skill, TishkaEvent } from '../core/types';
@@ -20,6 +21,7 @@ import type {
   ConnectionPlanResult,
   ConnectionSaveResult,
   ConnectionView,
+  SttCheckView,
   VoiceStateView
 } from './ipc-settings';
 import type { ExportSkillResult, ImportSkillResult } from './ipc-automations';
@@ -95,6 +97,7 @@ import {
   VOICE_APPLY_CHANNEL,
   VOICE_CALIBRATION_CHANNEL,
   VOICE_CHECK_CHANNEL,
+  VOICE_CHECK_URL_CHANNEL,
   VOICE_DICTATE_CHANNEL,
   VOICE_STATUS_CHANNEL,
   SPEECH_HEALTH_CHANNEL,
@@ -107,6 +110,22 @@ const api = {
   onEvent(listener: (event: TishkaEvent) => void): () => void {
     const handler = (_event: Electron.IpcRendererEvent, event: TishkaEvent): void => {
       listener(event);
+    };
+    ipcRenderer.on(EVENT_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(EVENT_CHANNEL, handler);
+    };
+  },
+  // Подписка на события инструмента просмотра экрана: окно ежа ведёт по ним
+  // кнопку с глазом, как и чат. Вид — всегда от ядра, не локальное состояние.
+  onScreenLook(listener: (looking: boolean) => void): () => void {
+    let looking = false;
+    const handler = (_event: Electron.IpcRendererEvent, event: TishkaEvent): void => {
+      const next = nextScreenLooking(looking, event);
+      if (next !== looking) {
+        looking = next;
+        listener(looking);
+      }
     };
     ipcRenderer.on(EVENT_CHANNEL, handler);
     return () => {
@@ -391,6 +410,9 @@ const api = {
     },
     check(): Promise<VoiceStateView> {
       return ipcRenderer.invoke(VOICE_CHECK_CHANNEL);
+    },
+    checkUrl(url: string): Promise<SttCheckView> {
+      return ipcRenderer.invoke(VOICE_CHECK_URL_CHANNEL, url);
     },
     apply(hotkey: string): Promise<void> {
       return ipcRenderer.invoke(VOICE_APPLY_CHANNEL, hotkey);

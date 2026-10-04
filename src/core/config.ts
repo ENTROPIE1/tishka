@@ -7,6 +7,7 @@ export const CONFIG_FILE = 'config.json';
 type FyrLevel = Config['persona']['fyr'];
 type Sensitivity = Config['voice']['sensitivity'];
 type LlmApi = Config['llm']['api'];
+type SttMode = Config['voice']['stt']['mode'];
 
 export function defaultConfig(): Config {
   return {
@@ -25,7 +26,7 @@ export function defaultConfig(): Config {
       sensitivity: 'normal',
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: 'http://127.0.0.1:8178',
-      stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
+      stt: { exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' },
       tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
     },
     mcpServers: [],
@@ -83,6 +84,16 @@ function pickSensitivity(value: unknown, fallback: Sensitivity): Sensitivity {
 
 function pickApi(value: unknown, fallback: LlmApi): LlmApi {
   return value === 'chat' || value === 'responses' ? value : fallback;
+}
+
+function pickSttMode(value: unknown): SttMode | undefined {
+  return value === 'local' || value === 'remote' ? value : undefined;
+}
+
+// Настройки без поля mode: заполненные пути программы и модели — местная
+// служба, пустые — готовая по адресу.
+function inferSttMode(exe: string, model: string): SttMode {
+  return exe.trim() !== '' && model.trim() !== '' ? 'local' : 'remote';
 }
 
 function pickPetX(value: unknown, fallback: number | null): number | null {
@@ -218,12 +229,17 @@ export function mergeConfig(value: unknown): Config {
       sensitivity: pickSensitivity(voice.sensitivity, defaults.voice.sensitivity),
       mic: parseMic(mic, defaults.voice.mic),
       sttUrl: pickString(voice.sttUrl, defaults.voice.sttUrl),
-      stt: {
-        exe: pickString(stt.exe, defaults.voice.stt.exe),
-        model: pickString(stt.model, defaults.voice.stt.model),
-        audioCtx: pickNumber(stt.audioCtx, defaults.voice.stt.audioCtx),
-        threads: pickNumber(stt.threads, defaults.voice.stt.threads)
-      },
+      stt: (() => {
+        const exe = pickString(stt.exe, defaults.voice.stt.exe);
+        const model = pickString(stt.model, defaults.voice.stt.model);
+        return {
+          exe,
+          model,
+          audioCtx: pickNumber(stt.audioCtx, defaults.voice.stt.audioCtx),
+          threads: pickNumber(stt.threads, defaults.voice.stt.threads),
+          mode: pickSttMode(stt.mode) ?? inferSttMode(exe, model)
+        };
+      })(),
       tts: {
         enabled: pickBoolean(tts.enabled, defaults.voice.tts.enabled),
         url: pickString(tts.url, defaults.voice.tts.url),
