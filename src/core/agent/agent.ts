@@ -3,6 +3,7 @@ import { LlmError } from '../llm/client';
 import { memoryBlock, type MemoryLine } from '../memory/prompt';
 import { stepTools } from '../skills/tools';
 import type { EventBus, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
+import { shortenUserMessage, trimHistory } from './context';
 import type { FyrLevel } from './persona';
 import { buildSystemPrompt } from './prompt';
 import { REPLY_TOOL_NAME, replyFromText, replyFromToolArgs, replyTool } from './reply';
@@ -25,7 +26,6 @@ export interface Agent {
 }
 
 const MAX_ROUNDS = 8;
-const MAX_HISTORY = 40;
 const MAX_TOOL_CONTENT = 6000;
 const TRUNCATED_MARK = '\n[обрезано]';
 
@@ -74,30 +74,9 @@ export function createAgent(deps: AgentDeps): Agent {
     }
   }
 
-  function trimHistory(): void {
-    while (history.length > MAX_HISTORY) {
-      const index = history.findIndex((message) => message.role !== 'system');
-      if (index < 0) {
-        return;
-      }
-      const [removed] = history.splice(index, 1);
-      if (removed.role === 'assistant' && removed.toolCalls !== undefined && removed.toolCalls.length > 0) {
-        const ids = new Set(removed.toolCalls.map((call) => call.id));
-        while (index < history.length) {
-          const next = history[index];
-          if (next.role !== 'tool' || !ids.has(next.toolCallId)) {
-            break;
-          }
-          ids.delete(next.toolCallId);
-          history.splice(index, 1);
-        }
-      }
-    }
-  }
-
   function push(message: ChatMessage): void {
     history.push(message);
-    trimHistory();
+    trimHistory(history);
   }
 
   async function callTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
@@ -120,8 +99,14 @@ export function createAgent(deps: AgentDeps): Agent {
 
   async function handle(userText: string): Promise<Reply> {
     refreshSystemMessage(userText);
-    push({ role: 'user', content: userText });
+    const userMessage: ChatMessage = { role: 'user', content: userText };
+    push(userMessage);
+    const reply = await respond();
+    shortenUserMessage(history, userMessage);
+    return reply;
+  }
 
+  async function respond(): Promise<Reply> {
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
       deps.events.emit({ type: 'think.start' });
 

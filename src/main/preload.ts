@@ -28,12 +28,14 @@ import {
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
+  HISTORY_SEARCH_CHANNEL,
   MEMORY_CLEAR_CHANNEL,
   MEMORY_LIST_CHANNEL,
   MEMORY_REMOVE_CHANNEL,
   MEMORY_SEARCH_CHANNEL,
   MEMORY_UPDATE_CHANNEL,
   NAVIGATE_CHANNEL,
+  NEW_CONVERSATION_CHANNEL,
   OPEN_CHAT_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
   OPEN_SETTINGS_CHANNEL,
@@ -73,6 +75,12 @@ const api = {
   },
   history(limit?: number): Promise<HistoryEntry[]> {
     return ipcRenderer.invoke(HISTORY_CHANNEL, limit);
+  },
+  historySearch(query: string, limit?: number): Promise<HistoryEntry[]> {
+    return ipcRenderer.invoke(HISTORY_SEARCH_CHANNEL, query, limit);
+  },
+  newConversation(): Promise<void> {
+    return ipcRenderer.invoke(NEW_CONVERSATION_CHANNEL);
   },
   clearHistory(): Promise<void> {
     return ipcRenderer.invoke(HISTORY_CLEAR_CHANNEL);

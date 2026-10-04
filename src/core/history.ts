@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { searchHistoryEntries } from './history-search';
 import type { EventBus, Mood, Panel, TishkaEvent } from './types';
 
-export interface HistoryEntry {
+export interface HistoryMessage {
+  kind: 'message';
   id: string;
   at: string;                       // ISO
   from: 'user' | 'tishka' | 'system';
@@ -12,10 +14,20 @@ export interface HistoryEntry {
   mood?: Mood;
 }
 
+export interface HistoryDivider {
+  kind: 'divider';
+  id: string;
+  at: string;
+}
+
+export type HistoryEntry = HistoryMessage | HistoryDivider;
+
 export interface History {
   start(): Promise<void>;           // читает файл, подписывается на события
   stop(): void;
   list(limit?: number): HistoryEntry[];   // последние записи по порядку, по умолчанию 200
+  search(query: string, limit?: number): HistoryEntry[];
+  addDivider(): void;               // запись-разделитель: начало нового разговора
   clear(): Promise<void>;
 }
 
@@ -35,6 +47,12 @@ function parseEntry(line: string): HistoryEntry | undefined {
     return undefined;
   }
   const record = value as Record<string, unknown>;
+  if (record['kind'] === 'divider') {
+    if (typeof record['id'] !== 'string' || typeof record['at'] !== 'string') {
+      return undefined;
+    }
+    return { kind: 'divider', id: record['id'], at: record['at'] };
+  }
   const from = record['from'];
   if (
     typeof record['id'] !== 'string' ||
@@ -45,10 +63,11 @@ function parseEntry(line: string): HistoryEntry | undefined {
   ) {
     return undefined;
   }
-  const entry: HistoryEntry = {
+  const entry: HistoryMessage = {
+    kind: 'message',
     id: record['id'],
     at: record['at'],
-    from: from as HistoryEntry['from'],
+    from: from as HistoryMessage['from'],
     text: record['text']
   };
   if (record['panel'] !== undefined) {
@@ -66,8 +85,8 @@ export function createHistory(filePath: string, events: EventBus, now: () => Dat
   let entries: HistoryEntry[] = [];
   let unsubscribe: (() => void) | undefined;
 
-  function toEntry(event: TishkaEvent): HistoryEntry | undefined {
-    const base = { id: randomUUID(), at: now().toISOString() };
+  function toEntry(event: TishkaEvent): HistoryMessage | undefined {
+    const base = { kind: 'message', id: randomUUID(), at: now().toISOString() } as const;
     switch (event.type) {
       case 'listen.end':
         return { ...base, from: 'user', text: event.text };
@@ -132,6 +151,14 @@ export function createHistory(filePath: string, events: EventBus, now: () => Dat
     return entries.slice(-limit);
   }
 
+  function search(query: string, limit?: number): HistoryEntry[] {
+    return searchHistoryEntries(entries, query, limit);
+  }
+
+  function addDivider(): void {
+    append({ kind: 'divider', id: randomUUID(), at: now().toISOString() });
+  }
+
   async function clear(): Promise<void> {
     entries = [];
     try {
@@ -141,5 +168,5 @@ export function createHistory(filePath: string, events: EventBus, now: () => Dat
     }
   }
 
-  return { start, stop, list, clear };
+  return { start, stop, list, search, addDivider, clear };
 }

@@ -2,6 +2,9 @@ import { MEMORY_RULES } from '../memory/prompt';
 import type { FyrLevel } from './persona';
 import { personaPrompt } from './persona';
 
+const HISTORY_RULE =
+  'Если человек ссылается на прошлый разговор («что ты мне вчера писал про…», «как в прошлый раз»), а в текущем контексте этого нет — сначала поищи в истории инструментом history_search.';
+
 const WEEKDAY = new Intl.DateTimeFormat('ru-RU', { weekday: 'long' });
 const DATE = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 const TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -33,6 +36,8 @@ export function buildSystemPrompt(
       `Сегодня ${date}, ${weekday}, время ${time}.`,
       '',
       'Безопасность: ничего не отправляй и не меняй без явного согласия человека. Письма и встречи создавай только черновиком и показывай черновик человеку, прежде чем что-то отправлять.',
+      '',
+      HISTORY_RULE,
       '',
       MEMORY_RULES
     ].join('\n')

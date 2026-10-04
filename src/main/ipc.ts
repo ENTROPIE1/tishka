@@ -8,6 +8,8 @@ import {
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
+  HISTORY_SEARCH_CHANNEL,
+  NEW_CONVERSATION_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
   SECRETS_DELETE_CHANNEL,
   SECRETS_HAS_CHANNEL,
@@ -56,8 +58,19 @@ export function registerIpc(bus: EventBus, core: TishkaCore, secrets: SecretStor
     return core.history(typeof limit === 'number' ? limit : undefined);
   });
 
+  ipcMain.handle(HISTORY_SEARCH_CHANNEL, (_event, query: unknown, limit: unknown) => {
+    if (typeof query !== 'string' || query.trim() === '') {
+      return [];
+    }
+    return core.historySearch(query, typeof limit === 'number' ? limit : undefined);
+  });
+
   ipcMain.handle(HISTORY_CLEAR_CHANNEL, async () => {
     await core.clearHistory();
+  });
+
+  ipcMain.handle(NEW_CONVERSATION_CHANNEL, () => {
+    core.newConversation();
   });
 
   ipcMain.handle(OPEN_EXTERNAL_CHANNEL, (_event, url: unknown) => {

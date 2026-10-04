@@ -1,7 +1,9 @@
 export const EVENT_CHANNEL = 'tishka:event';
 export const USER_TEXT_CHANNEL = 'tishka:user-text';
 export const HISTORY_CHANNEL = 'tishka:history';
+export const HISTORY_SEARCH_CHANNEL = 'tishka:history:search';
 export const HISTORY_CLEAR_CHANNEL = 'tishka:history:clear';
+export const NEW_CONVERSATION_CHANNEL = 'tishka:new-conversation';
 export const OPEN_EXTERNAL_CHANNEL = 'tishka:open-external';
 export const COPY_TEXT_CHANNEL = 'tishka:copy-text';
 export const COPY_RICH_CHANNEL = 'tishka:copy-rich';
