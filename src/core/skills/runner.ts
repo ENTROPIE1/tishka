@@ -1,4 +1,5 @@
 import type { EventBus, Panel, Reply, Skill, ToolRegistry } from '../types';
+import { CancelledError, isCancelled, withCancel } from '../cancel';
 import { renderTemplate, type TemplateContext, type TemplateStepResult } from './template';
 
 export interface RunResult {
@@ -18,6 +19,7 @@ export interface SkillRunnerDeps {
 
 export interface SkillRunOptions {
   background?: boolean;          // true — вызовы инструментов идут без tool.start и tool.end
+  signal?: AbortSignal;          // отмена хода человеком
 }
 
 export interface SkillRunner {
@@ -85,24 +87,31 @@ export function createSkillRunner(deps: SkillRunnerDeps): SkillRunner {
 
     const steps: Record<string, TemplateStepResult> = {};
     let lastReply: Reply | undefined;
+    const signal = opts?.signal;
 
     for (const step of skill.steps) {
+      if (signal?.aborted) {
+        throw new CancelledError();
+      }
       const ctx: TemplateContext = { inputs: resolved.values, steps, now: deps.now() };
 
       try {
         if ('tool' in step) {
           const args = renderTemplate(step.args, ctx) as Record<string, unknown>;
-          const result =
-            opts?.background === true
-              ? await deps.registry.call(step.tool, args, { background: true })
-              : await deps.registry.call(step.tool, args);
+          const background = opts?.background === true;
+          const result = await withCancel(
+            background
+              ? deps.registry.call(step.tool, args, { background: true })
+              : deps.registry.call(step.tool, args),
+            signal
+          );
           if (!result.ok) {
             return fail(step.id, result.error ?? result.content, steps);
           }
           steps[step.id] = withData({ content: result.content, data: result.data });
         } else if ('ask' in step) {
           const prompt = textOf(renderTemplate(step.ask, ctx));
-          const answer = await deps.ask(prompt);
+          const answer = await withCancel(deps.ask(prompt), signal);
           steps[step.id] = { content: answer };
         } else {
           const say = textOf(renderTemplate(step.say, ctx));
@@ -113,6 +122,9 @@ export function createSkillRunner(deps: SkillRunnerDeps): SkillRunner {
           lastReply = reply;
         }
       } catch (error) {
+        if (isCancelled(error, signal)) {
+          throw error;
+        }
         return fail(step.id, errorMessage(error), steps);
       }
     }

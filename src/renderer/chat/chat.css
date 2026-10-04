@@ -426,6 +426,11 @@ body {
   height: 34px;
 }
 
+.screen-look-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .mic-button {
   display: flex;
   align-items: center;
@@ -533,4 +538,8 @@ body {
 
 .send-button:hover {
   filter: brightness(1.08);
+}
+
+.send-button.stop {
+  background: #b3402e;
 }

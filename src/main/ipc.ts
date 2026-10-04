@@ -5,6 +5,7 @@ import type { SecretStore, TishkaEvent } from '../core/types';
 import { isMainWindow } from './chat-window';
 import type { SourceBus } from './source-bus';
 import {
+  CANCEL_CHANNEL,
   CONFIG_CHANGED_CHANNEL,
   COPY_IMAGE_CHANNEL,
   COPY_RICH_CHANNEL,
@@ -61,6 +62,11 @@ export function registerIpc(bus: SourceBus, core: TishkaCore, secrets: SecretSto
     const window = BrowserWindow.fromWebContents(event.sender);
     const source = window !== null && isMainWindow(window) && window.isFocused() ? 'chat' : 'pet';
     void bus.run(source, () => core.handleUserText(trimmed)).catch(() => undefined);
+  });
+
+  // Остановка доступна любому окну: чат и окно ежа используют один канал.
+  ipcMain.on(CANCEL_CHANNEL, () => {
+    core.cancel();
   });
 
   ipcMain.handle(HISTORY_CHANNEL, (_event, limit: unknown) => {

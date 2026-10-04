@@ -4,7 +4,7 @@ import { matchSkill } from './skills/match';
 import type { RunResult } from './skills/runner';
 
 export interface RouterDeps {
-  agent: { handle(userText: string): Promise<Reply> };
+  agent: { handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply> };
   skills: { list(): Promise<Skill[]> };
   runner: SkillToolRunner;
   registry: ToolRegistry;
@@ -12,7 +12,7 @@ export interface RouterDeps {
 }
 
 export interface Router {
-  handle(userText: string): Promise<Reply>;
+  handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply>;
   refreshSkills(): Promise<void>;
 }
 
@@ -31,14 +31,14 @@ export function createRouter(deps: RouterDeps): Router {
     }
   });
 
-  async function handle(userText: string): Promise<Reply> {
+  async function handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply> {
     const enabled = (await deps.skills.list()).filter((item) => item.enabled !== false);
     const skill = matchSkill(userText, enabled);
     if (skill === undefined || !runsWithoutInputs(skill)) {
-      return deps.agent.handle(userText);
+      return opts === undefined ? deps.agent.handle(userText) : deps.agent.handle(userText, opts);
     }
 
-    const result: RunResult = await deps.runner.run(skill);
+    const result: RunResult = await deps.runner.run(skill, undefined, opts);
     if (result.ok) {
       return result.reply ?? { say: 'Готово!' };
     }
