@@ -1,4 +1,5 @@
 import { mountConnectionsSection } from './connections-section';
+import { mountMemorySection } from './memory-section';
 import { mountModelSection } from './model-section';
 import { mountPersonaSection } from './persona-section';
 import { mountVoiceSection } from './voice-section';
@@ -15,6 +16,7 @@ mountModelSection(section('model-section'));
 mountVoiceSection(section('voice-section'));
 mountConnectionsSection(section('connections-section'));
 mountPersonaSection(section('persona-section'));
+mountMemorySection(section('memory-section'));
 
 document.getElementById('settings-close')?.addEventListener('click', () => {
   void window.tishka.closeSettings();

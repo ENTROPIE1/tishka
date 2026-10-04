@@ -1,5 +1,6 @@
 import type { ChatMessage, ChatRequest, ChatResponse } from '../llm/client';
 import { LlmError } from '../llm/client';
+import { memoryBlock, type MemoryLine } from '../memory/prompt';
 import { stepTools } from '../skills/tools';
 import type { EventBus, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
 import type { FyrLevel } from './persona';
@@ -13,6 +14,7 @@ export interface AgentDeps {
   events: EventBus;
   getModel: () => string;
   getPersona?: () => { fyr: FyrLevel };
+  memory?: { search(query: string, limit?: number): MemoryLine[] };
   now: () => Date;
 }
 
@@ -57,10 +59,14 @@ function toolResultToText(result: ToolResult): string {
 export function createAgent(deps: AgentDeps): Agent {
   const history: ChatMessage[] = [];
 
-  function refreshSystemMessage(): void {
+  function refreshSystemMessage(userText: string): void {
     const fyr = deps.getPersona?.().fyr ?? 'sometimes';
     const guide = skillGuide(stepTools(deps.registry));
-    const system: ChatMessage = { role: 'system', content: buildSystemPrompt(deps.now(), fyr, guide) };
+    const block = memoryBlock(deps.memory?.search(userText, 8) ?? []);
+    const system: ChatMessage = {
+      role: 'system',
+      content: buildSystemPrompt(deps.now(), fyr, guide, block)
+    };
     if (history[0]?.role === 'system') {
       history[0] = system;
     } else {
@@ -113,7 +119,7 @@ export function createAgent(deps: AgentDeps): Agent {
   }
 
   async function handle(userText: string): Promise<Reply> {
-    refreshSystemMessage();
+    refreshSystemMessage(userText);
     push({ role: 'user', content: userText });
 
     for (let round = 0; round < MAX_ROUNDS; round += 1) {

@@ -1,3 +1,4 @@
+import { MEMORY_RULES } from '../memory/prompt';
 import type { FyrLevel } from './persona';
 import { personaPrompt } from './persona';
 
@@ -8,7 +9,8 @@ const TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digi
 export function buildSystemPrompt(
   now: Date,
   fyr: FyrLevel = 'sometimes',
-  skillGuideSection?: string
+  skillGuideSection?: string,
+  memorySection?: string
 ): string {
   const date = DATE.format(now);
   const weekday = WEEKDAY.format(now);
@@ -29,11 +31,16 @@ export function buildSystemPrompt(
       '',
       `Сегодня ${date}, ${weekday}, время ${time}.`,
       '',
-      'Безопасность: ничего не отправляй и не меняй без явного согласия человека. Письма и встречи создавай только черновиком и показывай черновик человеку, прежде чем что-то отправлять.'
+      'Безопасность: ничего не отправляй и не меняй без явного согласия человека. Письма и встречи создавай только черновиком и показывай черновик человеку, прежде чем что-то отправлять.',
+      '',
+      MEMORY_RULES
     ].join('\n')
   ];
   if (skillGuideSection !== undefined && skillGuideSection !== '') {
     sections.push(skillGuideSection);
+  }
+  if (memorySection !== undefined && memorySection !== '') {
+    sections.push(memorySection);
   }
   return sections.join('\n\n');
 }

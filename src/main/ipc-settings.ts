@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import type { TishkaCore } from '../core/app';
 import type { McpStatus } from '../core/mcp/manager';
+import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { SecretStore } from '../core/types';
 import { broadcastConfigChanged } from './ipc';
 import {
@@ -12,6 +13,11 @@ import {
   CONNECTIONS_REMOVE_CHANNEL,
   CONNECTIONS_SAVE_CHANNEL,
   CONNECTIONS_STATUS_CHANNEL,
+  MEMORY_CLEAR_CHANNEL,
+  MEMORY_LIST_CHANNEL,
+  MEMORY_REMOVE_CHANNEL,
+  MEMORY_SEARCH_CHANNEL,
+  MEMORY_UPDATE_CHANNEL,
   OPEN_SETTINGS_CHANNEL
 } from './ipc-channels';
 import { closeSettingsWindow, openSettingsWindow } from './settings-window';
@@ -39,6 +45,30 @@ export type {
   ConnectionView,
   VoiceStateView
 } from './settings-types';
+
+function memoryPatch(value: unknown): { id: string; patch: UpdateMemoryPatch } | undefined {
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record['id'] !== 'string') {
+    return undefined;
+  }
+  const patch: UpdateMemoryPatch = {};
+  if (typeof record['text'] === 'string') {
+    patch.text = record['text'];
+  }
+  const tags = record['tags'];
+  if (Array.isArray(tags) && tags.every((tag) => typeof tag === 'string')) {
+    patch.tags = tags as string[];
+  }
+  if (record['reviewDays'] === null) {
+    patch.reviewDays = null;
+  } else if (typeof record['reviewDays'] === 'number' && Number.isFinite(record['reviewDays'])) {
+    patch.reviewDays = record['reviewDays'];
+  }
+  return { id: record['id'], patch };
+}
 
 export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore): void {
   ipcMain.handle(CONFIG_GET_CHANNEL, (): Promise<ConfigView> => configView(core));
@@ -72,4 +102,21 @@ export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore): voi
   ipcMain.handle(CLOSE_SETTINGS_CHANNEL, () => {
     closeSettingsWindow();
   });
+
+  ipcMain.handle(MEMORY_LIST_CHANNEL, (): MemoryRecord[] => core.memory());
+
+  ipcMain.handle(MEMORY_SEARCH_CHANNEL, (_event, query: unknown): MemoryRecord[] =>
+    typeof query === 'string' && query.trim() !== '' ? core.memorySearch(query) : core.memory()
+  );
+
+  ipcMain.handle(MEMORY_UPDATE_CHANNEL, (_event, value: unknown): Promise<MemoryRecord | undefined> => {
+    const parsed = memoryPatch(value);
+    return parsed === undefined ? Promise.resolve(undefined) : core.memoryUpdate(parsed.id, parsed.patch);
+  });
+
+  ipcMain.handle(MEMORY_REMOVE_CHANNEL, (_event, id: unknown): Promise<boolean> =>
+    typeof id === 'string' ? core.memoryRemove(id) : Promise.resolve(false)
+  );
+
+  ipcMain.handle(MEMORY_CLEAR_CHANNEL, (): Promise<void> => core.memoryClear());
 }

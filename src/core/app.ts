@@ -4,6 +4,9 @@ import { defaultConfig, loadConfig, saveConfig as persistConfig } from './config
 import { createHistory, type HistoryEntry } from './history';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
+import { createMemoryReviewer, type MemoryReviewer } from './memory/review';
+import { createMemoryStore, type MemoryRecord, type MemoryStore, type UpdateMemoryPatch } from './memory/store';
+import { registerMemoryTools } from './memory/tools';
 import { createRouter, type Router } from './router';
 import { createSkillRunner } from './skills/runner';
 import { createSkillStore } from './skills/store';
@@ -40,6 +43,11 @@ export interface TishkaCore {
   reconnect(name: string): Promise<McpStatus | undefined>;   // переподключить один сервер и вернуть его статус
   history(limit?: number): HistoryEntry[];
   clearHistory(): Promise<void>;
+  memory(): MemoryRecord[];
+  memorySearch(query: string): MemoryRecord[];
+  memoryUpdate(id: string, patch: UpdateMemoryPatch): Promise<MemoryRecord | undefined>;
+  memoryRemove(id: string): Promise<boolean>;
+  memoryClear(): Promise<void>;
 }
 
 const API_KEY_SECRET = 'DKS_API_KEY';
@@ -79,6 +87,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let router: Router | undefined;
   let scheduler: Scheduler | undefined;
   let watcher: Watcher | undefined;
+  let reviewer: MemoryReviewer | undefined;
+  let memory: MemoryStore | undefined;
   let mcp: McpManager | undefined;
   let mcpTask: Promise<void> | undefined;
   let started = false;
@@ -175,6 +185,14 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       now: deps.now
     });
 
+    const memoryStore = createMemoryStore({
+      filePath: join(deps.dataDir, 'memory.json'),
+      now: deps.now
+    });
+    await memoryStore.load();
+    memory = memoryStore;
+    registerMemoryTools(registry, memoryStore);
+
     const llm = createLlmClient({
       baseUrl: config.llm.baseUrl,
       getApiKey: gatewayKey,
@@ -205,13 +223,16 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       events: deps.events,
       getModel: () => config.llm.model,
       getPersona: () => config.persona,
+      memory: { search: (query, limit) => memoryStore.search(query, limit) },
       now: deps.now
     });
     router = createRouter({ agent, skills, runner, registry, events: deps.events });
     await router.refreshSkills();
 
+    reviewer = createMemoryReviewer({ store: memoryStore, events: deps.events, now: deps.now });
     await scheduler.start();
     await watcher.start();
+    await reviewer.start();
 
     // Подключение серверов MCP не задерживает запуск: идёт в фоне.
     mcp = createMcpManager({ registry, secrets: deps.secrets });
@@ -222,6 +243,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     historyStore.stop();
     scheduler?.stop();
     watcher?.stop();
+    reviewer?.stop();
     const task = mcpTask;
     mcpTask = undefined;
     if (task !== undefined) {
@@ -266,6 +288,13 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     saveConfig,
     reconnect,
     history: (limit?: number) => historyStore.list(limit),
-    clearHistory: () => historyStore.clear()
+    clearHistory: () => historyStore.clear(),
+    memory: () => memory?.list() ?? [],
+    memorySearch: (query: string) => memory?.search(query) ?? [],
+    memoryUpdate: (id: string, patch: UpdateMemoryPatch) =>
+      memory === undefined ? Promise.resolve(undefined) : memory.update(id, patch),
+    memoryRemove: (id: string) =>
+      memory === undefined ? Promise.resolve(false) : memory.remove(id),
+    memoryClear: () => (memory === undefined ? Promise.resolve() : memory.clear())
   };
 }

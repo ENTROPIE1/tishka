@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { ConnectionDraft } from '../core/connections';
 import type { HistoryEntry } from '../core/history';
 import type { McpStatus } from '../core/mcp/manager';
+import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { Config, TishkaEvent } from '../core/types';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
@@ -27,6 +28,11 @@ import {
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
+  MEMORY_CLEAR_CHANNEL,
+  MEMORY_LIST_CHANNEL,
+  MEMORY_REMOVE_CHANNEL,
+  MEMORY_SEARCH_CHANNEL,
+  MEMORY_UPDATE_CHANNEL,
   OPEN_CHAT_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
   OPEN_SETTINGS_CHANNEL,
@@ -131,6 +137,14 @@ const api = {
   },
   closeSettings(): Promise<void> {
     return ipcRenderer.invoke(CLOSE_SETTINGS_CHANNEL);
+  },
+  memory: {
+    list: (): Promise<MemoryRecord[]> => ipcRenderer.invoke(MEMORY_LIST_CHANNEL),
+    search: (query: string): Promise<MemoryRecord[]> => ipcRenderer.invoke(MEMORY_SEARCH_CHANNEL, query),
+    update: (id: string, patch: UpdateMemoryPatch): Promise<MemoryRecord | undefined> =>
+      ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, { id, ...patch }),
+    remove: (id: string): Promise<boolean> => ipcRenderer.invoke(MEMORY_REMOVE_CHANNEL, id),
+    clear: (): Promise<void> => ipcRenderer.invoke(MEMORY_CLEAR_CHANNEL)
   },
   openChat(): Promise<void> {
     return ipcRenderer.invoke(OPEN_CHAT_CHANNEL);

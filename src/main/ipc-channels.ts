@@ -23,6 +23,12 @@ export const OPEN_SETTINGS_CHANNEL = 'tishka:open-settings';
 export const CLOSE_SETTINGS_CHANNEL = 'tishka:close-settings';
 export const OPEN_CHAT_CHANNEL = 'tishka:open-chat';
 
+export const MEMORY_LIST_CHANNEL = 'tishka:memory:list';
+export const MEMORY_SEARCH_CHANNEL = 'tishka:memory:search';
+export const MEMORY_UPDATE_CHANNEL = 'tishka:memory:update';
+export const MEMORY_REMOVE_CHANNEL = 'tishka:memory:remove';
+export const MEMORY_CLEAR_CHANNEL = 'tishka:memory:clear';
+
 export const PET_MODEL_CHANNEL = 'tishka:pet:model';
 export const PET_INTERACTIVE_CHANNEL = 'tishka:pet:interactive';
 export const PET_BUSY_CHANNEL = 'tishka:pet:busy';
