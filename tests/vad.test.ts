@@ -77,6 +77,42 @@ describe('createVad', () => {
   });
 });
 
+describe('createVad: непрерывный режим', () => {
+  it('до начала речи не завершается по timeout, сколько бы ни длилась тишина', () => {
+    const vad = createVad({ continuous: true, noSpeechMs: 0, settleMs: 300 });
+    expect(feed(vad, 0.002, 2000)).toBe('continue');
+    expect(vad.heardSpeech()).toBe(false);
+  });
+
+  it('предел длины фразы отсчитывается от начала речи, а не от открытия микрофона', () => {
+    const vad = createVad({ continuous: true, noSpeechMs: 0, maxMs: 400, silenceMs: 10000 });
+    expect(feed(vad, 0.002, 300)).toBe('continue');
+    expect(vad.heardSpeech()).toBe(false);
+    expect(feed(vad, 0.1, 100)).toBe('timeout');
+  });
+
+  it('после end VAD готов к следующей фразе, шум не сбрасывается', () => {
+    const vad = createVad({ continuous: true, noSpeechMs: 0, settleMs: 300, silenceMs: 200 });
+    feed(vad, 0.002, 20);
+    expect(feed(vad, 0.012, 15)).toBe('continue');
+    expect(vad.heardSpeech()).toBe(true);
+    expect(feed(vad, 0.002, 15)).toBe('end');
+    expect(feed(vad, 0.002, 5)).toBe('continue');
+    expect(vad.heardSpeech()).toBe(false);
+    expect(feed(vad, 0.012, 15)).toBe('continue');
+    expect(vad.heardSpeech()).toBe(true);
+  });
+
+  it('первые 300 мс после включения не считаются речью, но речь сразу после распознаётся', () => {
+    const vad = createVad({ continuous: true, noSpeechMs: 0, settleMs: 300 });
+    feed(vad, 0.002, 14);
+    vad.push(frame(0.8), FRAME_MS);
+    expect(vad.heardSpeech()).toBe(false);
+    expect(feed(vad, 0.012, 15)).toBe('continue');
+    expect(vad.heardSpeech()).toBe(true);
+  });
+});
+
 describe('trimSpeech', () => {
   it('добавляет запас до начала речи и обрезает длинную тишину', () => {
     const samples = new Float32Array(16000).fill(1);

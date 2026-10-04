@@ -1,19 +1,13 @@
 import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
 import { encodeWav, normalizePeak, resample } from '../../voice/wav';
+import { createMicCapture, type MicCapture } from './mic-capture';
 
-const PROCESSOR_BUFFER = 1024;
 const TARGET_RATE = 16000;
 const DEFAULT_SILENCE_MS = 800;
 const DEFAULT_MAX_PHRASE_MS = 12000;
-
-const MIC_CONSTRAINTS: MediaStreamConstraints = {
-  audio: {
-    autoGainControl: true,
-    noiseSuppression: true,
-    echoCancellation: true,
-    channelCount: 1
-  }
-};
+const PRE_ROLL_MS = 500;
+const SETTLE_MS = 300;
+const MIN_PHRASE_MS = 400;
 
 export interface PhraseListenerOptions {
   onPhrase(wav: Uint8Array): void;
@@ -22,6 +16,7 @@ export interface PhraseListenerOptions {
   sensitivity?: VadSensitivity;
   silenceMs?: number;
   maxPhraseMs?: number;
+  capture?: MicCapture;
 }
 
 export interface PhraseListener {
@@ -29,56 +24,47 @@ export interface PhraseListener {
   stop(): void;
 }
 
-function stopTracks(stream: MediaStream | undefined): void {
-  if (stream === undefined) {
-    return;
-  }
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
+interface PreRollFrame {
+  data: Float32Array;
+  startMs: number;
+  ms: number;
 }
 
 // Постоянное прослушивание для режима разговора: микрофон открыт, речь режется
-// на фразы тем же VAD, готовые фразы уходят наружу.
+// на фразы. Пока речь не началась, звук не копится — держим только скользящий
+// запас последних 500 мс, чтобы не обрезать первое слово.
 export function createPhraseListener(options: PhraseListenerOptions): PhraseListener {
   const silenceMs = options.silenceMs ?? DEFAULT_SILENCE_MS;
   const maxPhraseMs = options.maxPhraseMs ?? DEFAULT_MAX_PHRASE_MS;
-  let stream: MediaStream | undefined;
-  let context: AudioContext | undefined;
-  let processor: ScriptProcessorNode | undefined;
-  let vad: Vad | undefined;
-  let chunks: Float32Array[] = [];
-  let sourceRate = TARGET_RATE;
+  const capture = options.capture ?? createMicCapture();
+
   let active = false;
   let runId = 0;
+  let vad: Vad | undefined;
+  let sourceRate = TARGET_RATE;
+  let nowMs = 0;
+  let preRoll: PreRollFrame[] = [];
+  let preRollMs = 0;
+  let capturing = false;
+  let phraseFrames: Float32Array[] = [];
+  let phraseStartMs = 0;
 
-  function resetPhrase(): void {
-    chunks = [];
-    vad = createVad({ silenceMs, maxMs: maxPhraseMs, noSpeechMs: 0, sensitivity: options.sensitivity });
+  function makeVad(): Vad {
+    return createVad({
+      silenceMs,
+      maxMs: maxPhraseMs,
+      noSpeechMs: 0,
+      sensitivity: options.sensitivity,
+      continuous: true,
+      settleMs: SETTLE_MS
+    });
   }
 
-  function teardown(): void {
-    if (processor !== undefined) {
-      processor.onaudioprocess = null;
-      processor.disconnect();
-      processor = undefined;
-    }
-    if (context !== undefined) {
-      void context.close().catch(() => undefined);
-      context = undefined;
-    }
-    stopTracks(stream);
-    stream = undefined;
-    vad = undefined;
-    chunks = [];
-    active = false;
-  }
-
-  function emitPhrase(): void {
-    const collected = chunks;
-    const rate = sourceRate;
-    const activeVad = vad;
-    resetPhrase();
+  function emitPhrase(activeVad: Vad): void {
+    const collected = phraseFrames;
+    const startMs = phraseStartMs;
+    phraseFrames = [];
+    capturing = false;
     if (collected.length === 0) {
       return;
     }
@@ -86,15 +72,60 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     for (const part of collected) {
       total += part.length;
     }
+    if (total === 0) {
+      return;
+    }
     const merged = new Float32Array(total);
     let offset = 0;
     for (const part of collected) {
       merged.set(part, offset);
       offset += part.length;
     }
-    const trimmed = activeVad === undefined ? merged : activeVad.result(merged, rate);
+    if (!activeVad.heardSpeech()) {
+      return;
+    }
+    const trimmed = activeVad.result(merged, sourceRate, startMs);
+    if (trimmed.length === 0 || (trimmed.length / sourceRate) * 1000 < MIN_PHRASE_MS) {
+      return;
+    }
     const normalized = normalizePeak(trimmed);
-    options.onPhrase(encodeWav(resample(normalized, rate, TARGET_RATE), TARGET_RATE));
+    options.onPhrase(encodeWav(resample(normalized, sourceRate, TARGET_RATE), TARGET_RATE));
+  }
+
+  function handleFrame(frame: Float32Array, sampleRate: number): void {
+    if (!active || vad === undefined) {
+      return;
+    }
+    sourceRate = sampleRate;
+    const frameMs = (frame.length / sampleRate) * 1000;
+    const frameStartMs = nowMs;
+    const verdict = vad.push(frame, frameMs);
+    options.onLevel?.(vad.level());
+
+    if (!capturing) {
+      preRoll.push({ data: frame, startMs: frameStartMs, ms: frameMs });
+      preRollMs += frameMs;
+      while (preRollMs > PRE_ROLL_MS && preRoll.length > 0) {
+        const oldest = preRoll.shift();
+        if (oldest !== undefined) {
+          preRollMs -= oldest.ms;
+        }
+      }
+      if (vad.heardSpeech()) {
+        capturing = true;
+        phraseFrames = preRoll.map((item) => item.data);
+        phraseStartMs = preRoll.length > 0 ? preRoll[0].startMs : frameStartMs;
+        preRoll = [];
+        preRollMs = 0;
+      }
+    } else {
+      phraseFrames.push(frame);
+    }
+    nowMs += frameMs;
+
+    if (capturing && (verdict === 'end' || verdict === 'timeout')) {
+      emitPhrase(vad);
+    }
   }
 
   async function start(): Promise<boolean> {
@@ -102,49 +133,33 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
       return true;
     }
     const id = (runId += 1);
-    let media: MediaStream;
-    try {
-      media = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
-    } catch {
+    const ok = await capture.start(handleFrame);
+    if (id !== runId) {
+      return false;
+    }
+    if (!ok) {
       options.onError?.('Не слышу микрофон');
       return false;
     }
-    if (id !== runId) {
-      stopTracks(media);
-      return false;
-    }
-    stream = media;
-    context = new AudioContext();
-    sourceRate = context.sampleRate;
-    resetPhrase();
-    const source = context.createMediaStreamSource(stream);
-    processor = context.createScriptProcessor(PROCESSOR_BUFFER, 1, 1);
-    processor.onaudioprocess = (event) => {
-      if (vad === undefined) {
-        return;
-      }
-      const frame = new Float32Array(event.inputBuffer.getChannelData(0));
-      chunks.push(frame);
-      const verdict = vad.push(frame, (frame.length / sourceRate) * 1000);
-      options.onLevel?.(vad.level());
-      if (verdict === 'end' || verdict === 'timeout') {
-        emitPhrase();
-      } else if (verdict === 'nospeech') {
-        resetPhrase();
-      }
-    };
-    const sink = context.createGain();
-    sink.gain.value = 0;
-    source.connect(processor);
-    processor.connect(sink);
-    sink.connect(context.destination);
+    nowMs = 0;
+    preRoll = [];
+    preRollMs = 0;
+    capturing = false;
+    phraseFrames = [];
+    vad = makeVad();
     active = true;
     return true;
   }
 
   function stop(): void {
     runId += 1;
-    teardown();
+    active = false;
+    vad = undefined;
+    preRoll = [];
+    preRollMs = 0;
+    capturing = false;
+    phraseFrames = [];
+    capture.stop();
   }
 
   return { start, stop };

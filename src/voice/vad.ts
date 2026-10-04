@@ -10,13 +10,17 @@ export interface VadOptions {
   sensitivity?: VadSensitivity;
   leadMs?: number;         // запас до начала речи в результате
   tailMs?: number;         // запас после конца речи в результате
+  continuous?: boolean;    // фраза за фразой без пересоздания, шум не сбрасывается
+  settleMs?: number;       // первые кадры только в оценку шума (щелчок включения)
 }
 
 export interface Vad {
   push(frame: Float32Array, frameMs: number): VadVerdict;
   level(): number;         // 0..1 относительно порога (порог — 0.5)
   heardSpeech(): boolean;
-  result(samples: Float32Array, sampleRate: number): Float32Array;
+  // bufferStartMs — время начала переданного буфера на общей шкале VAD;
+  // нужно, когда буфер собран заново и его края не совпадают с началом записи.
+  result(samples: Float32Array, sampleRate: number, bufferStartMs?: number): Float32Array;
 }
 
 const NOISE_WINDOW_MS = 2000;
@@ -76,6 +80,8 @@ export function createVad(options: VadOptions = {}): Vad {
   const noSpeechMs = options.noSpeechMs ?? NOSPEECH_MS;
   const leadMs = options.leadMs ?? DEFAULT_LEAD_MS;
   const tailMs = options.tailMs ?? DEFAULT_TAIL_MS;
+  const continuous = options.continuous ?? false;
+  const settleMs = options.settleMs ?? 0;
   const limits = SENSITIVITY[options.sensitivity ?? 'normal'];
 
   let elapsed = 0;
@@ -101,9 +107,23 @@ export function createVad(options: VadOptions = {}): Vad {
     return Math.max(noise() * limits.k, limits.floor);
   }
 
+  // Новая фраза: оценка шума (levels) сохраняется — иначе первые кадры фразы
+  // снова окажутся без данных о шуме.
+  function resetPhrase(): void {
+    speechStarted = false;
+    speechStartMs = 0;
+    lastLoudMs = 0;
+    silenceRun = 0;
+    loudMarks.length = 0;
+    done = false;
+  }
+
   function push(frame: Float32Array, frameMs: number): VadVerdict {
     if (done) {
-      return 'continue';
+      if (!continuous) {
+        return 'continue';
+      }
+      resetPhrase();
     }
     const value = rms(frame);
     lastLevel = value;
@@ -112,7 +132,9 @@ export function createVad(options: VadOptions = {}): Vad {
       levels.shift();
     }
 
-    const loud = value - threshold() > LEVEL_EPSILON;
+    // Кадры после включения микрофона идут только в оценку шума.
+    const settling = elapsed < settleMs;
+    const loud = !settling && value - threshold() > LEVEL_EPSILON;
     if (loud) {
       loudMarks.push(elapsed);
       lastLoudMs = elapsed + frameMs;
@@ -134,6 +156,14 @@ export function createVad(options: VadOptions = {}): Vad {
       done = true;
       return 'end';
     }
+    // Предел длины фразы считается от начала речи, а не от открытия микрофона.
+    if (speechStarted && elapsed - speechStartMs >= maxMs) {
+      done = true;
+      return 'timeout';
+    }
+    if (continuous) {
+      return 'continue';
+    }
     if (elapsed >= maxMs) {
       done = true;
       return 'timeout';
@@ -151,11 +181,18 @@ export function createVad(options: VadOptions = {}): Vad {
     level(): number {
       return Math.max(0, Math.min(1, lastLevel / (2 * threshold())));
     },
-    result(samples: Float32Array, sampleRate: number): Float32Array {
+    result(samples: Float32Array, sampleRate: number, bufferStartMs = 0): Float32Array {
       if (!speechStarted) {
         return samples.slice();
       }
-      return trimSpeech(samples, sampleRate, speechStartMs, lastLoudMs, leadMs, tailMs);
+      return trimSpeech(
+        samples,
+        sampleRate,
+        speechStartMs - bufferStartMs,
+        lastLoudMs - bufferStartMs,
+        leadMs,
+        tailMs
+      );
     }
   };
 }

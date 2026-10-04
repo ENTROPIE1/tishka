@@ -1,11 +1,6 @@
-import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
-import { encodeWav, normalizePeak, resample } from '../../voice/wav';
+import { createPhraseListener, type PhraseListener } from '../shared/phrase-listener';
+import type { VadSensitivity } from '../../voice/vad';
 
-const PROCESSOR_BUFFER = 4096;
-const TARGET_RATE = 16000;
-const SILENCE_MS = 800;
-const MAX_PHRASE_MS = 12000;
-const MIN_PHRASE_MS = 400;
 const MIC_RETRY_MS = 30000;
 const MIC_ERROR = 'Не слышу микрофон';
 
@@ -18,16 +13,8 @@ export interface WakeListener {
   dispose(): void;
 }
 
-function stopTracks(stream: MediaStream | undefined): void {
-  if (stream === undefined) {
-    return;
-  }
-  for (const track of stream.getTracks()) {
-    track.stop();
-  }
-}
-
-// Постоянное прослушивание: микрофон открыт, звук режется на фразы тем же VAD.
+// Окно-питомец: постоянное прослушивание ведёт общий phrase-listener,
+// здесь остаётся только связка с состоянием окна.
 export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   const level = document.getElementById('level') as HTMLElement | null;
   const levelFill = document.getElementById('level-fill') as HTMLElement | null;
@@ -35,20 +22,9 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let active = false;
   let conversation = false;
   let soon = false;
-  let stream: MediaStream | undefined;
-  let context: AudioContext | undefined;
-  let processor: ScriptProcessorNode | undefined;
-  let vad: Vad | undefined;
-  let chunks: Float32Array[] = [];
-  let sourceRate = TARGET_RATE;
-  let runId = 0;
   let sensitivity: VadSensitivity = 'normal';
+  let listener: PhraseListener | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
-
-  function resetPhrase(): void {
-    chunks = [];
-    vad = createVad({ silenceMs: SILENCE_MS, maxMs: MAX_PHRASE_MS, noSpeechMs: 0, sensitivity });
-  }
 
   function clearRetry(): void {
     if (retryTimer !== undefined) {
@@ -57,113 +33,54 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     }
   }
 
-  // Микрофон не открылся: сообщаем один раз и пробуем снова через полминуты.
-  function scheduleRetry(id: number): void {
+  function scheduleRetry(): void {
     if (retryTimer !== undefined) {
       return;
     }
     window.tishka.pet.wakeError(MIC_ERROR);
     retryTimer = setTimeout(() => {
       retryTimer = undefined;
-      if (id === runId && active && stream === undefined) {
-        void open();
+      if (active && listener === undefined) {
+        start();
       }
     }, MIC_RETRY_MS);
   }
 
-  function teardown(): void {
-    clearRetry();
-    if (processor !== undefined) {
-      processor.onaudioprocess = null;
-      processor.disconnect();
-      processor = undefined;
+  function onError(): void {
+    stopListener();
+    if (active) {
+      scheduleRetry();
     }
-    if (context !== undefined) {
-      void context.close().catch(() => undefined);
-      context = undefined;
-    }
-    stopTracks(stream);
-    stream = undefined;
-    vad = undefined;
-    chunks = [];
   }
 
-  function emitPhrase(): void {
-    let total = 0;
-    for (const part of chunks) {
-      total += part.length;
-    }
-    const collected = chunks;
-    const rate = sourceRate;
-    const activeVad = vad;
-    resetPhrase();
-    if (total === 0 || (total / rate) * 1000 < MIN_PHRASE_MS) {
+  function start(): void {
+    if (listener !== undefined || !active) {
       return;
     }
-    const merged = new Float32Array(total);
-    let offset = 0;
-    for (const part of collected) {
-      merged.set(part, offset);
-      offset += part.length;
-    }
-    const trimmed = activeVad === undefined ? merged : activeVad.result(merged, rate);
-    const normalized = normalizePeak(trimmed);
-    window.tishka.pet.wakePhrase(encodeWav(resample(normalized, rate, TARGET_RATE), TARGET_RATE));
-  }
-
-  async function open(): Promise<void> {
-    const id = (runId += 1);
-    let media: MediaStream;
-    try {
-      media = await navigator.mediaDevices.getUserMedia({
-      audio: { autoGainControl: true, noiseSuppression: true, echoCancellation: true, channelCount: 1 }
+    listener = createPhraseListener({
+      sensitivity,
+      onPhrase: (wav) => window.tishka.pet.wakePhrase(wav),
+      onLevel: (value) => {
+        if (levelFill !== null && conversation) {
+          levelFill.style.width = `${Math.round(value * 100)}%`;
+        }
+      },
+      onError
     });
-    } catch {
-      if (id === runId && active) {
-        scheduleRetry(id);
-      }
-      return;
-    }
-    if (id !== runId || !active) {
-      stopTracks(media);
-      return;
-    }
+    void listener.start();
+  }
+
+  function stopListener(): void {
     clearRetry();
-    stream = media;
-    context = new AudioContext();
-    sourceRate = context.sampleRate;
-    resetPhrase();
-    const source = context.createMediaStreamSource(stream);
-    processor = context.createScriptProcessor(PROCESSOR_BUFFER, 1, 1);
-    processor.onaudioprocess = (event) => {
-      if (!active || vad === undefined) {
-        return;
-      }
-      const frame = new Float32Array(event.inputBuffer.getChannelData(0));
-      chunks.push(frame);
-      const verdict = vad.push(frame, (frame.length / sourceRate) * 1000);
-      if (levelFill !== null && conversation) {
-        levelFill.style.width = `${Math.round(vad.level() * 100)}%`;
-      }
-      if (verdict === 'end' || verdict === 'timeout') {
-        emitPhrase();
-      } else if (verdict === 'nospeech') {
-        resetPhrase();
-      }
-    };
-    const sink = context.createGain();
-    sink.gain.value = 0;
-    source.connect(processor);
-    processor.connect(sink);
-    sink.connect(context.destination);
+    listener?.stop();
+    listener = undefined;
   }
 
   function applyActive(): void {
-    if (active && stream === undefined) {
-      void open();
-    } else if (!active && stream !== undefined) {
-      runId += 1;
-      teardown();
+    if (active) {
+      start();
+    } else {
+      stopListener();
     }
   }
 
@@ -183,14 +100,18 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   }
 
   window.tishka.pet.onWakeState((state) => {
+    const wasActive = active;
     active = state.active;
     soon = state.soon;
-    if (state.sensitivity !== undefined) {
-      sensitivity = state.sensitivity;
-    }
+    const nextSensitivity = state.sensitivity ?? sensitivity;
+    const sensitivityChanged = nextSensitivity !== sensitivity;
+    sensitivity = nextSensitivity;
     if (state.conversation !== conversation) {
       conversation = state.conversation;
       deps.onConversation?.(conversation);
+    }
+    if (active && (!wasActive || sensitivityChanged) && listener !== undefined) {
+      stopListener();
     }
     applyActive();
     applyUi();
@@ -203,9 +124,8 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       applyUi();
     },
     dispose(): void {
-      runId += 1;
       active = false;
-      teardown();
+      stopListener();
     }
   };
 }
