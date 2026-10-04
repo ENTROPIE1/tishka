@@ -168,4 +168,16 @@ describe('pet state', () => {
     model = onTick(model, 1500, MODE_OFF);
     expect(model.state).toBe('idle');
   });
+
+  it('счётчик ответов растёт на каждом reply и держится при переходах', () => {
+    let model = fire(initialPet(0), { type: 'reply', reply: { say: 'раз' } }, 0);
+    expect(model.replies).toBe(1);
+
+    model = fire(model, { type: 'reply', reply: { say: 'два' } }, 100);
+    expect(model.replies).toBe(2);
+
+    model = onTick(model, 10_000, MODE_OFF);
+    expect(model.state).toBe('idle');
+    expect(model.replies).toBe(2);
+  });
 });

@@ -24,7 +24,7 @@ export function createPetCard(host: PetCardHost): PetCard {
 
   function render(model: PetModel): void {
     const { panel, ask } = model;
-    const key = JSON.stringify({ panel, ask });
+    const key = JSON.stringify({ panel, ask, replies: model.replies ?? 0 });
     if (key !== lastKey) {
       lastKey = key;
       closed = false;

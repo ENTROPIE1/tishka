@@ -14,9 +14,11 @@ export interface ChatToolbarDeps {
   feed: ChatFeed;
   reload: () => Promise<void>;
   loadAll: () => Promise<HistoryEntry[]>;
+  setStatus: (text: string) => void;
+  clearStatus: () => void;
 }
 
-// Шапка чата: поиск по истории и кнопка нового разговора.
+// Шапка чата: поиск по истории, новый разговор и очистка истории.
 export function mountChatToolbar(deps: ChatToolbarDeps): void {
   createChatSearch({
     feed: deps.feed,
@@ -27,6 +29,25 @@ export function mountChatToolbar(deps: ChatToolbarDeps): void {
     loadAll: deps.loadAll
   });
   element<HTMLButtonElement>('new-conversation').addEventListener('click', () => {
-    void window.tishka.newConversation().then(deps.reload);
+    void window.tishka
+      .newConversation()
+      .then(deps.reload)
+      .catch(() => {
+        deps.setStatus('Не удалось начать новый разговор');
+      });
+  });
+  element<HTMLButtonElement>('clear-history').addEventListener('click', () => {
+    if (!window.confirm('Очистить всю переписку с Тишкой?')) {
+      return;
+    }
+    void window.tishka
+      .clearHistory()
+      .then(() => {
+        deps.feed.clear();
+        deps.clearStatus();
+      })
+      .catch(() => {
+        deps.setStatus('Не удалось очистить историю');
+      });
   });
 }
