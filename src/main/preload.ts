@@ -161,7 +161,7 @@ const api = {
     save(config: Config): Promise<void> {
       return ipcRenderer.invoke(CONFIG_SAVE_CHANNEL, config);
     },
-    checkGateway(input: { baseUrl: string; model: string; key?: string }): Promise<GatewayCheckResult> {
+    checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult> {
       return ipcRenderer.invoke(GATEWAY_CHECK_CHANNEL, input);
     },
     onChanged(listener: () => void): () => void {

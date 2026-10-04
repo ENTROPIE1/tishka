@@ -6,7 +6,7 @@ import { mountModelSection } from '../src/renderer/settings/model-section';
 
 function makeConfig(): Config {
   return {
-    llm: { baseUrl: 'https://llm.example.test/v1', model: 'DKS-Lynx', visionModel: 'DKS-Vision' },
+    llm: { baseUrl: 'https://llm.example.test/v1', model: 'DKS-Lynx', visionModel: 'DKS-Vision', api: 'chat' },
     voice: {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],
@@ -65,6 +65,20 @@ afterEach(() => {
 });
 
 describe('mountModelSection', () => {
+  it('кнопки «Сохранить» и «Проверить» имеют общий базовый класс', async () => {
+    install({ ok: true, models: [], ms: 1 });
+    const root = document.createElement('div');
+    mountModelSection(root);
+    await flush();
+
+    const save = buttonWith(root, 'Сохранить');
+    const check = buttonWith(root, 'Проверить');
+
+    expect(save.classList.contains('button')).toBe(true);
+    expect(check.classList.contains('button')).toBe(true);
+    expect(check.classList.contains('button-secondary')).toBe(true);
+  });
+
   it('кнопка «Проверить» показывает результат и список моделей', async () => {
     vi.useFakeTimers();
     install({ ok: true, models: ['DKS-Lynx', 'DKS-Vision'], ms: 42 });
@@ -100,6 +114,46 @@ describe('mountModelSection', () => {
     await flush();
 
     expect(root.querySelector('.message-error')?.textContent).toBe('Ключ шлюза не принят');
+
+    await vi.runAllTimersAsync();
+  });
+
+  it('формат запросов показывается, сохраняется и уходит в проверку', async () => {
+    vi.useFakeTimers();
+    const saved: Config[] = [];
+    let current = makeConfig();
+    install({ ok: true, models: ['DKS-Lynx'], ms: 10 });
+    (window.tishka.config.get as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
+      config: current,
+      gatewayKeySet: true
+    }));
+    (window.tishka.config.save as ReturnType<typeof vi.fn>).mockImplementation(async (config: Config) => {
+      saved.push(config);
+      current = config;
+    });
+    const root = document.createElement('div');
+    mountModelSection(root);
+    await flush();
+
+    const format = root.querySelector('select');
+    expect(format).not.toBeNull();
+    expect([...(format as HTMLSelectElement).options].map((option) => option.textContent)).toEqual([
+      'Chat Completions',
+      'Responses'
+    ]);
+    expect((format as HTMLSelectElement).value).toBe('chat');
+
+    (format as HTMLSelectElement).value = 'responses';
+    buttonWith(root, 'Сохранить').click();
+    await flush();
+    expect(saved[0]?.llm.api).toBe('responses');
+    expect((format as HTMLSelectElement).value).toBe('responses');
+
+    buttonWith(root, 'Проверить').click();
+    await flush();
+    expect(checkGateway).toHaveBeenCalledWith(
+      expect.objectContaining({ baseUrl: 'https://llm.example.test/v1', api: 'responses' })
+    );
 
     await vi.runAllTimersAsync();
   });

@@ -31,6 +31,7 @@ describe('defaultConfig', () => {
     expect(config.llm.baseUrl).toBe('https://llm.dks.lanit.ru/v1');
     expect(config.llm.model).toBe('DKS-Lynx');
     expect(config.llm.visionModel).toBe('DKS-Vision');
+    expect(config.llm.api).toBe('chat');
     expect(config.voice.hotkey).toBe('Control+Alt+Space');
     expect(config.voice.wakeWords).toEqual(['тишка']);
     expect(config.voice.sttUrl).toBe('http://127.0.0.1:8178');
@@ -67,6 +68,24 @@ describe('loadConfig', () => {
     mockedReadFile.mockResolvedValueOnce(JSON.stringify({ web: { enabled: false } }) as never);
     const config = await loadConfig(dir);
     expect(config.web).toEqual({ enabled: false });
+  });
+
+  it('без поля llm.api формат читается как chat', async () => {
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({ llm: { model: 'Своя модель' } }) as never);
+    const config = await loadConfig(dir);
+    expect(config.llm.api).toBe('chat');
+  });
+
+  it('неизвестное значение llm.api читается как chat', async () => {
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({ llm: { api: 'giga' } }) as never);
+    const config = await loadConfig(dir);
+    expect(config.llm.api).toBe('chat');
+  });
+
+  it('формат responses сохраняется', async () => {
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({ llm: { api: 'responses' } }) as never);
+    const config = await loadConfig(dir);
+    expect(config.llm.api).toBe('responses');
   });
 
   it('читает tts и игнорирует старое поле ttsEngine', async () => {    mockedReadFile.mockResolvedValueOnce(

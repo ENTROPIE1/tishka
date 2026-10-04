@@ -52,6 +52,9 @@ vi.mock('electron', () => {
     setPosition(x: number, y: number): void {
       fake.bounds = { ...fake.bounds, x, y };
     }
+    setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
+      fake.bounds = { ...bounds };
+    }
     getBounds(): { x: number; y: number; width: number; height: number } {
       return fake.bounds;
     }
@@ -80,6 +83,7 @@ vi.mock('electron', () => {
     BrowserWindow: MockBrowserWindow,
     screen: {
       getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }),
+      getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }],
       getCursorScreenPoint: () => fake.cursor
     },
     shell: { openExternal: () => undefined }
