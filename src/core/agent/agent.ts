@@ -8,6 +8,7 @@ import type { FyrLevel } from './persona';
 import { buildSystemPrompt } from './prompt';
 import { REPLY_TOOL_NAME, replyFromText, replyFromToolArgs, replyTool } from './reply';
 import { skillGuide } from './skill-guide';
+import type { TimingMark } from '../../main/timing-log';
 
 export interface AgentDeps {
   llm: { chat(req: ChatRequest): Promise<ChatResponse> };
@@ -17,6 +18,7 @@ export interface AgentDeps {
   getPersona?: () => { fyr: FyrLevel };
   memory?: { search(query: string, limit?: number): MemoryLine[] };
   now: () => Date;
+  mark?: TimingMark;
 }
 
 export interface Agent {
@@ -58,6 +60,7 @@ function toolResultToText(result: ToolResult): string {
 
 export function createAgent(deps: AgentDeps): Agent {
   const history: ChatMessage[] = [];
+  let rounds = 0;
 
   function refreshSystemMessage(userText: string): void {
     const fyr = deps.getPersona?.().fyr ?? 'sometimes';
@@ -101,13 +104,18 @@ export function createAgent(deps: AgentDeps): Agent {
     refreshSystemMessage(userText);
     const userMessage: ChatMessage = { role: 'user', content: userText };
     push(userMessage);
+    rounds = 0;
+    const startedAt = Date.now();
+    deps.mark?.('model.request.start');
     const reply = await respond();
+    deps.mark?.('model.request.end', { ms: Date.now() - startedAt, steps: rounds });
     shortenUserMessage(history, userMessage);
     return reply;
   }
 
   async function respond(): Promise<Reply> {
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
+      rounds = round + 1;
       deps.events.emit({ type: 'think.start' });
 
       let response: ChatResponse;

@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import { NAVIGATE_CHANNEL } from './ipc-channels';
 import { guardNavigation } from './navigation-guard';
+import { mark } from './timing-log';
 
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 640;
@@ -60,6 +61,8 @@ export function openMainWindow(screen?: MainScreen): void {
 
   window.setMenu(null);
   guardNavigation(window);
+  mark('chat.window.created');
+  window.once('ready-to-show', () => mark('chat.window.shown'));
 
   // Микрофон для диктовки: разрешён только доступ к медиа.
   window.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {

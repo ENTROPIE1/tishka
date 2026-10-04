@@ -1,6 +1,7 @@
 import type { ListenResult } from '../../voice/listen';
 import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
 import { encodeWav, normalizePeak, resample } from '../../voice/wav';
+import { timingMark } from './timing';
 
 const PROCESSOR_BUFFER = 1024;
 const TARGET_RATE = 16000;
@@ -85,6 +86,7 @@ export function createRecorder(options: RecorderOptions): Recorder {
     teardown();
     reset();
     if (collected.length === 0) {
+      timingMark('record.end', { kind: 'nospeech' });
       options.onResult({ kind: 'nospeech' });
       return;
     }
@@ -101,7 +103,9 @@ export function createRecorder(options: RecorderOptions): Recorder {
     const trimmed = activeVad === undefined ? merged : activeVad.result(merged, rate);
     const normalized = normalizePeak(trimmed);
     const resampled = resample(normalized, rate, targetRate);
-    options.onResult({ kind: 'wav', data: encodeWav(resampled, targetRate) });
+    const wav = encodeWav(resampled, targetRate);
+    timingMark('record.end', { kind: 'wav', bytes: wav.length });
+    options.onResult({ kind: 'wav', data: wav });
   }
 
   // Повторное нажатие до фактического начала записи отменяет запуск.
@@ -180,6 +184,7 @@ export function createRecorder(options: RecorderOptions): Recorder {
     sink.connect(context.destination);
     active = true;
     starting = false;
+    timingMark('record.start');
     return true;
   }
 
