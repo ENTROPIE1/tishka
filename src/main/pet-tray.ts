@@ -50,6 +50,7 @@ export function createPetTray(deps: PetTrayDeps): PetTray {
   ]);
 
   tray.setContextMenu(menu);
+  tray.on('click', () => deps.openChat());
 
   function refresh(): void {
     const petMode = menu.getMenuItemById('pet-mode');

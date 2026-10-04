@@ -9,18 +9,24 @@ const MIC_PATHS = [
   'M12 18v3'
 ];
 const SEND_PATHS = ['M4 12h13', 'M11 6l6 6-6 6'];
+const GEAR_PATHS = [
+  'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z',
+  'M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z'
+];
 
 export interface ComposerActions {
   onSend(text: string): void;
   onEscape(): void;
   onExpand(): void;
   onFocus(): void;
+  onSettings?(): void;
 }
 
 export interface Composer {
   element: HTMLFormElement;
   input: HTMLInputElement;
   mic: HTMLButtonElement;
+  settings: HTMLButtonElement;
   setListening(listening: boolean): void;
   setBusy(busy: boolean): void;
   setCollapsed(collapsed: boolean): void;
@@ -73,6 +79,17 @@ export function createComposer(actions: ComposerActions): Composer {
   send.setAttribute('aria-label', 'Отправить');
   send.append(svgIcon('send-icon', SEND_PATHS));
 
+  const settings = document.createElement('button');
+  settings.id = 'settings';
+  settings.className = 'mic';
+  settings.type = 'button';
+  settings.title = 'Настройки';
+  settings.setAttribute('aria-label', 'Настройки');
+  settings.append(svgIcon('mic-icon', GEAR_PATHS));
+  settings.addEventListener('click', () => {
+    actions.onSettings?.();
+  });
+
   const level = document.createElement('div');
   level.id = 'level';
   level.className = 'level';
@@ -82,7 +99,7 @@ export function createComposer(actions: ComposerActions): Composer {
   levelFill.className = 'level-fill';
   level.append(levelFill);
 
-  element.append(mic, input, send, level);
+  element.append(mic, input, send, settings, level);
 
   let busy = false;
   let collapsed = false;
@@ -156,6 +173,7 @@ export function createComposer(actions: ComposerActions): Composer {
     element,
     input,
     mic,
+    settings,
     setListening(listening): void {
       input.placeholder = listening ? PLACEHOLDER_LISTENING : PLACEHOLDER_IDLE;
     },
