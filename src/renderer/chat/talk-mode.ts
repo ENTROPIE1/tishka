@@ -6,6 +6,7 @@ import { createVoiceReadiness } from '../shared/voice-readiness';
 
 const MIC_RETRY_MS = 30000;
 const MIC_ERROR = 'Не слышу микрофон';
+const LISTEN_PAUSE_MS = 2000;
 const LISTEN_LABEL = 'Слушаю… нажмите на микрофон, чтобы писать текстом';
 
 export interface TalkModeElements {
@@ -45,12 +46,34 @@ export function createTalkMode(
   let sensitivity: VadSensitivity = 'normal';
   let threshold: number | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let pauseTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clearRetry(): void {
     if (retryTimer !== undefined) {
       clearTimeout(retryTimer);
       retryTimer = undefined;
     }
+  }
+
+  function clearPause(): void {
+    if (pauseTimer !== undefined) {
+      clearTimeout(pauseTimer);
+      pauseTimer = undefined;
+    }
+  }
+
+  // Набор текста в поле: запись фраз на паузе, возобновление через 2 секунды
+  // после последнего нажатия. Состояние значка микрофона не меняется.
+  function pauseListening(): void {
+    if (listener === undefined) {
+      return;
+    }
+    listener.pause();
+    clearPause();
+    pauseTimer = setTimeout(() => {
+      pauseTimer = undefined;
+      listener?.resume();
+    }, LISTEN_PAUSE_MS);
   }
 
   function scheduleRetry(): void {
@@ -66,6 +89,7 @@ export function createTalkMode(
 
   function stopListener(): void {
     clearRetry();
+    clearPause();
     listener?.stop();
     listener = undefined;
   }
@@ -142,7 +166,10 @@ export function createTalkMode(
 
   return {
     button,
-    keyboard: () => window.tishka.chatTalk.keyboard(),
+    keyboard(): void {
+      pauseListening();
+      window.tishka.chatTalk.keyboard();
+    },
     dispose(): void {
       stopListener();
       readiness.dispose();

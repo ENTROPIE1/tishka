@@ -20,7 +20,7 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
   };
 }
 
-export type PhraseScript = string | { error: string };
+export type PhraseScript = string | { error: string; empty?: boolean };
 
 export interface Harness {
   flow: WakeFlow;
@@ -63,7 +63,9 @@ export function makeHarness(
     if (item === undefined) {
       return { ok: false, error: 'Не расслышал' };
     }
-    return typeof item === 'string' ? { ok: true, text: item } : { ok: false, error: item.error };
+    return typeof item === 'string'
+      ? { ok: true, text: item }
+      : { ok: false, error: item.error, empty: item.empty };
   });
 
   const core = {

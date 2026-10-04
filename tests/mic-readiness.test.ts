@@ -100,6 +100,8 @@ describe('talk-mode: повтор открытия микрофона', () => {
         starts.push(1);
         return false;
       },
+      pause: () => undefined,
+      resume: () => undefined,
       stop: () => undefined
     };
     let apply: (state: ChatTalkState) => void = () => undefined;
@@ -126,7 +128,12 @@ describe('talk-mode: повтор открытия микрофона', () => {
 
   it('dispose снимает слушатель Escape и таймеры', async () => {
     setReadyVoice();
-    const fake: PhraseListener = { start: async () => false, stop: () => undefined };
+    const fake: PhraseListener = {
+      start: async () => false,
+      pause: () => undefined,
+      resume: () => undefined,
+      stop: () => undefined
+    };
     let apply: (state: ChatTalkState) => void = () => undefined;
     const api = (window as unknown as { tishka: { chatTalk: { onState: (cb: (s: ChatTalkState) => void) => () => void } } }).tishka;
     api.chatTalk.onState = (cb) => {

@@ -3,6 +3,7 @@ import type { VadSensitivity } from '../../voice/vad';
 
 const MIC_RETRY_MS = 30000;
 const MIC_ERROR = 'Не слышу микрофон';
+const LISTEN_PAUSE_MS = 2000;
 
 export interface WakeListenerDeps {
   onConversation?(on: boolean): void;
@@ -11,6 +12,7 @@ export interface WakeListenerDeps {
 
 export interface WakeListener {
   setActive(active: boolean): void;
+  keyboard(): void;
   dispose(): void;
 }
 
@@ -27,12 +29,34 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let threshold: number | undefined;
   let listener: PhraseListener | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  let pauseTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clearRetry(): void {
     if (retryTimer !== undefined) {
       clearTimeout(retryTimer);
       retryTimer = undefined;
     }
+  }
+
+  function clearPause(): void {
+    if (pauseTimer !== undefined) {
+      clearTimeout(pauseTimer);
+      pauseTimer = undefined;
+    }
+  }
+
+  // Набор текста в строке ежа: запись на паузе, возобновление через 2 секунды
+  // после последнего нажатия. Значок микрофона при этом не меняется.
+  function pauseListening(): void {
+    if (listener === undefined) {
+      return;
+    }
+    listener.pause();
+    clearPause();
+    pauseTimer = setTimeout(() => {
+      pauseTimer = undefined;
+      listener?.resume();
+    }, LISTEN_PAUSE_MS);
   }
 
   function scheduleRetry(): void {
@@ -76,6 +100,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
 
   function stopListener(): void {
     clearRetry();
+    clearPause();
     listener?.stop();
     listener = undefined;
   }
@@ -129,6 +154,9 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       active = value;
       applyActive();
       applyUi();
+    },
+    keyboard(): void {
+      pauseListening();
     },
     dispose(): void {
       active = false;

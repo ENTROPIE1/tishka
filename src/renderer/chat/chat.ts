@@ -104,7 +104,9 @@ function initComposer(): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       send();
+      return;
     }
+    talkMode?.keyboard();
   });
 }
 

@@ -59,11 +59,14 @@ const speaker = createSpeaker({
 });
 const petCard = createPetCard({ element: cardHost, refreshBusy });
 const listen = createListenUi(() => updateBubble(), micThreshold);
-createWakeListener({
+const wake = createWakeListener({
   onConversation: (on) => {
     listen.setConversation(on);
     composer.setListening(on);
   }
+});
+composer.input.addEventListener('keydown', () => {
+  wake.keyboard();
 });
 
 function isOnScreen(state: PetState): boolean {

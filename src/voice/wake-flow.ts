@@ -193,17 +193,24 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     }
   }
 
-  async function transcribe(wav: Uint8Array): Promise<void> {
+  // Возвращает true, если фраза — событие для человека и стоит заводить таймер.
+  async function transcribe(wav: Uint8Array): Promise<boolean> {
     const result = await deps.stt.transcribe(wav, wakePrompt(deps.getVoice().wakeWords, deps.memoryName?.()));
-    if (!result.ok) {
-      if (result.error !== 'Не расслышал') {
-        reportError(result.error);
-      } else {
-        deps.onMissedSpeech?.();
-      }
-      return;
+    if (result.ok) {
+      routeText(result.text);
+      return true;
     }
-    routeText(result.text);
+    // Пустой или шумовой отклик распознавания человеку не показываем:
+    // запись сработала на стук клавиш, прослушивание продолжается.
+    if (result.empty === true) {
+      return false;
+    }
+    if (result.error !== 'Не расслышал') {
+      reportError(result.error);
+    } else {
+      deps.onMissedSpeech?.();
+    }
+    return true;
   }
 
   function handlePhrase(wav: Uint8Array): void {
@@ -218,21 +225,23 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       pending = wav;
       return;
     }
-    clearTimer();
     recognizing = true;
-    void transcribe(wav).finally(() => {
-      recognizing = false;
-      const next = pending;
-      pending = undefined;
-      if (next !== undefined) {
-        handlePhrase(next);
-        return;
-      }
-      // После любой обработанной фразы (успех, «Не расслышал», ошибка службы,
-      // фраза не по адресу) отсчёт тишины начинается заново. Во время ответа
-      // armTimer ничего не делает — таймер заведёт завершение ответа.
-      armTimer();
-    });
+    void transcribe(wav)
+      .then((heard) => {
+        // Ложное срабатывание (пустой отклик) не продлевает тишину разговора.
+        // Во время ответа armTimer ничего не делает — таймер заведёт его конец.
+        if (heard) {
+          armTimer();
+        }
+      })
+      .finally(() => {
+        recognizing = false;
+        const next = pending;
+        pending = undefined;
+        if (next !== undefined) {
+          handlePhrase(next);
+        }
+      });
   }
 
   const unsubscribe = deps.bus.on((event) => {

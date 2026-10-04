@@ -51,7 +51,11 @@ describe('createSttService.transcribe', () => {
     const fetchMock = vi.fn(async () => okResponse({ text: '   ' }));
     const stt = service(fetchMock);
 
-    await expect(stt.transcribe(new Uint8Array([1]))).resolves.toEqual({ ok: false, error: 'Не расслышал' });
+    await expect(stt.transcribe(new Uint8Array([1]))).resolves.toEqual({
+      ok: false,
+      error: 'Не расслышал',
+      empty: true
+    });
   });
 
   it('сбой сети даёт понятную ошибку', async () => {

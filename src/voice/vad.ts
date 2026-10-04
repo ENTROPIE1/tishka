@@ -1,3 +1,5 @@
+import { createSpeechStart } from './speech-start';
+
 export type VadVerdict = 'continue' | 'end' | 'timeout' | 'nospeech';
 
 export type VadSensitivity = 'low' | 'normal' | 'high';
@@ -19,6 +21,7 @@ export interface Vad {
   push(frame: Float32Array, frameMs: number): VadVerdict;
   level(): number;         // 0..1 относительно порога (порог — 0.5)
   heardSpeech(): boolean;
+  reset(): void;           // сброс текущей фразы, оценка шума сохраняется
   // bufferStartMs — время начала переданного буфера на общей шкале VAD;
   // нужно, когда буфер собран заново и его края не совпадают с началом записи.
   result(samples: Float32Array, sampleRate: number, bufferStartMs?: number): Float32Array;
@@ -28,8 +31,7 @@ const NOISE_WINDOW_MS = 2000;
 const NOISE_PERCENTILE = 0.1;
 const NOISE_MIN_FRAMES = 5;
 const INITIAL_NOISE = 0.002;
-const SPEECH_WINDOW_MS = 400;
-const DEFAULT_MIN_SPEECH_MS = 150;
+const DEFAULT_MIN_SPEECH_MS = 200;
 const DEFAULT_LEAD_MS = 300;
 const DEFAULT_TAIL_MS = 200;
 const NOSPEECH_MS = 5000;
@@ -89,8 +91,8 @@ export function createVad(options: VadOptions = {}): Vad {
   let lastLoudMs = 0;
   let silenceRun = 0;
   let done = false;
+  const speech = createSpeechStart(minSpeechMs);
   const levels: Array<{ at: number; value: number }> = [];
-  const loudMarks: number[] = [];
 
   function noise(): number {
     if (levels.length < NOISE_MIN_FRAMES) {
@@ -116,7 +118,7 @@ export function createVad(options: VadOptions = {}): Vad {
     speechStartMs = 0;
     lastLoudMs = 0;
     silenceRun = 0;
-    loudMarks.length = 0;
+    speech.reset();
     done = false;
   }
 
@@ -138,15 +140,11 @@ export function createVad(options: VadOptions = {}): Vad {
     const settling = elapsed < settleMs;
     const loud = !settling && value - threshold() > LEVEL_EPSILON;
     if (loud) {
-      loudMarks.push(elapsed);
       lastLoudMs = elapsed + frameMs;
     }
-    while (loudMarks.length > 0 && loudMarks[0] <= elapsed - SPEECH_WINDOW_MS) {
-      loudMarks.shift();
-    }
-    if (!speechStarted && loudMarks.length * frameMs >= minSpeechMs) {
+    if (!speechStarted && speech.push(loud, frameMs, elapsed)) {
       speechStarted = true;
-      speechStartMs = loudMarks[0];
+      speechStartMs = speech.startMs();
     }
     if (speechStarted) {
       silenceRun = loud ? 0 : silenceRun + frameMs;
@@ -180,6 +178,7 @@ export function createVad(options: VadOptions = {}): Vad {
   return {
     push,
     heardSpeech: () => speechStarted,
+    reset: resetPhrase,
     level(): number {
       return Math.max(0, Math.min(1, lastLevel / (2 * threshold())));
     },

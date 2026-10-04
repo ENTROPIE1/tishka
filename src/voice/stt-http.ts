@@ -1,10 +1,11 @@
 export type TranscribeResult =
   | { ok: true; text: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; empty?: boolean };
 
 const REQUEST_TIMEOUT_MS = 30000;
 export const PROBE_TIMEOUT_MS = 3000;
 const NON_ASCII = /[^\x00-\x7F]/;
+const MEANINGFUL = /[\p{L}\p{N}]/u;
 
 export function resolveBaseUrl(url: string): string {
   return url.replace(/\/+$/, '');
@@ -37,6 +38,11 @@ export function cleanTranscript(text: string): string {
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// Пустой результат, одни пометки, шум или знаки препинания — не речь человека.
+export function isNoiseTranscript(text: string): boolean {
+  return !MEANINGFUL.test(text);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -103,8 +109,8 @@ export async function transcribeHttp(
     const data: unknown = await response.json();
     const raw = isRecord(data) && typeof data.text === 'string' ? data.text : '';
     const text = cleanTranscript(raw);
-    if (text === '') {
-      return { ok: false, error: 'Не расслышал' };
+    if (text === '' || isNoiseTranscript(text)) {
+      return { ok: false, error: 'Не расслышал', empty: true };
     }
     return { ok: true, text };
   } catch (error) {

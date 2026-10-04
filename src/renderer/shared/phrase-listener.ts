@@ -22,6 +22,8 @@ export interface PhraseListenerOptions {
 
 export interface PhraseListener {
   start(): Promise<boolean>;
+  pause(): void;
+  resume(): void;
   stop(): void;
 }
 
@@ -40,6 +42,7 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
   const capture = options.capture ?? createMicCapture();
 
   let active = false;
+  let paused = false;
   let runId = 0;
   let vad: Vad | undefined;
   let sourceRate = TARGET_RATE;
@@ -95,7 +98,7 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
   }
 
   function handleFrame(frame: Float32Array, sampleRate: number): void {
-    if (!active || vad === undefined) {
+    if (!active || paused || vad === undefined) {
       return;
     }
     sourceRate = sampleRate;
@@ -149,13 +152,33 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     capturing = false;
     phraseFrames = [];
     vad = makeVad();
+    paused = false;
     active = true;
     return true;
+  }
+
+  // Пауза на время набора текста: микрофон открыт, но кадры не разбираются,
+  // начатая фраза отбрасывается без распознавания.
+  function pause(): void {
+    if (!active) {
+      return;
+    }
+    paused = true;
+    capturing = false;
+    phraseFrames = [];
+    preRoll = [];
+    preRollMs = 0;
+    vad?.reset();
+  }
+
+  function resume(): void {
+    paused = false;
   }
 
   function stop(): void {
     runId += 1;
     active = false;
+    paused = false;
     vad = undefined;
     preRoll = [];
     preRollMs = 0;
@@ -164,5 +187,5 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     capture.stop();
   }
 
-  return { start, stop };
+  return { start, pause, resume, stop };
 }

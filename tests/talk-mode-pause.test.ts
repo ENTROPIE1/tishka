@@ -22,14 +22,22 @@ interface Harness {
   apply: (value: ChatTalkState) => void;
   starts: number;
   stops: number;
+  pauses: number;
+  resumes: number;
 }
 
 function harness(): Harness {
-  const result: Harness = { apply: () => undefined, starts: 0, stops: 0 };
+  const result: Harness = { apply: () => undefined, starts: 0, stops: 0, pauses: 0, resumes: 0 };
   const listener: PhraseListener = {
     start: async () => {
       result.starts += 1;
       return true;
+    },
+    pause: () => {
+      result.pauses += 1;
+    },
+    resume: () => {
+      result.resumes += 1;
     },
     stop: () => {
       result.stops += 1;
@@ -84,5 +92,27 @@ describe('talk-mode: пауза калибровки', () => {
     await Promise.resolve();
     expect(h.starts).toBe(0);
     expect(mode?.button.classList.contains('active')).toBe(false);
+  });
+
+  it('набор текста ставит запись на паузу и снимает её через 2 секунды', async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.apply(state(true, true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.starts).toBe(1);
+
+    mode?.keyboard();
+    expect(h.pauses).toBe(1);
+    expect(h.resumes).toBe(0);
+    expect(mode?.button.classList.contains('active')).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1500);
+    mode?.keyboard();
+    expect(h.pauses).toBe(2);
+    expect(h.resumes).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(h.resumes).toBe(1);
+    vi.useRealTimers();
   });
 });
