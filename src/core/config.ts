@@ -28,7 +28,8 @@ export function defaultConfig(): Config {
     persona: { fyr: 'sometimes' },
     pet: { x: null },
     petMode: false,
-    screen: { enabled: true }
+    screen: { enabled: true },
+    web: { enabled: true }
   };
 }
 
@@ -163,6 +164,7 @@ export function mergeConfig(value: unknown): Config {
   const persona = isRecord(value.persona) ? value.persona : {};
   const pet = isRecord(value.pet) ? value.pet : {};
   const screen = isRecord(value.screen) ? value.screen : {};
+  const web = isRecord(value.web) ? value.web : {};
   return normalizeConfig({
     llm: {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
@@ -192,7 +194,8 @@ export function mergeConfig(value: unknown): Config {
     persona: { fyr: pickFyr(persona.fyr, defaults.persona.fyr) },
     pet: { x: pickPetX(pet.x, defaults.pet.x) },
     petMode: pickBoolean(value.petMode, defaults.petMode),
-    screen: { enabled: pickBoolean(screen.enabled, defaults.screen.enabled) }
+    screen: { enabled: pickBoolean(screen.enabled, defaults.screen.enabled) },
+    web: { enabled: pickBoolean(web.enabled, defaults.web.enabled) }
   });
 }
 

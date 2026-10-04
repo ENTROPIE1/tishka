@@ -23,6 +23,7 @@ import { createPetWindow, type PetWindow } from './pet-window';
 import { registerPetWake, type PetWake } from './pet-wake';
 import { createScreenCapture } from './screen-capture';
 import { openStandWindow } from './stand-window';
+import { createWebReader, type WebReaderHandle } from './web-reader';
 import { createWakeFlow } from '../voice/wake-flow';
 
 const bus = createEventBus();
@@ -35,6 +36,7 @@ let petWake: PetWake | undefined;
 let speech: SpeechOutput | undefined;
 let speechDone: (() => void) | undefined;
 let chatTalk: ChatTalk | undefined;
+let webReader: WebReaderHandle | undefined;
 
 // Второй запуск не создаёт копию, а поднимает окно чата работающего приложения.
 const singleInstance = app.requestSingleInstanceLock();
@@ -81,6 +83,9 @@ app.whenReady().then(async () => {
     }
   });
 
+  const reader = createWebReader();
+  webReader = reader;
+
   const tishka = createTishkaCore({
     dataDir,
     presetsDir: join(appRoot, 'presets'),
@@ -91,7 +96,8 @@ app.whenReady().then(async () => {
     // Панели приходят в составе ответа, отдельного показа пока не нужно.
     showPanel: () => undefined,
     now: () => new Date(),
-    captureScreen: (target) => screenCapture.capture(target)
+    captureScreen: (target) => screenCapture.capture(target),
+    readWeb: (url, options) => reader.read(url, options)
   });
   core = tishka;
 
@@ -275,6 +281,7 @@ app.on('will-quit', () => {
   petWake?.dispose();
   speech?.dispose();
   chatTalk?.dispose();
+  webReader?.dispose();
   pet?.dispose();
   tray?.destroy();
   void core?.stop();

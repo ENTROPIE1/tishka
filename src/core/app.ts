@@ -21,7 +21,9 @@ import { createWatcher, type Watcher } from './triggers/watcher';
 import { registerBuiltinTools } from './tools/builtin';
 import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
+import { registerWebTools } from './tools/web';
 import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore } from './types';
+import type { WebReader } from './web/types';
 import { createVisionLook, type CaptureResult, type ScreenTarget } from './vision/look';
 
 export interface CoreDeps {
@@ -35,6 +37,7 @@ export interface CoreDeps {
   now: () => Date;
   fetch?: typeof fetch;            // для тестов
   captureScreen?(target: ScreenTarget): Promise<CaptureResult>;   // снимок экрана из главного процесса
+  readWeb?: WebReader;             // чтение страниц из скрытого окна Electron
 }
 
 export interface TishkaCore {
@@ -211,6 +214,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       now: deps.now
     });
     registerHistoryTools(registry, historyStore);
+    registerWebTools(registry, { read: deps.readWeb, fetch: deps.fetch }, config.web.enabled);
 
     const memoryStore = createMemoryStore({
       filePath: join(deps.dataDir, 'memory.json'),
