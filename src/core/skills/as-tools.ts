@@ -1,8 +1,8 @@
 import type { Skill, ToolDef, ToolRegistry, ToolResult } from '../types';
-import type { RunResult } from './runner';
+import type { RunResult, SkillRunOptions } from './runner';
 
 export interface SkillToolRunner {
-  run(skill: Skill, inputs?: Record<string, unknown>): Promise<RunResult>;
+  run(skill: Skill, inputs?: Record<string, unknown>, opts?: SkillRunOptions): Promise<RunResult>;
 }
 
 function skillDescription(skill: Skill): string {

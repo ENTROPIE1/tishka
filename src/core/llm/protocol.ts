@@ -19,6 +19,7 @@ export interface ChatRequest {
   tools?: ToolDef[];
   temperature?: number;
   toolChoice?: 'auto' | 'required' | 'none';   // учитывается только форматом responses
+  signal?: AbortSignal;                        // отмена запроса человеком
 }
 
 export interface ChatResponse {

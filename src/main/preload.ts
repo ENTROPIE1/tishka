@@ -24,6 +24,7 @@ import type {
 } from './ipc-settings';
 import type { ExportSkillResult, ImportSkillResult } from './ipc-automations';
 import {
+  CANCEL_CHANNEL,
   CHAT_TALK_ESCAPE_CHANNEL,
   CHAT_TALK_KEYBOARD_CHANNEL,
   CHAT_TALK_PHRASE_CHANNEL,
@@ -114,6 +115,9 @@ const api = {
   },
   sendUserText(text: string): void {
     ipcRenderer.send(USER_TEXT_CHANNEL, text);
+  },
+  stop(): void {
+    ipcRenderer.send(CANCEL_CHANNEL);
   },
   history(limit?: number): Promise<HistoryEntry[]> {
     return ipcRenderer.invoke(HISTORY_CHANNEL, limit);

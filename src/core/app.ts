@@ -28,6 +28,8 @@ import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
 import { registerWebTools } from './tools/web';
 import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore, Skill } from './types';
+import { isCancelled } from './cancel';
+import { CANCELLED_REPLY, createTurnQueue } from './turn-queue';
 import type { WebReader } from './web/types';
 import { createVisionLook, type CaptureResult, type ScreenTarget } from './vision/look';
 import type { TimingMark } from '../main/timing-log';
@@ -66,6 +68,7 @@ export interface TishkaCore {
   start(): Promise<void>;
   stop(): Promise<void>;
   handleUserText(text: string): Promise<Reply>;
+  cancel(): void;                  // прервать текущую работу и очистить очередь
   hasGatewayKey(): Promise<boolean>;
   checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult>;
   config(): Config;
@@ -91,6 +94,7 @@ const DRIVE_PATTERN = /^[A-Za-z]:/;
 const NOT_READY: Reply = { say: 'Я ещё не проснулся, дай мне мгновение', mood: 'confused' };
 const NO_KEY: Reply = { say: 'Ключ шлюза не задан, добавь его в подключениях', mood: 'confused' };
 const UNEXPECTED: Reply = { say: 'Что-то пошло не так, попробуй ещё раз', mood: 'confused' };
+const STOPPED_TITLE = 'Остановлено';
 
 function isAbsoluteArg(value: string): boolean {
   return value.startsWith('/') || value.startsWith('\\') || DRIVE_PATTERN.test(value);
@@ -130,7 +134,6 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let agent: Agent | undefined;
   let started = false;
   let starting: Promise<void> | undefined;
-  let queue: Promise<unknown> = Promise.resolve();
   let skillStore: ReturnType<typeof createSkillStore> | undefined;
   let skillRunner: SkillRunner | undefined;
   let skillOverview: SkillOverviewService | undefined;
@@ -138,6 +141,10 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let screenTools: ToolGroup | undefined;
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
   const conversation = createConversationClock();
+  const turns = createTurnQueue({
+    run: (text, signal) => processUserText(text, signal),
+    reset: () => agent?.reset()
+  });
 
   // Новый разговор: чистый контекст агента плюс разделитель в ленте.
   function openConversation(at: Date): void {
@@ -151,10 +158,11 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   function newConversation(): void {
     historyStore.addDivider();
     conversation.start(deps.now());
-    const reset = queue.then(() => {
+    if (turns.busy()) {
+      turns.resetBetweenTurns();
+    } else {
       agent?.reset();
-    });
-    queue = reset.catch(() => undefined);
+    }
   }
 
   async function applyMcpServers(servers: McpServerConfig[]): Promise<void> {
@@ -221,7 +229,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     );
   }
 
-  async function processUserText(text: string): Promise<Reply> {
+  async function processUserText(text: string, signal: AbortSignal): Promise<Reply> {
     const now = deps.now();
     if (conversation.userTurn(now)) {
       openConversation(now);
@@ -234,9 +242,14 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       } else if ((await gatewayKey()) === undefined) {
         reply = NO_KEY;
       } else {
-        reply = await router.handle(text);
+        reply = await router.handle(text, { signal });
       }
     } catch (error) {
+      if (isCancelled(error, signal)) {
+        deps.events.emit({ type: 'notify', title: STOPPED_TITLE });
+        deps.events.emit({ type: 'idle' });
+        return CANCELLED_REPLY;
+      }
       const raw = error instanceof Error ? error.message : String(error);
       const message = await scrubMessage(raw);
       deps.events.emit({ type: 'error', message });
@@ -250,9 +263,22 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     if (!started) {
       return Promise.resolve(NOT_READY);
     }
-    const task = queue.then(() => processUserText(text));
-    queue = task.catch(() => undefined);
-    return task;
+    return turns.push(text);
+  }
+
+  // Остановка текущей работы: ход прерывается сигналом в запросах, очередь
+  // очищается, окна получают событие простоя.
+  function cancel(): void {
+    if (!turns.cancel()) {
+      deps.events.emit({ type: 'idle' });
+      return;
+    }
+    if (turns.busy()) {
+      // Выполняющийся ход завершится сам и пришлёт «Остановлено» с простоем.
+      return;
+    }
+    deps.events.emit({ type: 'notify', title: STOPPED_TITLE });
+    deps.events.emit({ type: 'idle' });
   }
 
   async function start(): Promise<void> {
@@ -537,6 +563,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     start,
     stop,
     handleUserText,
+    cancel,
     hasGatewayKey,
     checkGateway,
     config: () => config,

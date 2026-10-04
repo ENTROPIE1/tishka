@@ -1,6 +1,7 @@
 import { installLinkGuard } from '../shared/links';
 import { timingMark } from '../shared/timing';
 import { createChatFeed } from './feed';
+import { createComposer } from './composer';
 import { initAppShell } from './navigation';
 import { appendSkillSaveCard } from './skill-card';
 import { createTalkMode, type TalkMode } from './talk-mode';
@@ -37,14 +38,30 @@ function clearStatus(): void {
   statusLine.textContent = '';
 }
 
-function send(): void {
-  const text = input.value.trim();
-  if (text === '') {
-    return;
+// Реплика человека показывается в ленте сразу при отправке, а не когда
+// до неё дошла очередь; после перечитывания истории её заменит запись из истории.
+function echoUserMessage(text: string): void {
+  view.appendEntry({
+    kind: 'message',
+    id: crypto.randomUUID(),
+    at: nowIso(),
+    from: 'user',
+    text
+  });
+}
+
+const composer = createComposer(
+  { send: sendButton, screenLook: screenLookButton, input },
+  {
+    send: (text) => window.tishka.sendUserText(text),
+    stop: () => window.tishka.stop(),
+    echo: echoUserMessage,
+    status: setStatus
   }
-  window.tishka.sendUserText(text);
-  input.value = '';
-  input.focus();
+);
+
+function send(): void {
+  composer.sendMessage();
   talkMode?.keyboard();
 }
 
@@ -54,6 +71,7 @@ function initEvents(): void {
       case 'listen.end':
         // Перечитываем историю: ядро могло начать новый разговор и добавить разделитель.
         void reloadFeed();
+        composer.begin();
         break;
       case 'reply':
         timingMark('reply.shown');
@@ -82,12 +100,15 @@ function initEvents(): void {
         clearStatus();
         break;
       case 'think.start':
+        composer.begin();
         setStatus('Тишка думает…');
         break;
       case 'tool.start':
+        composer.begin();
         setStatus(`Тишка использует инструмент ${event.tool}`);
         break;
       case 'idle':
+        composer.end();
         clearStatus();
         break;
       default:
@@ -101,11 +122,15 @@ function initFeed(): void {
 }
 
 function initComposer(): void {
-  sendButton.addEventListener('click', send);
+  sendButton.addEventListener('click', () => composer.onSendClick());
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       send();
+      return;
+    }
+    // Пока Тишка занят, Escape останавливает текущую работу.
+    if (event.key === 'Escape' && composer.escape()) {
       return;
     }
     talkMode?.keyboard();
@@ -123,13 +148,7 @@ function initTalkMode(): void {
 
 // Кнопка с глазом отправляет набранный вопрос вместе с просьбой посмотреть на экран.
 function initScreenLookButton(): void {
-  screenLookButton.addEventListener('click', () => {
-    const question = input.value.trim();
-    const text = question === '' ? 'Посмотри, что у меня на экране' : `Посмотри на экран. ${question}`;
-    window.tishka.sendUserText(text);
-    input.value = '';
-    input.focus();
-  });
+  screenLookButton.addEventListener('click', () => composer.lookAtScreen());
 }
 
 async function loadHistory(): Promise<void> {

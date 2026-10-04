@@ -1,5 +1,6 @@
 import type { ChatRequest, ChatResponse, LlmApi } from './protocol';
 import { LlmError } from './protocol';
+import { CancelledError } from '../cancel';
 import { chatWireBody, parseResponse } from './chat-format';
 import { parseResponsesResponse, responseFromEventStream, toResponsesRequest } from './responses-format';
 
@@ -80,6 +81,17 @@ export function createLlmClient(opts: LlmClientOptions): {
 
   async function requestOnce(req: ChatRequest, apiKey: string, api: LlmApi): Promise<Response> {
     const controller = new AbortController();
+    const external = req.signal;
+    const onAbort = (): void => {
+      controller.abort();
+    };
+    if (external !== undefined) {
+      if (external.aborted) {
+        controller.abort();
+      } else {
+        external.addEventListener('abort', onAbort, { once: true });
+      }
+    }
     const timer = setTimeout(() => {
       controller.abort();
     }, TIMEOUT_MS);
@@ -96,6 +108,7 @@ export function createLlmClient(opts: LlmClientOptions): {
       });
     } finally {
       clearTimeout(timer);
+      external?.removeEventListener('abort', onAbort);
     }
   }
 
@@ -125,11 +138,18 @@ export function createLlmClient(opts: LlmClientOptions): {
     }
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      if (req.signal?.aborted) {
+        throw new CancelledError();
+      }
       const api = resolveApi();
       let response: Response;
       try {
         response = await requestOnce(req, apiKey, api);
       } catch {
+        // Отмена человеком — не сетевой сбой: без повторных попыток.
+        if (req.signal?.aborted) {
+          throw new CancelledError();
+        }
         if (attempt < MAX_ATTEMPTS - 1) {
           await delay(RETRY_DELAYS_MS[attempt]);
           continue;
@@ -138,6 +158,9 @@ export function createLlmClient(opts: LlmClientOptions): {
       }
 
       if (response.ok) {
+        if (req.signal?.aborted) {
+          throw new CancelledError();
+        }
         return readOk(response, api);
       }
 

@@ -1,5 +1,6 @@
 import type { ChatMessage, ChatRequest, ChatResponse } from '../llm/client';
 import { LlmError } from '../llm/client';
+import { isCancelled, withCancel } from '../cancel';
 import { memoryBlock, type MemoryLine } from '../memory/prompt';
 import { stepTools } from '../skills/tools';
 import type { EventBus, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
@@ -22,7 +23,7 @@ export interface AgentDeps {
 }
 
 export interface Agent {
-  handle(userText: string): Promise<Reply>;
+  handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply>;
   history(): ChatMessage[];
   reset(): void;
 }
@@ -82,10 +83,13 @@ export function createAgent(deps: AgentDeps): Agent {
     trimHistory(history);
   }
 
-  async function callTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+  async function callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<ToolResult> {
     try {
-      return await deps.registry.call(name, args);
+      return await withCancel(deps.registry.call(name, args), signal);
     } catch (error) {
+      if (isCancelled(error, signal)) {
+        throw error;
+      }
       const message = error instanceof Error ? error.message : String(error);
       return { ok: false, content: '', error: message };
     }
@@ -100,20 +104,45 @@ export function createAgent(deps: AgentDeps): Agent {
     return reply;
   }
 
-  async function handle(userText: string): Promise<Reply> {
+  // Оборванный ход не должен остаться в контексте: запрос к модели отвергается,
+  // если за вызовом инструмента не следует его результат.
+  function dropIncompleteTurn(): void {
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+      const message = history[index];
+      if (message.role === 'tool') {
+        continue;
+      }
+      if (message.role === 'assistant' && message.toolCalls !== undefined) {
+        if (history.length - index - 1 < message.toolCalls.length) {
+          history.splice(index);
+        }
+      }
+      return;
+    }
+  }
+
+  async function handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply> {
+    const signal = opts?.signal;
     refreshSystemMessage(userText);
     const userMessage: ChatMessage = { role: 'user', content: userText };
     push(userMessage);
     rounds = 0;
     const startedAt = Date.now();
     deps.mark?.('model.request.start');
-    const reply = await respond();
-    deps.mark?.('model.request.end', { ms: Date.now() - startedAt, steps: rounds });
-    shortenUserMessage(history, userMessage);
-    return reply;
+    try {
+      const reply = await respond(signal);
+      deps.mark?.('model.request.end', { ms: Date.now() - startedAt, steps: rounds });
+      shortenUserMessage(history, userMessage);
+      return reply;
+    } catch (error) {
+      if (isCancelled(error, signal)) {
+        dropIncompleteTurn();
+      }
+      throw error;
+    }
   }
 
-  async function respond(): Promise<Reply> {
+  async function respond(signal?: AbortSignal): Promise<Reply> {
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
       rounds = round + 1;
       deps.events.emit({ type: 'think.start' });
@@ -123,9 +152,13 @@ export function createAgent(deps: AgentDeps): Agent {
         response = await deps.llm.chat({
           model: deps.getModel(),
           messages: [...history],
-          tools: toolsForModel()
+          tools: toolsForModel(),
+          signal
         });
       } catch (error) {
+        if (isCancelled(error, signal)) {
+          throw error;
+        }
         const phrase =
           error instanceof LlmError ? ERROR_PHRASES[error.kind] : 'Что-то пошло не так, попробуй ещё раз';
         const message = error instanceof Error ? error.message : String(error);
@@ -152,7 +185,7 @@ export function createAgent(deps: AgentDeps): Agent {
           push({ role: 'tool', toolCallId: call.id, content: 'Ответ передан пользователю' });
           continue;
         }
-        const result = await callTool(call.name, call.args);
+        const result = await callTool(call.name, call.args, signal);
         push({ role: 'tool', toolCallId: call.id, content: toolResultToText(result) });
       }
       if (finalReply !== null) {
