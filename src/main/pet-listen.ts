@@ -73,10 +73,12 @@ export function createPetListen(deps: PetListenDeps): PetListen {
     if (result.kind === 'nospeech') {
       deps.onMissedSpeech?.();
       deps.bus.emit({ type: 'error', message: 'Не расслышал' });
+      deps.bus.emit({ type: 'idle' });
       return;
     }
     if (result.kind === 'error') {
       deps.bus.emit({ type: 'error', message: result.message });
+      deps.bus.emit({ type: 'idle' });
       return;
     }
 

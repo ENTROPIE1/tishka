@@ -298,6 +298,62 @@ describe('createMcpManager', () => {
     });
   });
 
+  it('два одновременных подключения к одному серверу оставляют одно живое подключение', async () => {
+    const registry = createToolRegistry(createEventBus());
+    const specs = new Map([['confluence', makeSpec([mcpTool('get_page', true)])]]);
+    const closed: string[] = [];
+    const base = fakeFactory(specs, new Map(), closed);
+    let active = 0;
+    let maxActive = 0;
+    const createConnection: McpConnectionFactory = async (server, credentials) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const connection = await base(server, credentials);
+      return {
+        listTools: connection.listTools,
+        callTool: connection.callTool,
+        close: async () => {
+          active -= 1;
+          await connection.close();
+        }
+      };
+    };
+    const manager = createMcpManager({ registry, secrets: fakeSecrets({}), createConnection });
+
+    const [first, second] = await Promise.all([
+      manager.reconnect(httpServer('confluence')),
+      manager.reconnect(httpServer('confluence'))
+    ]);
+
+    expect(first).toEqual({ name: 'confluence', state: 'connected', tools: 1 });
+    expect(second).toEqual({ name: 'confluence', state: 'connected', tools: 1 });
+    expect(maxActive).toBe(1);
+    expect(active).toBe(1);
+    expect(closed).toEqual(['confluence']);
+    expect(defsOfSource(registry, 'mcp:confluence')).toHaveLength(1);
+  });
+
+  it('closeAll во время подключения не оставляет живых подключений', async () => {
+    const registry = createToolRegistry(createEventBus());
+    const specs = new Map([['confluence', makeSpec([mcpTool('get_page', true)])]]);
+    const closed: string[] = [];
+    const base = fakeFactory(specs, new Map(), closed);
+    const createConnection: McpConnectionFactory = async (server, credentials) => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return base(server, credentials);
+    };
+    const manager = createMcpManager({ registry, secrets: fakeSecrets({}), createConnection });
+
+    const connecting = manager.reconnect(httpServer('confluence'));
+    const closing = manager.closeAll();
+    await Promise.all([connecting, closing]);
+
+    expect(closed).toEqual(['confluence']);
+    expect(registry.list()).toEqual([]);
+    expect(manager.status()).toEqual([{ name: 'confluence', state: 'disabled', tools: 0 }]);
+  });
+
   it('closeAll отключает все серверы и чистит реестр', async () => {
     const registry = createToolRegistry(createEventBus());
     const specs = new Map([

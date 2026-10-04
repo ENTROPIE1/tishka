@@ -1,8 +1,22 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createTishkaCore } from '../src/core/app';
 import { defaultConfig } from '../src/core/config';
-import { choice, cleanupCores, replyChoice, setupCore, toolChoice } from './core-helpers';
+import { createEventBus } from '../src/core/events';
+import type { TishkaEvent } from '../src/core/types';
+import {
+  choice,
+  cleanupCores,
+  FIXED_NOW,
+  fakeSecrets,
+  presetsDir,
+  replyChoice,
+  root,
+  setupCore,
+  toolChoice
+} from './core-helpers';
 
 const delay = (ms: number): Promise<void> =>
   new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
@@ -229,6 +243,70 @@ describe('createTishkaCore', () => {
     for (const timer of created) {
       expect(cleared.has(timer)).toBe(true);
     }
+  });
+
+  it('сбой чтения истории при старте: ядро отвечает, событие error отправлено', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'tishka-core-'));
+    await mkdir(join(dataDir, 'history.jsonl'), { recursive: true });
+    const bus = createEventBus();
+    const events: TishkaEvent[] = [];
+    bus.on((event) => events.push(event));
+    const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'Привет! Я Тишка.'));
+    const core = createTishkaCore({
+      dataDir,
+      presetsDir,
+      appRoot: root,
+      secrets: fakeSecrets(),
+      events: bus,
+      openExternal: vi.fn(async () => undefined),
+      showPanel: () => undefined,
+      now: () => FIXED_NOW,
+      fetch: fetchMock
+    });
+
+    await core.start();
+
+    expect(events.some((event) => event.type === 'error')).toBe(true);
+    const reply = await core.handleUserText('привет');
+    expect(reply.say).toBe('Привет! Я Тишка.');
+
+    await core.stop();
+    await rm(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  });
+
+  it('после сбоя обязательного шага повторный start() поднимает ядро', async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), 'tishka-core-'));
+    const bus = createEventBus();
+    let breakClock = true;
+    const now = (): Date => {
+      if (breakClock) {
+        throw new Error('часы недоступны');
+      }
+      return FIXED_NOW;
+    };
+    const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'Привет! Я Тишка.'));
+    const core = createTishkaCore({
+      dataDir,
+      presetsDir,
+      appRoot: root,
+      secrets: fakeSecrets(),
+      events: bus,
+      openExternal: vi.fn(async () => undefined),
+      showPanel: () => undefined,
+      now,
+      fetch: fetchMock
+    });
+
+    await expect(core.start()).rejects.toThrow();
+
+    breakClock = false;
+    await core.start();
+
+    const reply = await core.handleUserText('привет');
+    expect(reply.say).toBe('Привет! Я Тишка.');
+
+    await core.stop();
+    await rm(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
   });
 
   it('новый разговор очищает контекст агента и добавляет разделитель', async () => {

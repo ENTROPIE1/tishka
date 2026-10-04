@@ -124,8 +124,17 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
           continue;
         }
         const at = Date.parse(skill.trigger.at);
-        if (Number.isNaN(at) || nowMs < at) {
-          if (!Number.isNaN(at) && setNext(state, skill.id, skill.trigger.at)) {
+        if (Number.isNaN(at)) {
+          state.firedOnce.push(skill.id);
+          changed = true;
+          deps.events.emit({
+            type: 'error',
+            message: `Навык ${skill.name}: не разбирается время запуска «${skill.trigger.at}»`
+          });
+          continue;
+        }
+        if (nowMs < at) {
+          if (setNext(state, skill.id, skill.trigger.at)) {
             changed = true;
           }
           continue;

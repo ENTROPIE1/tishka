@@ -20,12 +20,19 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function createToolRegistry(bus: EventBus): ToolRegistry {
+export interface MutableToolRegistry extends ToolRegistry {
+  remove(name: string): void;
+}
+
+export function createToolRegistry(bus: EventBus): MutableToolRegistry {
   const tools = new Map<string, { def: ToolDef; handler: ToolHandler }>();
 
   return {
     register(def: ToolDef, handler: ToolHandler): void {
       tools.set(def.name, { def, handler });
+    },
+    remove(name: string): void {
+      tools.delete(name);
     },
     unregisterSource(source: ToolDef['source']): void {
       for (const [name, entry] of tools) {

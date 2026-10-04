@@ -225,6 +225,44 @@ describe('createScheduler — навыки', () => {
     expect(h.events).not.toContainEqual({ type: 'notify', title: 'Просроченный', skillId: 'stale' });
   });
 
+  it('навык с неразборчивым at не проходит проверку', () => {
+    const result = validateSkill({
+      format: 'tishka-skill/1',
+      id: 'once',
+      name: 'Разовый',
+      description: '',
+      phrases: [],
+      trigger: { type: 'schedule', at: 'завтра утром' },
+      steps: [{ id: 'step', tool: 'noop', args: {} }]
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join(' ')).toContain('at');
+    }
+  });
+
+  it('сохранённый навык с неразборчивым at один раз даёт error и больше не проверяется', async () => {
+    const skill: Skill = {
+      format: 'tishka-skill/1',
+      id: 'broken-at',
+      name: 'Сломанное время',
+      description: '',
+      phrases: [],
+      trigger: { type: 'schedule', at: 'завтра утром' },
+      steps: [{ id: 'step', tool: 'noop', args: {} }]
+    };
+    const h = setup({ skills: [skill], startNow: local(2026, 10, 5, 9, 0) });
+
+    await h.scheduler.tick();
+    await h.scheduler.tick();
+
+    const errors = h.events.filter((event) => event.type === 'error');
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as { message: string }).message).toContain('Сломанное время');
+    expect(h.runs).toHaveLength(0);
+  });
+
   it('сбой навыка даёт событие error, следующая проверка работает', async () => {
     const skill = makeSkill({ id: 'flaky', name: 'Сбойный', trigger: { type: 'schedule', cron: '* * * * *' } });
     let attempt = 0;

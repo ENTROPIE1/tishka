@@ -84,6 +84,16 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
   const connect = deps.createConnection ?? connectMcpServer;
   const live = new Map<string, LiveConnection>();
   const statuses = new Map<string, McpStatus>();
+  const chains = new Map<string, Promise<unknown>>();
+
+  // Подключения к одному серверу идут строго по очереди: второй вызов ждёт
+  // завершения первого, поэтому лишних незакрытых подключений не остаётся.
+  function serialize<T>(name: string, task: () => Promise<T>): Promise<T> {
+    const previous = chains.get(name) ?? Promise.resolve();
+    const result = previous.then(task);
+    chains.set(name, result.catch(() => undefined));
+    return result;
+  }
 
   async function drop(name: string): Promise<void> {
     const existing = live.get(name);
@@ -119,7 +129,7 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
     );
   }
 
-  async function connectOne(server: McpServerConfig): Promise<McpStatus> {
+  async function openOne(server: McpServerConfig): Promise<McpStatus> {
     await drop(server.name);
     let connection: McpConnection | undefined;
     try {
@@ -143,6 +153,10 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
     }
   }
 
+  function connectOne(server: McpServerConfig): Promise<McpStatus> {
+    return serialize(server.name, () => openOne(server));
+  }
+
   return {
     async connectAll(servers: McpServerConfig[]): Promise<McpStatus[]> {
       const results: McpStatus[] = [];
@@ -158,7 +172,7 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
 
     async disconnect(name: string): Promise<void> {
       const known = statuses.has(name) || live.has(name);
-      await drop(name);
+      await serialize(name, () => drop(name));
       if (known) {
         statuses.set(name, disabledStatus(name));
       }
@@ -169,8 +183,9 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
     },
 
     async closeAll(): Promise<void> {
-      for (const name of [...statuses.keys()]) {
-        await drop(name);
+      const names = new Set([...statuses.keys(), ...live.keys(), ...chains.keys()]);
+      for (const name of names) {
+        await serialize(name, () => drop(name));
         statuses.set(name, disabledStatus(name));
       }
     }
