@@ -17,6 +17,7 @@ export interface WakeFlowDeps {
   onSoonChange?(): void;
   isReady?(): boolean;                 // служба распознавания готова
   memoryName?(): string | undefined;   // имя человека из памяти для подсказки
+  onMissedSpeech?(): void;             // «Не расслышал» — повод для подсказки о калибровке
 }
 
 export interface WakeFlow {
@@ -197,6 +198,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     if (!result.ok) {
       if (result.error !== 'Не расслышал') {
         reportError(result.error);
+      } else {
+        deps.onMissedSpeech?.();
       }
       return;
     }

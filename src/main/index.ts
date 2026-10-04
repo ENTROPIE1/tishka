@@ -28,6 +28,7 @@ import { createScreenCapture } from './screen-capture';
 import { openStandWindow } from './stand-window';
 import { createWebReader, type WebReaderHandle } from './web-reader';
 import { createWakeFlow } from '../voice/wake-flow';
+import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
 
 const bus = createEventBus();
 let core: TishkaCore | undefined;
@@ -169,11 +170,17 @@ app.whenReady().then(async () => {
   registerSpeechIpc(speechOutput);
   speechOutput.warm();
 
+  const calibrationHint = createCalibrationHint({
+    isCalibrated: () => tishka.config().voice.mic.calibratedAt !== null,
+    report: () => bus.emit({ type: 'status', text: CALIBRATION_HINT })
+  });
+
   const listen = createPetListen({
     bus,
     core: tishka,
     stt: sttService,
-    sendCommand: (command) => pet?.listenCommand(command)
+    sendCommand: (command) => pet?.listenCommand(command),
+    onMissedSpeech: () => calibrationHint.missed()
   });
   registerPetIpc(pet, listen);
 
@@ -184,6 +191,7 @@ app.whenReady().then(async () => {
     bus,
     memoryName: () => tishka.memoryName(),
     isReady: () => sttService.status() === 'ready',
+    onMissedSpeech: () => calibrationHint.missed(),
     sendCommand: (command) => {
       if (command === 'listen') {
         pet?.listenCommand('start');
@@ -254,7 +262,11 @@ app.whenReady().then(async () => {
   hotkeyRegistrar.set(tishka.config().voice.hotkey, toggleConversationByHotkey);
   registerVoiceIpc({
     stt: sttService,
-    reloadHotkey: (hotkey) => hotkeyRegistrar.set(hotkey, toggleConversationByHotkey)
+    reloadHotkey: (hotkey) => hotkeyRegistrar.set(hotkey, toggleConversationByHotkey),
+    setCalibration: (active) => {
+      petWake?.setPaused(active);
+      chatTalk?.setPaused(active);
+    }
   });
 
   app.setLoginItemSettings(loginItemSettings(tishka.config().app.autostart));

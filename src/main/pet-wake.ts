@@ -35,6 +35,7 @@ export interface PetWakeDeps {
 
 export interface PetWake {
   broadcast(): void;
+  setPaused(value: boolean): void;
   isListening(): boolean;
   dispose(): void;
 }
@@ -42,6 +43,7 @@ export interface PetWake {
 // Связка постоянного прослушивания с окном-питомцем: фразы, режим разговора, пауза.
 export function registerPetWake(deps: PetWakeDeps): PetWake {
   let busy = false;
+  let paused = false;
   let listening = false;
   let lastInteractionAt = Date.now();
 
@@ -58,12 +60,13 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
       now: Date.now(),
       warmMinutes: deps.getWarmMinutes?.() ?? DEFAULT_WARM_MINUTES
     });
-    listening = !busy && deps.isReady() && (mine || warm);
+    listening = !paused && !busy && deps.isReady() && (mine || warm);
     deps.pet.wakeState({
       active: listening,
       conversation: mine,
       soon: mine && deps.flow.isLeavingSoon(),
-      sensitivity: voice.sensitivity
+      sensitivity: voice.sensitivity,
+      threshold: voice.mic.threshold
     });
   }
 
@@ -111,6 +114,10 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
 
   return {
     broadcast,
+    setPaused(value: boolean): void {
+      paused = value;
+      broadcast();
+    },
     isListening: () => listening,
     dispose(): void {
       clearInterval(warmTimer);

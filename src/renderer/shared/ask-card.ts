@@ -1,4 +1,5 @@
 import { createMicButton } from './mic-button';
+import { micThreshold } from './mic-threshold';
 import { insertAtCursor } from './text-insert';
 
 export interface AskRequest {
@@ -62,7 +63,8 @@ export function askCardElement(ask: AskRequest, actions: AskCardActions): HTMLEl
       onLevel: () => undefined,
       onListeningChange: (listening) => {
         tools.classList.toggle('listening', listening);
-      }
+      },
+      getThreshold: micThreshold
     });
     tools.append(mic.element);
     body.append(tools);
