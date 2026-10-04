@@ -1,6 +1,16 @@
 import { normalizeBaseUrl } from '../../core/llm/check';
 import type { Config } from '../../core/types';
-import { button, clear, el, field, runWithFeedback, sectionTitle, textInput, type SettingsSection } from './dom';
+import {
+  button,
+  clear,
+  el,
+  field,
+  runWithFeedback,
+  sectionTitle,
+  selectInput,
+  textInput,
+  type SettingsSection
+} from './dom';
 
 const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
 const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
@@ -10,12 +20,17 @@ const KEY_MISSING = 'Ключ не задан';
 const MODEL_MISSING = 'такой модели в списке шлюза нет';
 const MODEL_LIST_ID = 'gateway-model-list';
 const VISION_LIST_ID = 'gateway-vision-list';
+const FORMAT_OPTIONS = [
+  { value: 'chat', label: 'Chat Completions' },
+  { value: 'responses', label: 'Responses' }
+];
 
 export function mountModelSection(root: HTMLElement): SettingsSection {
   clear(root);
   root.append(sectionTitle('Модель'));
 
   const baseUrl = textInput();
+  const format = selectInput(FORMAT_OPTIONS, 'chat');
   const model = textInput();
   const visionModel = textInput();
   const key = textInput('', 'password');
@@ -38,11 +53,12 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
   visionField.append(visionHint);
 
   const save = button('Сохранить');
-  const check = button('Проверить', 'button-secondary');
+  const check = button('Проверить', 'button button-secondary');
   const messages = el('div', 'messages');
 
   root.append(
     field('Адрес шлюза', baseUrl),
+    field('Формат запросов', format, 'Выберите Responses, если шлюз принимает только POST /responses'),
     modelField,
     visionField,
     field('Ключ шлюза', key, 'Сохранённый ключ не показывается; пустое поле оставляет прежний ключ'),
@@ -91,6 +107,7 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
   async function refresh(): Promise<void> {
     const view = await window.tishka.config.get();
     baseUrl.value = view.config.llm.baseUrl;
+    format.value = view.config.llm.api;
     model.value = view.config.llm.model;
     visionModel.value = view.config.llm.visionModel;
     keyState.textContent = view.gatewayKeySet ? KEY_SET : KEY_MISSING;
@@ -110,7 +127,8 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
           llm: {
             baseUrl: normalized.value,
             model: model.value.trim(),
-            visionModel: visionModel.value.trim()
+            visionModel: visionModel.value.trim(),
+            api: format.value === 'responses' ? 'responses' : 'chat'
           }
         };
         await window.tishka.config.save(next);
@@ -133,7 +151,8 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
       const result = await window.tishka.config.checkGateway({
         baseUrl: baseUrl.value,
         model: model.value.trim(),
-        key: key.value.trim()
+        key: key.value.trim(),
+        api: format.value
       });
       if (!result.ok) {
         const error = result.error ?? 'Не удалось проверить шлюз';

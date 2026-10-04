@@ -1,45 +1,16 @@
-import type { ToolDef } from '../types';
+import type { ChatRequest, ChatResponse, LlmApi } from './protocol';
+import { LlmError } from './protocol';
+import { chatWireBody, parseResponse } from './chat-format';
+import { parseResponsesResponse, responseFromEventStream, toResponsesRequest } from './responses-format';
 
-export type ContentPart = { type: 'text'; text: string } | { type: 'image'; dataUrl: string };
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  args: Record<string, unknown>;
-}
-
-export type ChatMessage =
-  | { role: 'system' | 'user'; content: string | ContentPart[] }
-  | { role: 'assistant'; content: string | null; toolCalls?: ToolCall[] }
-  | { role: 'tool'; toolCallId: string; content: string };
-
-export interface ChatRequest {
-  model: string;
-  messages: ChatMessage[];
-  tools?: ToolDef[];
-  temperature?: number;
-}
-
-export interface ChatResponse {
-  text: string | null;
-  toolCalls: ToolCall[];
-}
-
-export type LlmErrorKind = 'auth' | 'limit' | 'network' | 'server' | 'bad_response';
-
-export class LlmError extends Error {
-  readonly kind: LlmErrorKind;
-
-  constructor(kind: LlmErrorKind, message: string) {
-    super(message);
-    this.name = 'LlmError';
-    this.kind = kind;
-  }
-}
+export type { ChatMessage, ChatRequest, ChatResponse, ContentPart, ToolCall } from './protocol';
+export type { LlmApi, LlmErrorKind } from './protocol';
+export { LlmError } from './protocol';
 
 export interface LlmClientOptions {
   baseUrl: string | (() => string);
   getApiKey: () => Promise<string | undefined>;
+  api?: LlmApi | (() => LlmApi);   // формат запросов; нет или неизвестно — 'chat'
   fetch?: typeof fetch;
 }
 
@@ -47,10 +18,7 @@ const TIMEOUT_MS = 60_000;
 const MAX_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [1000, 3000, 7000];
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+const EVENT_STREAM_TYPE = 'text/event-stream';
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -71,87 +39,6 @@ function parseRetryAfter(header: string | null): number | null {
     return null;
   }
   return Math.max(0, date - Date.now());
-}
-
-function toWireContent(
-  content: string | ContentPart[]
-): string | Array<Record<string, unknown>> {
-  if (typeof content === 'string') {
-    return content;
-  }
-  return content.map((part) =>
-    part.type === 'text'
-      ? { type: 'text', text: part.text }
-      : { type: 'image_url', image_url: { url: part.dataUrl } }
-  );
-}
-
-function toWireMessage(message: ChatMessage): Record<string, unknown> {
-  if (message.role === 'tool') {
-    return { role: 'tool', tool_call_id: message.toolCallId, content: message.content };
-  }
-  if (message.role === 'assistant') {
-    const wire: Record<string, unknown> = { role: 'assistant', content: message.content };
-    if (message.toolCalls !== undefined && message.toolCalls.length > 0) {
-      wire.tool_calls = message.toolCalls.map((call) => ({
-        id: call.id,
-        type: 'function',
-        function: { name: call.name, arguments: JSON.stringify(call.args) }
-      }));
-    }
-    return wire;
-  }
-  return { role: message.role, content: toWireContent(message.content) };
-}
-
-function toWireTools(tools: ToolDef[] | undefined): Array<Record<string, unknown>> | undefined {
-  if (tools === undefined || tools.length === 0) {
-    return undefined;
-  }
-  return tools.map((tool) => ({
-    type: 'function',
-    function: {
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.inputSchema
-    }
-  }));
-}
-
-function parseToolCall(value: unknown): ToolCall {
-  const source = isRecord(value) ? value : {};
-  const fn = isRecord(source.function) ? source.function : {};
-  const id = typeof source.id === 'string' ? source.id : '';
-  const name = typeof fn.name === 'string' ? fn.name : '';
-  let args: Record<string, unknown> = {};
-  if (typeof fn.arguments === 'string' && fn.arguments.length > 0) {
-    try {
-      const parsed: unknown = JSON.parse(fn.arguments);
-      if (isRecord(parsed)) {
-        args = parsed;
-      }
-    } catch {
-      args = {};
-    }
-  } else if (isRecord(fn.arguments)) {
-    args = fn.arguments;
-  }
-  return { id, name, args };
-}
-
-function parseResponse(payload: unknown): ChatResponse {
-  if (!isRecord(payload) || !Array.isArray(payload.choices) || payload.choices.length === 0) {
-    throw new LlmError('bad_response', 'Шлюз моделей вернул ответ неожиданного вида');
-  }
-  const first = payload.choices[0];
-  if (!isRecord(first) || !isRecord(first.message)) {
-    throw new LlmError('bad_response', 'Шлюз моделей вернул ответ неожиданного вида');
-  }
-  const message = first.message;
-  const text = typeof message.content === 'string' ? message.content : null;
-  const rawCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
-  const toolCalls = rawCalls.map(parseToolCall);
-  return { text, toolCalls };
 }
 
 function statusToError(status: number): LlmError {
@@ -175,30 +62,60 @@ export function createLlmClient(opts: LlmClientOptions): {
     const raw = typeof opts.baseUrl === 'function' ? opts.baseUrl() : opts.baseUrl;
     return raw.replace(/\/+$/, '');
   };
+  const resolveApi = (): LlmApi => {
+    const raw = typeof opts.api === 'function' ? opts.api() : opts.api;
+    return raw === 'responses' ? 'responses' : 'chat';
+  };
 
-  async function requestOnce(req: ChatRequest, apiKey: string): Promise<Response> {
+  function wireRequest(
+    req: ChatRequest,
+    api: LlmApi,
+    base: string
+  ): { url: string; body: string } {
+    if (api === 'responses') {
+      return { url: `${base}/responses`, body: JSON.stringify(toResponsesRequest(req)) };
+    }
+    return { url: `${base}/chat/completions`, body: JSON.stringify(chatWireBody(req)) };
+  }
+
+  async function requestOnce(req: ChatRequest, apiKey: string, api: LlmApi): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => {
       controller.abort();
     }, TIMEOUT_MS);
+    const wire = wireRequest(req, api, resolveBaseUrl());
     try {
-      return await doFetch(`${resolveBaseUrl()}/chat/completions`, {
+      return await doFetch(wire.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: req.model,
-          messages: req.messages.map(toWireMessage),
-          tools: toWireTools(req.tools),
-          temperature: req.temperature
-        }),
+        body: wire.body,
         signal: controller.signal
       });
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  async function readJson(response: Response): Promise<unknown> {
+    try {
+      return await response.json();
+    } catch {
+      throw new LlmError('bad_response', 'Шлюз моделей вернул ответ неожиданного вида');
+    }
+  }
+
+  async function readOk(response: Response, api: LlmApi): Promise<ChatResponse> {
+    if (api !== 'responses') {
+      return parseResponse(await readJson(response));
+    }
+    const contentType = response.headers.get('Content-Type') ?? '';
+    if (contentType.includes(EVENT_STREAM_TYPE)) {
+      return parseResponsesResponse(responseFromEventStream(await response.text()));
+    }
+    return parseResponsesResponse(await readJson(response));
   }
 
   async function chat(req: ChatRequest): Promise<ChatResponse> {
@@ -208,9 +125,10 @@ export function createLlmClient(opts: LlmClientOptions): {
     }
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const api = resolveApi();
       let response: Response;
       try {
-        response = await requestOnce(req, apiKey);
+        response = await requestOnce(req, apiKey, api);
       } catch {
         if (attempt < MAX_ATTEMPTS - 1) {
           await delay(RETRY_DELAYS_MS[attempt]);
@@ -220,13 +138,7 @@ export function createLlmClient(opts: LlmClientOptions): {
       }
 
       if (response.ok) {
-        let payload: unknown;
-        try {
-          payload = await response.json();
-        } catch {
-          throw new LlmError('bad_response', 'Шлюз моделей вернул ответ неожиданного вида');
-        }
-        return parseResponse(payload);
+        return readOk(response, api);
       }
 
       const error = statusToError(response.status);

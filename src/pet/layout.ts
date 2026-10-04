@@ -1,6 +1,7 @@
 // Раскладка окна-питомца: ёжик стоит сбоку от колонки ответов, строка ввода —
 // в самом низу. Функция чистая: по рабочей области, желаемому месту ёжика и
 // размерам частей считает прямоугольник окна и сторону раскладки.
+// Положение ёжика не влияет на размер окна: перемещение меняет только место.
 
 export interface WorkArea {
   x: number;
@@ -17,6 +18,9 @@ export interface PetLayoutContent {
   gap?: number;
   margin?: number;
   composerHeight?: number;
+  // Масштаб экрана (1, 1.25, 1.5 …). Положение окна округляется до целого
+  // числа физических пикселей, чтобы при перемещении оно не «плыло».
+  scale?: number;
 }
 
 export interface PetWindowRect {
@@ -56,6 +60,59 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function snap(value: number, scale: number): number {
+  if (scale <= 0 || scale === 1) {
+    return Math.round(value);
+  }
+  return Math.round(value * scale) / scale;
+}
+
+// Экран, на котором находится точка: содержащий её, иначе ближайший.
+export function workAreaForPoint(workAreas: WorkArea[], x: number, y: number): WorkArea {
+  if (workAreas.length === 0) {
+    throw new Error('нет доступных экранов');
+  }
+  for (const area of workAreas) {
+    const insideX = x >= area.x && x <= area.x + area.width;
+    const insideY = y >= area.y && y <= area.y + area.height;
+    if (insideX && insideY) {
+      return area;
+    }
+  }
+  let best = workAreas[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const area of workAreas) {
+    const dx = Math.max(area.x - x, 0, x - (area.x + area.width));
+    const dy = Math.max(area.y - y, 0, y - (area.y + area.height));
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = area;
+    }
+  }
+  return best;
+}
+
+// Полностью ли прямоугольник лежит в одном из экранов.
+export function rectWithinAny(workAreas: WorkArea[], rect: PetWindowRect): boolean {
+  return workAreas.some(
+    (area) =>
+      rect.x >= area.x &&
+      rect.y >= area.y &&
+      rect.x + rect.width <= area.x + area.width &&
+      rect.y + rect.height <= area.y + area.height
+  );
+}
+
+// Положение ёжика, при котором он остаётся в пределах рабочей области.
+export function clampPetX(workArea: WorkArea, petX: number, content: PetLayoutContent = {}): number {
+  const petWidth = content.petWidth ?? PET_LAYOUT_DEFAULTS.petWidth;
+  const margin = content.margin ?? PET_LAYOUT_DEFAULTS.margin;
+  const min = workArea.x + margin;
+  const max = workArea.x + workArea.width - margin - petWidth;
+  return max < min ? min : clamp(petX, min, max);
+}
+
 export function petLayout(
   workArea: WorkArea,
   petX: number,
@@ -68,11 +125,10 @@ export function petLayout(
   const gap = content.gap ?? PET_LAYOUT_DEFAULTS.gap;
   const margin = content.margin ?? PET_LAYOUT_DEFAULTS.margin;
   const composerHeight = content.composerHeight ?? PET_LAYOUT_DEFAULTS.composerHeight;
+  const scale = content.scale ?? 1;
 
   const right = workArea.x + workArea.width;
-  const minPetX = workArea.x + margin;
-  const maxPetX = right - margin - petWidth;
-  const desiredPetX = clamp(petX, minPetX, maxPetX);
+  const desiredPetX = clampPetX(workArea, petX, content);
 
   // Колонка сужается до доступной ширины, но не меньше минимума.
   const available = workArea.width - margin * 2 - gap - petWidth;
@@ -88,7 +144,14 @@ export function petLayout(
   // Окно целиком держим в рабочей области; на сверхузких экранах минимум
   // колонки важнее и окно может выйти за край.
   const maxWindowX = right - width;
-  const x = maxWindowX < workArea.x ? workArea.x : clamp(desiredWindowX, workArea.x, maxWindowX);
+  let x: number;
+  if (maxWindowX < workArea.x) {
+    x = workArea.x;
+  } else {
+    const minX = Math.ceil(workArea.x * scale) / scale;
+    const maxX = Math.floor(maxWindowX * scale) / scale;
+    x = maxX < minX ? workArea.x : clamp(snap(desiredWindowX, scale), minX, maxX);
+  }
 
   const petLeft = mirrored ? x + margin : x + margin + columnWidth + gap;
   const columnX = mirrored ? x + margin + petWidth + gap : x + margin;

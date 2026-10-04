@@ -1,4 +1,5 @@
-import { DEFAULT_TIMEOUT_MS, fetchModels, modelMissing, probeChat } from './gateway-http';
+import { DEFAULT_TIMEOUT_MS, fetchModels, modelMissing, probeChat, probeResponses } from './gateway-http';
+import type { LlmApi } from './protocol';
 import { normalizeBaseUrl } from './gateway-url';
 
 export { normalizeBaseUrl } from './gateway-url';
@@ -15,6 +16,7 @@ export interface GatewayCheckRequest {
   baseUrl: string;
   model: string;
   apiKey: string;
+  api?: LlmApi;   // нет или неизвестно — 'chat'
 }
 
 export interface GatewayCheckOptions {
@@ -46,7 +48,9 @@ export async function checkGateway(
     return { ok: false, models: models.models, error: modelMissing(req.model), ms: elapsed() };
   }
 
-  const error = await probeChat(doFetch, normalized.value, req, timeoutMs, models.present);
+  const api: LlmApi = req.api === 'responses' ? 'responses' : 'chat';
+  const probe = api === 'responses' ? probeResponses : probeChat;
+  const error = await probe(doFetch, normalized.value, req, timeoutMs, models.present);
   if (error !== undefined) {
     return { ok: false, models: models.models, error, ms: elapsed() };
   }

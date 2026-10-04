@@ -6,13 +6,15 @@ export const CONFIG_FILE = 'config.json';
 
 type FyrLevel = Config['persona']['fyr'];
 type Sensitivity = Config['voice']['sensitivity'];
+type LlmApi = Config['llm']['api'];
 
 export function defaultConfig(): Config {
   return {
     llm: {
       baseUrl: 'https://llm.dks.lanit.ru/v1',
       model: 'DKS-Lynx',
-      visionModel: 'DKS-Vision'
+      visionModel: 'DKS-Vision',
+      api: 'chat'
     },
     voice: {
       hotkey: 'Control+Alt+Space',
@@ -77,6 +79,10 @@ function pickFyr(value: unknown, fallback: FyrLevel): FyrLevel {
 
 function pickSensitivity(value: unknown, fallback: Sensitivity): Sensitivity {
   return value === 'low' || value === 'normal' || value === 'high' ? value : fallback;
+}
+
+function pickApi(value: unknown, fallback: LlmApi): LlmApi {
+  return value === 'chat' || value === 'responses' ? value : fallback;
 }
 
 function pickPetX(value: unknown, fallback: number | null): number | null {
@@ -175,7 +181,8 @@ export function normalizeConfig(config: Config): Config {
     llm: {
       baseUrl: config.llm.baseUrl.trim(),
       model: config.llm.model.trim(),
-      visionModel: config.llm.visionModel.trim()
+      visionModel: config.llm.visionModel.trim(),
+      api: pickApi(config.llm.api, 'chat')
     }
   };
 }
@@ -199,7 +206,8 @@ export function mergeConfig(value: unknown): Config {
     llm: {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
       model: pickString(llm.model, defaults.llm.model),
-      visionModel: pickString(llm.visionModel, defaults.llm.visionModel)
+      visionModel: pickString(llm.visionModel, defaults.llm.visionModel),
+      api: pickApi(llm.api, defaults.llm.api)
     },
     voice: {
       hotkey: pickString(voice.hotkey, defaults.voice.hotkey),
