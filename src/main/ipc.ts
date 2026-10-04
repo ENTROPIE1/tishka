@@ -1,7 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { BrowserWindow, clipboard, ClipboardItem, ipcMain, shell } from 'electron';
 import type { TishkaCore } from '../core/app';
-import type { EventBus, SecretStore, TishkaEvent } from '../core/types';
+import type { SecretStore, TishkaEvent } from '../core/types';
+import { isMainWindow } from './chat-window';
+import type { SourceBus } from './source-bus';
 import {
   CONFIG_CHANGED_CHANNEL,
   COPY_IMAGE_CHANNEL,
@@ -44,17 +46,21 @@ function isWebUrl(value: string): boolean {
   }
 }
 
-export function registerIpc(bus: EventBus, core: TishkaCore, secrets: SecretStore): void {
+export function registerIpc(bus: SourceBus, core: TishkaCore, secrets: SecretStore): void {
   bus.on(broadcastEvent);
 
-  ipcMain.on(USER_TEXT_CHANNEL, (_event, text: unknown) => {
+  ipcMain.on(USER_TEXT_CHANNEL, (event, text: unknown) => {
     if (typeof text !== 'string') {
       return;
     }
     const trimmed = text.trim();
-    if (trimmed !== '') {
-      void core.handleUserText(trimmed).catch(() => undefined);
+    if (trimmed === '') {
+      return;
     }
+    // Реплика из чата, пока окно в фокусе, не будит ежа: ответ виден в чате.
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const source = window !== null && isMainWindow(window) && window.isFocused() ? 'chat' : 'pet';
+    void bus.run(source, () => core.handleUserText(trimmed)).catch(() => undefined);
   });
 
   ipcMain.handle(HISTORY_CHANNEL, (_event, limit: unknown) => {

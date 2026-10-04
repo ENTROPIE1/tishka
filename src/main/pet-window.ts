@@ -2,7 +2,7 @@ import { BrowserWindow, screen } from 'electron';
 import { join } from 'node:path';
 import type { Config, EventBus } from '../core/types';
 import { PET_LAYOUT_DEFAULTS, petLayout, type PetLayoutContent } from '../pet/layout';
-import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
+import { initialPet, onEvent, onTick, type PetModel, type TalkSource } from '../pet/state';
 import type { ListenCommand } from '../voice/listen';
 import type { WakeState } from '../voice/wake';
 import type { SpeakMessage } from '../voice/speech-queue';
@@ -14,7 +14,7 @@ const CONTENT: PetLayoutContent = {};
 const TICK_MS = 250;
 
 export interface PetWindowDeps {
-  bus: EventBus;
+  bus: EventBus & { source?(): TalkSource };   // источник текущего обращения: чат или ёж
   getConfig: () => Config;
   savePetX: (x: number | null) => Promise<void>;
   onReload?: () => void;
@@ -129,7 +129,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   }
 
   function handleEvent(event: Parameters<typeof onEvent>[1]): void {
-    applyModel(onEvent(model, event, Date.now(), { petMode: petMode(), busy }));
+    applyModel(onEvent(model, event, Date.now(), { petMode: petMode(), busy, source: deps.bus.source?.() }));
   }
 
   const unsubscribe = deps.bus.on(handleEvent);
