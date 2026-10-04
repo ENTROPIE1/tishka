@@ -22,12 +22,13 @@ async function flush(): Promise<void> {
   }
 }
 
-function setup(): { bus: ReturnType<typeof createEventBus>; events: TishkaEvent[] } {
+function setup(ready = true): { bus: ReturnType<typeof createEventBus>; events: TishkaEvent[] } {
   const bus = createEventBus();
   const events: TishkaEvent[] = [];
   createSpeechOutput({
     bus,
     getConfig: () => config(),
+    isReady: () => ready,
     play: () => new Promise<void>(() => undefined),
     fetch: (async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 })) as unknown as typeof fetch
   });
@@ -56,5 +57,16 @@ describe('createSpeechOutput: приветствие и уведомление',
     await flush();
 
     expect(spokenTexts(events)).toContain(prepareForSpeech(CANNED.greeting));
+  });
+
+  it('служба ещё поднимается: «слушаю» не обещаем, звучит нейтральное приветствие', async () => {
+    const { bus, events } = setup(false);
+
+    bus.emit({ type: 'wake', source: 'click' });
+    await flush();
+
+    const spoken = spokenTexts(events);
+    expect(spoken).toContain(prepareForSpeech(CANNED.neutral));
+    expect(spoken).not.toContain(prepareForSpeech(CANNED.greeting));
   });
 });

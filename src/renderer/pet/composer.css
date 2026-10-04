@@ -135,6 +135,12 @@
   animation: mic-soon 1s ease-in-out infinite;
 }
 
+.mic.waiting {
+  color: var(--accent);
+  border-color: var(--accent);
+  animation: mic-soon 1.2s ease-in-out infinite;
+}
+
 .mic-icon {
   width: 16px;
   height: 16px;

@@ -10,6 +10,10 @@ const LABELS: Partial<Record<PetState, string>> = {
   working: 'думает'
 };
 
-export function stateLabel(state: PetState): string {
+// Пока служба распознавания не готова, «слушает» обещать нельзя.
+export function stateLabel(state: PetState, waiting = false): string {
+  if (waiting && state === 'listening') {
+    return 'ждёт';
+  }
   return LABELS[state] ?? '';
 }

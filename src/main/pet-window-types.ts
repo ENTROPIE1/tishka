@@ -25,6 +25,7 @@ export interface PetWindow {
   hide(): void;
   show(): void;
   leave(): void;
+  isVisible(): boolean;
   reload(): void;
   dispose(): void;
 }

@@ -8,6 +8,7 @@ export interface SpeechOutputDeps {
   bus: EventBus;
   getConfig(): Config;
   play(message: SpeakMessage, signal: AbortSignal): Promise<void>;
+  isReady?(): boolean;   // служба распознавания готова: «слушаю» не обещаем зря
   fetch?: typeof fetch;
   now?: () => number;
 }
@@ -115,10 +116,10 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
         return;
       }
       case 'wake':
-        // Приветствие «Слушаю» уместно, только когда человек позвал Тишку сам;
-        // уведомление по триггеру не включает прослушивание.
+        // Приветствие «Слушаю» уместно, только когда человек позвал Тишку сам
+        // и запись действительно возможна; уведомление по триггеру не в счёт.
         if (event.source !== 'trigger') {
-          schedule(CANNED.greeting, false);
+          schedule(deps.isReady?.() === false ? CANNED.neutral : CANNED.greeting, false);
         }
         return;
       case 'listen.start':

@@ -65,6 +65,7 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
       active: listening,
       conversation: mine,
       soon: mine && deps.flow.isLeavingSoon(),
+      waiting: deps.flow.isWaiting?.() ?? false,
       sensitivity: voice.sensitivity,
       threshold: voice.mic.threshold
     });
