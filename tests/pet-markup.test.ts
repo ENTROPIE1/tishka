@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createComposer, PLACEHOLDER_IDLE, PLACEHOLDER_LISTENING } from '../src/renderer/pet/composer';
 import { applyPetLayout } from '../src/renderer/pet/layout-view';
+import { stateLabel } from '../src/renderer/pet/state-label';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(resolve(root, 'src/renderer/pet/index.html'), 'utf8');
@@ -88,9 +89,11 @@ describe('разметка окна-питомца', () => {
     expect(element('pet').classList.contains('mirrored')).toBe(false);
   });
 
-  it('видимой подписи состояния под ёжиком нет, состояние в data-state', () => {
+  it('подпись состояния стоит под ёжиком, состояние — в data-state', () => {
     mount();
-    expect(document.querySelector('.state-label')).toBeNull();
+    const label = document.querySelector('.state-label');
+    expect(label).not.toBeNull();
+    expect(element('character').nextElementSibling).toBe(label);
     expect(element('character').getAttribute('data-state')).not.toBeNull();
   });
 
@@ -155,5 +158,16 @@ describe('поведение строки общения', () => {
     expect(input.placeholder).toBe(PLACEHOLDER_LISTENING);
     composer.setListening(false);
     expect(input.placeholder).toBe(PLACEHOLDER_IDLE);
+  });
+});
+
+describe('подпись состояния', () => {
+  it('ждёт, слушает, думает и пусто для остальных состояний', () => {
+    expect(stateLabel('idle')).toBe('ждёт');
+    expect(stateLabel('listening')).toBe('слушает');
+    expect(stateLabel('thinking')).toBe('думает');
+    expect(stateLabel('working')).toBe('думает');
+    expect(stateLabel('talking')).toBe('');
+    expect(stateLabel('sleep')).toBe('');
   });
 });

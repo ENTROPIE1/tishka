@@ -45,9 +45,9 @@ export interface PetLayoutView {
 export const PET_LAYOUT_DEFAULTS = {
   columnWidth: 380,
   columnMinWidth: 260,
-  petWidth: 280,
+  petWidth: 200,
   petHeight: 200,
-  gap: 24,
+  gap: 12,
   margin: 16,
   composerHeight: 64
 } as const;

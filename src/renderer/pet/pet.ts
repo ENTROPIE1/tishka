@@ -6,6 +6,7 @@ import { applyPetLayout } from './layout-view';
 import { createListenUi } from './listen-ui';
 import { createPetCard } from './pet-card';
 import { createSpeaker } from './speaker';
+import { stateLabel } from './state-label';
 import { createWakeListener } from './wake-listener';
 
 const pet = document.getElementById('pet') as HTMLElement;
@@ -13,6 +14,7 @@ const bubble = document.getElementById('bubble') as HTMLElement;
 const say = document.getElementById('say') as HTMLElement;
 const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
+const stateLabelEl = document.getElementById('state-label') as HTMLElement;
 const composerHost = document.getElementById('composer-host') as HTMLElement;
 const characterModel: Character = createCharacter('svg');
 
@@ -89,6 +91,7 @@ function applyFlip(): void {
 function renderModel(model: PetModel): void {
   currentState = model.state;
   character.dataset.state = model.state;
+  stateLabelEl.textContent = stateLabel(model.state);
   say.textContent = listen.say(model.say, model.state);
   petCard.render(model);
 

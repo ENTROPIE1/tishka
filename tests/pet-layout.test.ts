@@ -30,7 +30,7 @@ describe('petLayout', () => {
   });
 
   it('узкая рабочая область сужает колонку, но не меньше 260 px', () => {
-    const narrow: WorkArea = { x: 0, y: 0, width: 680, height: 800 };
+    const narrow: WorkArea = { x: 0, y: 0, width: 600, height: 800 };
     const layout = petLayout(narrow, defaultPetX(narrow));
 
     expect(layout.columnWidth).toBeLessThan(desiredColumn);

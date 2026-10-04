@@ -8,8 +8,11 @@
   --border: #e2e0d9;
   --code-bg: #f0efe9;
   --shadow: 0 2px 10px rgb(0 0 0 / 18%);
-  --pet-gap: 24px;
-  --pet-width: 280px;
+  --pet-gap: 12px;
+  --pet-width: 200px;
+  --pet-margin: 16px;
+  /* Высота мордочки ёжика над нижним краем ряда: ноги, подпись и нос в svg. */
+  --pet-muzzle: 72px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -54,7 +57,7 @@ body {
   inset: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 16px 8px;
+  padding: 0 var(--pet-margin) 8px;
 }
 
 .pet-row {
@@ -70,11 +73,22 @@ body {
   flex-direction: row-reverse;
 }
 
+/* Колонка ёжика: сам ёжик и видимая подпись состояния под ним. */
+.pet-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
 .answers {
   flex: 1 1 auto;
   min-width: 260px;
   max-width: 380px;
   min-height: 0;
+  /* Облачко поднимается до уровня мордочки ёжика, а не стоит у строки ввода. */
+  padding-bottom: calc(var(--pet-muzzle) - 8px);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -115,12 +129,13 @@ body {
   align-self: flex-start;
 }
 
-/* Хвостик облачка направлен к ёжику на уровне его мордочки. */
+/* Хвостик — часть самого облачка: растёт из его правого края вниз (на уровне
+   мордочки) и целиком лежит внутри облачка даже у короткой реплики. */
 .bubble::after {
   content: "";
   position: absolute;
   right: -8px;
-  bottom: 42px;
+  bottom: 0;
   width: 0;
   height: 0;
   border-top: 8px solid transparent;
@@ -159,4 +174,13 @@ body {
   justify-content: center;
   background: transparent;
   cursor: grab;
+}
+
+.state-label {
+  height: 16px;
+  line-height: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  pointer-events: none;
+  user-select: none;
 }
