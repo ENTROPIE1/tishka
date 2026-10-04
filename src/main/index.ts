@@ -8,13 +8,15 @@ import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { createSttService, type SttService } from '../voice/stt-service';
 import { openMainWindow } from './chat-window';
-import { OPEN_CHAT_CHANNEL } from './ipc-channels';
+import { OPEN_CHAT_CHANNEL, PET_SPEAK_DONE_CHANNEL } from './ipc-channels';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
+import { registerSpeechIpc } from './ipc-speech';
 import { registerVoiceIpc } from './ipc-voice';
 import { createHotkeyRegistrar, type HotkeyRegistrar } from './pet-hotkey';
 import { registerPetIpc } from './pet-ipc';
 import { createPetListen } from './pet-listen';
+import { createSpeechOutput, type SpeechOutput } from './pet-speak';
 import { createPetTray, type PetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
 import { registerPetWake, type PetWake } from './pet-wake';
@@ -28,6 +30,8 @@ let tray: PetTray | undefined;
 let stt: SttService | undefined;
 let hotkeys: HotkeyRegistrar | undefined;
 let petWake: PetWake | undefined;
+let speech: SpeechOutput | undefined;
+let speechDone: (() => void) | undefined;
 
 // Второй запуск не создаёт копию, а поднимает окно чата работающего приложения.
 const singleInstance = app.requestSingleInstanceLock();
@@ -107,6 +111,30 @@ app.whenReady().then(async () => {
     // Позиция пишется в файл напрямую, чтобы перетаскивание не переподключало MCP.
     savePetX: (x) => persistConfig(dataDir, { ...tishka.config(), pet: { x } })
   });
+
+  // Звук, отправленный в окно-питомец, считается проигранным после ответа speak-done.
+  ipcMain.on(PET_SPEAK_DONE_CHANNEL, () => {
+    const resolve = speechDone;
+    speechDone = undefined;
+    resolve?.();
+  });
+
+  const speechOutput = createSpeechOutput({
+    bus,
+    getConfig: () => tishka.config(),
+    play: (message, signal) =>
+      new Promise<void>((resolve) => {
+        if (pet === undefined) {
+          resolve();
+          return;
+        }
+        speechDone = resolve;
+        pet.speak(message);
+        signal.addEventListener('abort', () => pet?.stopSpeaking(), { once: true });
+      })
+  });
+  speech = speechOutput;
+  registerSpeechIpc(speechOutput);
 
   const listen = createPetListen({
     bus,
@@ -207,6 +235,7 @@ app.on('will-quit', () => {
   hotkeys?.dispose();
   stt?.stop();
   petWake?.dispose();
+  speech?.dispose();
   pet?.dispose();
   tray?.destroy();
   void core?.stop();

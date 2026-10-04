@@ -98,7 +98,7 @@ export interface Config {
     talkTimeoutSec: number;              // уход по тишине в режиме разговора
     sttUrl: string;                      // адрес службы распознавания
     stt: { exe: string; model: string; audioCtx: number; threads: number };   // автозапуск службы; пустой exe — не запускать
-    ttsEngine: 'piper' | 'silero' | 'none';
+    tts: { enabled: boolean; url: string; volume: number };   // синтез речи: говорить вслух
   };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'

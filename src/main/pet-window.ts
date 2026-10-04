@@ -4,7 +4,14 @@ import type { Config, EventBus } from '../core/types';
 import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
 import type { ListenCommand } from '../voice/listen';
 import type { WakeState } from '../voice/wake';
-import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
+import type { SpeakMessage } from '../voice/speech-queue';
+import {
+  PET_LISTEN_COMMAND_CHANNEL,
+  PET_MODEL_CHANNEL,
+  PET_SPEAK_CHANNEL,
+  PET_SPEAK_STOP_CHANNEL,
+  PET_WAKE_STATE_CHANNEL
+} from './ipc-channels';
 import { Mover, clamp, type Geometry } from './pet-motion';
 
 const WIDTH = 440;
@@ -27,6 +34,8 @@ export interface PetWindow {
   dragEnd(): void;
   listenCommand(command: ListenCommand): void;
   wakeState(state: WakeState): void;
+  speak(message: SpeakMessage): void;
+  stopSpeaking(): void;
   hide(): void;
   dispose(): void;
 }
@@ -176,6 +185,16 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     wakeState(state): void {
       if (!window.isDestroyed()) {
         window.webContents.send(PET_WAKE_STATE_CHANNEL, state);
+      }
+    },
+    speak(message): void {
+      if (!window.isDestroyed()) {
+        window.webContents.send(PET_SPEAK_CHANNEL, message);
+      }
+    },
+    stopSpeaking(): void {
+      if (!window.isDestroyed()) {
+        window.webContents.send(PET_SPEAK_STOP_CHANNEL);
       }
     },
     hide(): void {
