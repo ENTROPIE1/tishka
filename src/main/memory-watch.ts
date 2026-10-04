@@ -11,6 +11,7 @@ export interface MemoryWatchDeps {
   reloadWindows(): void;          // перезагрузить окно-питомец и окно чата
   notify(text: string): void;     // одно уведомление перед перезапуском
   relaunch(): void;               // app.relaunch() и выход
+  canRelaunch?: boolean;          // false — режим разработки: вместо перезапуска сообщение (по умолчанию true)
   log(message: string): void;
   now?: () => number;
   intervalMs?: number;
@@ -25,6 +26,7 @@ export interface MemoryWatch {
 }
 
 export const MEMORY_NOTICE = 'Занимаю много памяти, перезапущусь';
+export const MEMORY_DEV_NOTICE = 'Занимаю много памяти, перезапустите Тишку вручную';
 const DEFAULT_INTERVAL_MS = 60000;
 const DEFAULT_GRACE_MS = 60000;
 const DEFAULT_COOLDOWN_MS = 3600000;
@@ -35,6 +37,7 @@ export function createMemoryWatch(deps: MemoryWatchDeps): MemoryWatch {
   const now = deps.now ?? ((): number => Date.now());
   const graceMs = deps.graceMs ?? DEFAULT_GRACE_MS;
   const cooldownMs = deps.cooldownMs ?? DEFAULT_COOLDOWN_MS;
+  const canRelaunch = deps.canRelaunch ?? true;
   let overSince: number | undefined;
   let notified = false;
   let lastRelaunchAt = -Infinity;
@@ -69,6 +72,17 @@ export function createMemoryWatch(deps: MemoryWatchDeps): MemoryWatch {
       return;
     }
     if (at - lastRelaunchAt < cooldownMs) {
+      return;
+    }
+    // В режиме разработки перезапуск теряет сервер разработки: вместо него
+    // человеку уходит сообщение, а в журнал времени — отметка.
+    if (!canRelaunch) {
+      if (!notified) {
+        notified = true;
+        deps.notify(MEMORY_DEV_NOTICE);
+      }
+      deps.log('перезапуск по пределу памяти пропущен в режиме разработки');
+      lastRelaunchAt = at;
       return;
     }
     if (!notified) {

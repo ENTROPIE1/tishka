@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import { NAVIGATE_CHANNEL } from './ipc-channels';
 import { guardNavigation } from './navigation-guard';
+import { loadRendererPage } from './renderer-page';
 import { mark } from './timing-log';
 
 const WINDOW_WIDTH = 900;
@@ -83,12 +84,7 @@ export function openMainWindow(screen?: MainScreen): void {
     });
   }
 
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (rendererUrl !== undefined) {
-    void window.loadURL(`${rendererUrl}/chat/index.html`);
-  } else {
-    void window.loadFile(join(__dirname, '../renderer/chat/index.html'));
-  }
+  loadRendererPage(window, 'chat', { rendererUrl: process.env['ELECTRON_RENDERER_URL'] });
 
   mainWindow = window;
 }

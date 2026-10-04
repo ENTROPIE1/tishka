@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createMemoryWatch, MEMORY_NOTICE, type MemoryWatchDeps } from '../src/main/memory-watch';
+import { createMemoryWatch, MEMORY_DEV_NOTICE, MEMORY_NOTICE, type MemoryWatchDeps } from '../src/main/memory-watch';
 
 function setup(overrides: Partial<MemoryWatchDeps> = {}): {
   deps: MemoryWatchDeps;
@@ -89,6 +89,17 @@ describe('createMemoryWatch', () => {
     expect(deps.reloadWindows).not.toHaveBeenCalled();
     expect(deps.notify).not.toHaveBeenCalled();
     expect(deps.relaunch).not.toHaveBeenCalled();
+  });
+
+  it('режим разработки: вместо перезапуска сообщение человеку и запись в журнал', () => {
+    const { deps, watch } = setup({ canRelaunch: false });
+
+    watch.check(0);
+    watch.check(60000);
+
+    expect(deps.relaunch).not.toHaveBeenCalled();
+    expect(deps.notify).toHaveBeenCalledWith(MEMORY_DEV_NOTICE);
+    expect(deps.log).toHaveBeenCalledWith('перезапуск по пределу памяти пропущен в режиме разработки');
   });
 
   it('нормальная память сбрасывает счётчик', () => {

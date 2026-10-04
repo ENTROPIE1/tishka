@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import { guardNavigation } from './navigation-guard';
+import { loadRendererPage } from './renderer-page';
 
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 640;
@@ -39,12 +40,7 @@ export function openStandWindow(): void {
     }
   });
 
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (rendererUrl !== undefined) {
-    void window.loadURL(`${rendererUrl}/stand/index.html`);
-  } else {
-    void window.loadFile(join(__dirname, '../renderer/stand/index.html'));
-  }
+  loadRendererPage(window, 'stand', { rendererUrl: process.env['ELECTRON_RENDERER_URL'] });
 
   standWindow = window;
 }

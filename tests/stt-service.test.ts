@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { REMOTE_UNREACHABLE } from '../src/voice/stt-service';
+import { REMOTE_UNREACHABLE, type SttStatus } from '../src/voice/stt-service';
 import { configWith, makeChild, okResponse, service, voice } from './stt-test-helpers';
 
 afterEach(() => {
@@ -233,5 +233,101 @@ describe('createSttService.start', () => {
     await expect(stt.start()).resolves.toEqual({ ok: true });
     expect(spawn).not.toHaveBeenCalled();
     expect(stt.pid()).toBeUndefined();
+  });
+});
+
+describe('createSttService в режиме remote: повторная проверка адреса', () => {
+  function remoteService(
+    fetchMock: ReturnType<typeof vi.fn>,
+    onStatusChange?: (status: SttStatus) => void
+  ) {
+    return service(
+      () => voice({ stt: { exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' } }),
+      vi.fn(() => makeChild().child),
+      fetchMock,
+      () => true,
+      onStatusChange === undefined ? {} : { onStatusChange }
+    );
+  }
+
+  it('служба появилась позже — через 5 секунд состояние становится ready и сообщается', async () => {
+    vi.useFakeTimers();
+    let alive = false;
+    const fetchMock = vi.fn(async () => {
+      if (alive) {
+        return okResponse();
+      }
+      throw new Error('connection refused');
+    });
+    const changes: SttStatus[] = [];
+    const stt = remoteService(fetchMock, (status) => changes.push(status));
+
+    await expect(stt.start()).resolves.toEqual({ ok: false, error: REMOTE_UNREACHABLE });
+    expect(stt.status()).toBe('off');
+
+    alive = true;
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(stt.status()).toBe('off');
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(stt.status()).toBe('ready');
+    expect(changes).toContain('ready');
+  });
+
+  it('служба пропала — через 30 секунд состояние возвращается в off', async () => {
+    vi.useFakeTimers();
+    let alive = true;
+    const fetchMock = vi.fn(async () => {
+      if (alive) {
+        return okResponse();
+      }
+      throw new Error('connection refused');
+    });
+    const changes: SttStatus[] = [];
+    const stt = remoteService(fetchMock, (status) => changes.push(status));
+
+    await expect(stt.start()).resolves.toEqual({ ok: true });
+    expect(stt.status()).toBe('ready');
+
+    alive = false;
+    await vi.advanceTimersByTimeAsync(29999);
+    expect(stt.status()).toBe('ready');
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(stt.status()).toBe('off');
+    expect(changes).toContain('off');
+  });
+
+  it('пока служба не отвечает, проверка повторяется каждые 5 секунд', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('connection refused');
+    });
+    const stt = remoteService(fetchMock);
+
+    await stt.start();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('stop прекращает повторные проверки', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async () => {
+      throw new Error('connection refused');
+    });
+    const stt = remoteService(fetchMock);
+
+    await stt.start();
+    const calls = fetchMock.mock.calls.length;
+    stt.stop();
+
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(fetchMock).toHaveBeenCalledTimes(calls);
+    expect(stt.status()).toBe('off');
   });
 });

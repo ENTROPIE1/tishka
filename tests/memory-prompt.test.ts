@@ -1,7 +1,5 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildSystemPrompt } from '../src/core/agent/prompt';
 import { createAgent } from '../src/core/agent/agent';
 import { createEventBus } from '../src/core/events';
@@ -9,8 +7,11 @@ import type { ChatRequest, ChatResponse } from '../src/core/llm/client';
 import { createMemoryStore } from '../src/core/memory/store';
 import { MEMORY_RULES, memoryBlock, type MemoryLine } from '../src/core/memory/prompt';
 import type { ToolRegistry } from '../src/core/types';
+import { cleanupCores, tempDir } from './core-helpers';
 
 const NOW = new Date('2026-10-05T09:30:00');
+
+afterEach(cleanupCores);
 
 const anna: MemoryLine = {
   id: 'anna',
@@ -90,23 +91,19 @@ describe('createAgent с памятью', () => {
   });
 
   it('запись, изменённая между ходами, попадает в следующий запрос новой', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'tishka-memory-prompt-'));
-    try {
-      const store = createMemoryStore({ filePath: join(dir, 'memory.json'), now: () => NOW });
-      await store.load();
-      const saved = await store.add({ text: 'Меня зовут Аня' });
-      const { agent, requests } = makeAgent({ search: (query, limit) => store.search(query, limit) });
+    const dir = await tempDir('tishka-memory-prompt-');
+    const store = createMemoryStore({ filePath: join(dir, 'memory.json'), now: () => NOW });
+    await store.load();
+    const saved = await store.add({ text: 'Меня зовут Аня' });
+    const { agent, requests } = makeAgent({ search: (query, limit) => store.search(query, limit) });
 
-      await agent.handle('Меня зовут Аня');
-      await store.update(saved.id, { text: 'Меня зовут Иван' });
-      await agent.handle('Меня зовут Аня');
+    await agent.handle('Меня зовут Аня');
+    await store.update(saved.id, { text: 'Меня зовут Иван' });
+    await agent.handle('Меня зовут Аня');
 
-      const second = requests[1].messages[0];
-      const content = second.role === 'system' && typeof second.content === 'string' ? second.content : '';
-      expect(content).toContain('Меня зовут Иван');
-      expect(content).not.toContain('Меня зовут Аня');
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+    const second = requests[1].messages[0];
+    const content = second.role === 'system' && typeof second.content === 'string' ? second.content : '';
+    expect(content).toContain('Меня зовут Иван');
+    expect(content).not.toContain('Меня зовут Аня');
   });
 });
