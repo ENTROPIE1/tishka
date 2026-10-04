@@ -129,6 +129,27 @@ body {
   border-color: var(--accent);
 }
 
+.mic.on {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic.soon {
+  animation: mic-soon 1s ease-in-out infinite;
+}
+
+@keyframes mic-soon {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
 .mic-button {
   display: flex;
   align-items: center;

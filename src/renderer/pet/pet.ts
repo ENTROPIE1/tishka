@@ -3,6 +3,7 @@ import { clipForState, type Character } from './character';
 import { createCharacter } from './character-factory';
 import { createListenUi } from './listen-ui';
 import { createPetCard } from './pet-card';
+import { createWakeListener } from './wake-listener';
 
 const bubble = document.getElementById('bubble') as HTMLElement;
 const say = document.getElementById('say') as HTMLElement;
@@ -17,6 +18,7 @@ const listen = createListenUi(() => {
   composer.hidden = false;
   updateBubble();
 });
+createWakeListener({ onConversation: (on) => listen.setConversation(on) });
 
 const STATE_LABELS: Record<PetState, string> = {
   hidden: 'спит за краем',
@@ -149,6 +151,7 @@ function initComposer(): void {
     if (listen.isListening()) {
       listen.escape();
     } else {
+      window.tishka.pet.wakeEscape();
       closeComposer();
     }
   });

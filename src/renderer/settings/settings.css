@@ -90,6 +90,12 @@
   width: 100%;
 }
 
+.checkbox-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
 .text-input:focus,
 .select-input:focus,
 .textarea-input:focus {

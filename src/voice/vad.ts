@@ -4,6 +4,7 @@ export interface VadOptions {
   silenceMs?: number;      // тишина после речи, завершающая фразу
   maxMs?: number;          // максимальная длительность записи
   minSpeechMs?: number;    // минимальная длинная речь, чтобы щелчок не считался
+  noSpeechMs?: number;     // предел ожидания речи; <= 0 — не ограничивать
 }
 
 export interface Vad {
@@ -29,6 +30,7 @@ export function createVad(options: VadOptions = {}): Vad {
   const silenceMs = options.silenceMs ?? 1200;
   const maxMs = options.maxMs ?? 15000;
   const minSpeechMs = options.minSpeechMs ?? 200;
+  const noSpeechMs = options.noSpeechMs ?? NOSPEECH_MS;
 
   let elapsed = 0;
   let noiseSum = 0;
@@ -78,7 +80,7 @@ export function createVad(options: VadOptions = {}): Vad {
       done = true;
       return 'timeout';
     }
-    if (!speechStarted && elapsed >= NOSPEECH_MS) {
+    if (!speechStarted && noSpeechMs > 0 && elapsed >= noSpeechMs) {
       done = true;
       return 'nospeech';
     }

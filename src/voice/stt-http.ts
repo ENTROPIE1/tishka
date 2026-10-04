@@ -54,13 +54,17 @@ export async function probe(fetchFn: typeof fetch, url: string): Promise<boolean
 export async function transcribeHttp(
   fetchFn: typeof fetch,
   url: string,
-  wav: Uint8Array
+  wav: Uint8Array,
+  prompt?: string
 ): Promise<TranscribeResult> {
   const bytes = new Uint8Array(wav.length);
   bytes.set(wav);
   const form = new FormData();
   form.append('file', new Blob([bytes.buffer], { type: 'audio/wav' }), 'audio.wav');
   form.append('response_format', 'json');
+  if (prompt !== undefined && prompt !== '') {
+    form.append('prompt', prompt);
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

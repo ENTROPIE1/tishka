@@ -94,6 +94,8 @@ export interface Config {
   voice: {
     hotkey: string;
     wakeWords: string[];
+    wakeEnabled: boolean;                // откликаться на имя
+    talkTimeoutSec: number;              // уход по тишине в режиме разговора
     sttUrl: string;                      // адрес службы распознавания
     stt: { exe: string; model: string; audioCtx: number; threads: number };   // автозапуск службы; пустой exe — не запускать
     ttsEngine: 'piper' | 'silero' | 'none';

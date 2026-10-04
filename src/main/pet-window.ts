@@ -3,12 +3,11 @@ import { join } from 'node:path';
 import type { Config, EventBus } from '../core/types';
 import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
 import type { ListenCommand } from '../voice/listen';
-import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL } from './ipc-channels';
+import type { WakeState } from '../voice/wake';
+import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
 import { Mover, clamp, type Geometry } from './pet-motion';
 
 const WIDTH = 440;
-// Высота с запасом вверх под облачко до 8 строк, карточку до 300 и персонажа 200.
-// Содержимое прижато к низу, поэтому рост облачка идёт вверх, а ёжик стоит на месте.
 const HEIGHT = 820;
 const TICK_MS = 250;
 const MIN_VISIBLE = 80;
@@ -27,6 +26,8 @@ export interface PetWindow {
   dragBy(deltaX: number): void;
   dragEnd(): void;
   listenCommand(command: ListenCommand): void;
+  wakeState(state: WakeState): void;
+  hide(): void;
   dispose(): void;
 }
 
@@ -42,22 +43,12 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   let restX = clamp(configuredX ?? workArea.x + workArea.width - WIDTH, minX, maxX);
 
   const window = new BrowserWindow({
-    width: WIDTH,
-    height: HEIGHT,
-    x: geometry.hiddenX,
-    y: geometry.y,
-    show: false,
-    frame: false,
-    transparent: true,
-    resizable: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: '#00000000',
+    width: WIDTH, height: HEIGHT, x: geometry.hiddenX, y: geometry.y,
+    show: false, frame: false, transparent: true, resizable: false,
+    alwaysOnTop: true, skipTaskbar: true, hasShadow: false, backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false
+      contextIsolation: true, nodeIntegration: false, backgroundThrottling: false
     }
   });
 
@@ -180,6 +171,17 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     listenCommand(command): void {
       if (!window.isDestroyed()) {
         window.webContents.send(PET_LISTEN_COMMAND_CHANNEL, command);
+      }
+    },
+    wakeState(state): void {
+      if (!window.isDestroyed()) {
+        window.webContents.send(PET_WAKE_STATE_CHANNEL, state);
+      }
+    },
+    hide(): void {
+      mover.stop();
+      if (!window.isDestroyed()) {
+        window.hide();
       }
     },
     dispose(): void {
