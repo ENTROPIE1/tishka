@@ -1,8 +1,8 @@
 import type { PetModel, PetState } from '../../pet/state';
 import { clipForState, type Character } from './character';
+import { createCharacter } from './character-factory';
 import { createListenUi } from './listen-ui';
 import { createPetCard } from './pet-card';
-import { SvgHedgehog } from './svg-hedgehog';
 
 const bubble = document.getElementById('bubble') as HTMLElement;
 const say = document.getElementById('say') as HTMLElement;
@@ -11,7 +11,7 @@ const input = document.getElementById('input') as HTMLInputElement;
 const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
 const stateLabel = document.getElementById('state') as HTMLElement;
-const characterModel: Character = new SvgHedgehog();
+const characterModel: Character = createCharacter('svg');
 const petCard = createPetCard({ element: cardHost, refreshBusy });
 const listen = createListenUi(() => {
   composer.hidden = false;

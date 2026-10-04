@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' file: data:; connect-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Тишка — стенд персонажа</title>
+    <link rel="stylesheet" href="./stand.css" />
+    <link rel="stylesheet" href="../pet/svg-hedgehog.css" />
+  </head>
+  <body>
+    <main class="stand">
+      <section class="stage-pane">
+        <div id="stage" class="stage bg-light">
+          <div id="frame" class="frame" hidden></div>
+          <div id="character" class="character"></div>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="group">
+          <label class="field-label" for="source">Источник персонажа</label>
+          <div class="row">
+            <select id="source" class="select"></select>
+            <button id="reload" type="button" class="button">Перезагрузить</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <span class="field-label">Клипы</span>
+          <div id="clips" class="buttons"></div>
+        </div>
+
+        <div class="group">
+          <span class="field-label">Рот</span>
+          <div class="row">
+            <input id="mouth" class="range" type="range" min="0" max="1" step="0.01" value="0" />
+            <span id="mouth-value" class="value">0.00</span>
+            <button id="talk" type="button" class="button toggle-button">Говорить</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <label class="check">
+            <input id="flip" type="checkbox" />
+            <span>Отразить</span>
+          </label>
+        </div>
+
+        <div class="group">
+          <span class="field-label">Фон</span>
+          <div id="backgrounds" class="buttons">
+            <button class="button" type="button" data-bg="bg-light">Светлый</button>
+            <button class="button" type="button" data-bg="bg-dark">Тёмный</button>
+            <button class="button" type="button" data-bg="bg-checker">Шахматка</button>
+            <button class="button" type="button" data-bg="bg-desktop">Рабочий стол</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <span class="field-label">Размер сцены</span>
+          <div class="row">
+            <input id="scale" class="range" type="range" min="50" max="200" step="10" value="100" />
+            <span id="scale-value" class="value">100 %</span>
+          </div>
+          <label class="check">
+            <input id="show-frame" type="checkbox" />
+            <span>Показать рамку 200×200</span>
+          </label>
+        </div>
+
+        <div class="group">
+          <span class="field-label">Состояния окна-питомца</span>
+          <div id="states" class="buttons"></div>
+        </div>
+
+        <div class="group">
+          <span class="field-label">Сценарий</span>
+          <div class="row">
+            <button id="play" type="button" class="button">Проиграть сценарий</button>
+            <button id="stop" type="button" class="button" disabled>Стоп</button>
+            <span id="script-step" class="value"></span>
+          </div>
+        </div>
+
+        <div class="group">
+          <span class="field-label">Сведения</span>
+          <pre id="info" class="info"></pre>
+        </div>
+      </aside>
+    </main>
+    <script type="module" src="./stand.ts"></script>
+  </body>
+</html>

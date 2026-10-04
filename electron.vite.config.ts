@@ -23,7 +23,8 @@ export default defineConfig({
         input: {
           chat: resolve(__dirname, 'src/renderer/chat/index.html'),
           settings: resolve(__dirname, 'src/renderer/settings/index.html'),
-          pet: resolve(__dirname, 'src/renderer/pet/index.html')
+          pet: resolve(__dirname, 'src/renderer/pet/index.html'),
+          stand: resolve(__dirname, 'src/renderer/stand/index.html')
         }
       }
     }

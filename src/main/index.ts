@@ -18,6 +18,7 @@ import { createPetListen } from './pet-listen';
 import { createPetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
 import { closeSettingsWindow, openSettingsWindow } from './settings-window';
+import { openStandWindow } from './stand-window';
 
 const bus = createEventBus();
 let core: TishkaCore | undefined;
@@ -44,6 +45,15 @@ function voiceRestartNeeded(previous: Config, next: Config): boolean {
     before.stt.exe !== after.stt.exe ||
     before.stt.model !== after.stt.model
   );
+}
+
+// При запуске со стендом открывается он, иначе — обычное окно чата.
+function openStartupWindow(): void {
+  if (process.env['TISHKA_STAND'] === '1') {
+    openStandWindow();
+  } else {
+    openChatWindow();
+  }
 }
 
 app.whenReady().then(async () => {
@@ -111,6 +121,7 @@ app.whenReady().then(async () => {
     wake: () => pet?.wake('name'),
     openChat: openChatWindow,
     openSettings: openSettingsWindow,
+    openStand: openStandWindow,
     getPetMode: () => tishka.config().petMode,
     setPetMode: (value) => {
       void tishka.saveConfig({ ...tishka.config(), petMode: value });
@@ -129,10 +140,10 @@ app.whenReady().then(async () => {
   // Служба распознавания поднимается в фоне, чтобы не задерживать окна.
   void sttService.start().catch(() => undefined);
 
-  openChatWindow();
+  openStartupWindow();
 
   app.on('activate', () => {
-    openChatWindow();
+    openStartupWindow();
   });
 });
 
