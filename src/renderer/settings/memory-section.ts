@@ -1,5 +1,6 @@
 import type { MemoryRecord } from '../../core/memory/store';
-import { button, clear, el, field, sectionTitle, textInput, textarea, type SettingsSection } from './dom';
+import { button, clear, el, sectionTitle, textInput, type SettingsSection } from './dom';
+import { createMemoryEditor } from './memory-editor';
 
 const MONTHS = [
   'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
@@ -53,6 +54,7 @@ export function mountMemorySection(root: HTMLElement): SettingsSection {
   root.append(actions, list, messages);
 
   let query = '';
+  let editor: HTMLElement | undefined;
 
   function show(error?: string, ok?: string): void {
     clear(messages);
@@ -73,6 +75,13 @@ export function mountMemorySection(root: HTMLElement): SettingsSection {
     }
   }
 
+  // Снимаем редактор и сразу перечитываем список из хранилища.
+  function closeEditor(): void {
+    editor?.remove();
+    editor = undefined;
+    void refresh();
+  }
+
   async function removeRecord(id: string): Promise<void> {
     try {
       await window.tishka.memory.remove(id);
@@ -84,35 +93,11 @@ export function mountMemorySection(root: HTMLElement): SettingsSection {
   }
 
   function openEditor(record: MemoryRecord): void {
+    if (editor !== undefined) {
+      return;
+    }
     clear(list);
-    const text = textarea(record.text);
-    const tags = textInput(record.tags.join(', '));
-    const save = button('Сохранить');
-    const cancel = button('Отмена', 'button button-secondary');
-    const buttons = el('div', 'row');
-    buttons.append(save, cancel);
-    const editor = el('div', 'editor');
-    editor.append(field('Текст', text), field('Метки через запятую', tags), buttons);
-
-    save.addEventListener('click', () => {
-      void (async () => {
-        const parsedTags = tags.value
-          .split(',')
-          .map((tag) => tag.trim())
-          .filter((tag) => tag !== '');
-        try {
-          await window.tishka.memory.update(record.id, { text: text.value, tags: parsedTags });
-          show(undefined, 'Запись обновлена');
-          await refresh();
-        } catch (error) {
-          show(error instanceof Error ? error.message : String(error));
-        }
-      })();
-    });
-    cancel.addEventListener('click', () => {
-      void refresh();
-    });
-
+    editor = createMemoryEditor({ record, onMessage: show, onClose: closeEditor });
     list.append(editor);
   }
 
@@ -138,8 +123,13 @@ export function mountMemorySection(root: HTMLElement): SettingsSection {
   }
 
   function render(records: MemoryRecord[]): void {
-    // Открытый редактор не закрываем и не затираем введённый текст.
-    if (list.querySelector('.editor') !== null) {
+    // Редактор мог снять экран (Esc в оболочке) — тогда считаем его закрытым.
+    if (editor !== undefined && editor.parentNode === null) {
+      editor = undefined;
+    }
+    // Пока редактор открыт, не затираем введённый текст; после закрытия список
+    // перечитывается заново через closeEditor().
+    if (editor !== undefined) {
       return;
     }
     clear(list);
@@ -172,7 +162,7 @@ export function mountMemorySection(root: HTMLElement): SettingsSection {
     })();
   });
 
-  // Ядро сообщает об изменении памяти: открытый экран обновляется сразу.
+  // Об изменении памяти сообщает ядро; открытый редактор при этом не трогаем.
   window.tishka.onEvent((event) => {
     if (event.type === 'memory.changed') {
       void refresh();
