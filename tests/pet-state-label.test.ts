@@ -11,4 +11,9 @@ describe('stateLabel: ожидание готовности распознава
     expect(stateLabel('thinking', true)).toBe('думает');
     expect(stateLabel('idle', true)).toBe('ждёт');
   });
+
+  it('во время приветствия подпись — «говорит», даже пока служба не готова', () => {
+    expect(stateLabel('listening', false, true)).toBe('говорит');
+    expect(stateLabel('listening', true, true)).toBe('говорит');
+  });
 });

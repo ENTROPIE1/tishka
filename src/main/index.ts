@@ -151,6 +151,7 @@ app.whenReady().then(async () => {
   pet = createPetWindow({
     bus,
     getConfig: () => tishka.config(),
+    isReady: () => sttService.status() === 'ready',
     // Позиция пишется в файл напрямую, чтобы перетаскивание не переподключало MCP.
     savePetX: (x) => persistConfig(dataDir, { ...tishka.config(), pet: { x } }),
     // Перезагрузка окна уничтожает звук: ожидающее обещание речи завершается.

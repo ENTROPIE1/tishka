@@ -1,6 +1,6 @@
 import type { Config, EventBus } from '../core/types';
 import type { TimingMark } from './timing-log';
-import { CANNED, CANNED_TEXTS } from '../voice/canned';
+import { CANNED, CANNED_TEXTS, greetingFor } from '../voice/canned';
 import { createSpeechQueue, type SpeakMessage } from '../voice/speech-queue';
 import { prepareForSpeech } from '../voice/speech-text';
 import { createTtsClient, type TtsHealth } from '../voice/tts-client';
@@ -131,7 +131,7 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
         // Приветствие «Слушаю» уместно, только когда человек позвал Тишку сам
         // и запись действительно возможна; уведомление по триггеру не в счёт.
         if (event.source !== 'trigger') {
-          schedule(deps.isReady?.() === false ? CANNED.neutral : CANNED.greeting, false);
+          schedule(greetingFor(deps.isReady?.() !== false), false);
         }
         return;
       case 'listen.start':

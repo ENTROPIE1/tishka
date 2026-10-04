@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Panel, TishkaEvent } from '../src/core/types';
 import { initialPet, onEvent, onTick, requestLeave, type PetModel, type PetOpts } from '../src/pet/state';
+import { CANNED } from '../src/voice/canned';
 
 const MODE_OFF: PetOpts = { petMode: false };
 const MODE_ON: PetOpts = { petMode: true };
@@ -343,5 +344,61 @@ describe('реплика из чата основного окна', () => {
     model = onTick(model, 901, MODE_OFF);
     expect(model.state).toBe('notify');
     expect(model.say).toBe('Купить хлеб');
+  });
+});
+
+describe('pet state: приветствие согласовано с облачком', () => {
+  const NOT_READY: PetOpts = { petMode: false, ready: false };
+  const READY: PetOpts = { petMode: false, ready: true };
+
+  function appearing(now: number, opts: PetOpts): PetModel {
+    const model = fire(initialPet(now), { type: 'wake', source: 'name' }, now, opts);
+    return onTick(model, now + 900, opts);
+  }
+
+  it('неготовое распознавание: в облачке нейтральное приветствие, без «Слушаю»', () => {
+    let model = fire(initialPet(0), { type: 'wake', source: 'name' }, 0, NOT_READY);
+    expect(model.say).toBe(CANNED.neutral);
+    expect(model.greeting).toBe(true);
+
+    model = onTick(model, 900, NOT_READY);
+    expect(model.state).toBe('listening');
+    expect(model.say).toBe(CANNED.neutral);
+  });
+
+  it('готовая запись: приветствие «Слушаю», после конца речи — запись', () => {
+    let model = appearing(0, READY);
+    expect(model.state).toBe('listening');
+    expect(model.say).toBe(CANNED.greeting);
+
+    model = fire(model, { type: 'speak.end' }, 901, READY);
+    expect(model.state).toBe('listening');
+    expect(model.greeting).toBeUndefined();
+    expect(model.say).toBeUndefined();
+  });
+
+  it('речь выключена: приветствие держится, затем облачко очищается', () => {
+    let model = appearing(0, READY);
+    const end = 900 + 1500 + CANNED.greeting.length * 60;
+
+    model = onTick(model, end - 1, READY);
+    expect(model.say).toBe(CANNED.greeting);
+
+    model = onTick(model, end, READY);
+    expect(model.greeting).toBeUndefined();
+    expect(model.say).toBeUndefined();
+  });
+
+  it('уведомление по триггеру приветствием не считается', () => {
+    const model = fire(initialPet(0), { type: 'wake', source: 'trigger' }, 0, READY);
+    expect(model.say).toBeUndefined();
+    expect(model.greeting).toBeUndefined();
+  });
+
+  it('уход во время приветствия его не ждёт и очищает облачко', () => {
+    const model = requestLeave(fire(initialPet(0), { type: 'wake', source: 'click' }, 0, READY), 1);
+    expect(model.state).toBe('leave');
+    expect(model.greeting).toBeUndefined();
+    expect(model.say).toBeUndefined();
   });
 });

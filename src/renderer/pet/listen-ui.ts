@@ -3,6 +3,26 @@ import { createVad } from '../../voice/vad';
 
 export const LISTEN_SAY = 'Слушаю…';
 
+export interface BubbleSay {
+  modelSay?: string;      // текст ответа или приветствия, пришедший из ядра
+  state: string;
+  listening: boolean;     // идёт запись по вызову или кнопке
+  conversation: boolean;  // включён режим разговора
+  error?: string;
+}
+
+// Что показывать в облачке: текст приветствия или ответа важнее «Слушаю…»,
+// а «Слушаю…» — только пока действительно идёт запись.
+export function bubbleSay(input: BubbleSay): string {
+  if (input.modelSay !== undefined && input.modelSay !== '') {
+    return input.modelSay;
+  }
+  if (input.listening || input.conversation) {
+    return LISTEN_SAY;
+  }
+  return input.state === 'confused' ? (input.error ?? '') : '';
+}
+
 export interface ListenUi {
   isListening(): boolean;
   escape(): void;
@@ -77,13 +97,7 @@ export function createListenUi(onStart: () => void, getThreshold?: () => number 
       if (state !== 'confused') {
         error = '';
       }
-      if (listening) {
-        return LISTEN_SAY;
-      }
-      if (conversation) {
-        return modelSay ?? LISTEN_SAY;
-      }
-      return modelSay ?? (state === 'confused' ? error : '');
+      return bubbleSay({ modelSay, state, listening, conversation, error });
     }
   };
 }

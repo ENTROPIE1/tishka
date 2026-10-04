@@ -14,3 +14,8 @@ export const CANNED_TEXTS: string[] = [
   CANNED.error,
   CANNED.farewell
 ];
+
+// Приветствие «слушаю» уместно, только когда распознавание уже готово.
+export function greetingFor(ready: boolean): string {
+  return ready ? CANNED.greeting : CANNED.neutral;
+}
