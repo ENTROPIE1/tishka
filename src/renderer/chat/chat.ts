@@ -1,6 +1,7 @@
 import { createMicButton } from '../shared/mic-button';
 import { insertAtCursor } from '../shared/text-insert';
 import { createChatFeed } from './feed';
+import { initAppShell } from './navigation';
 
 const feed = document.getElementById('feed') as HTMLElement;
 const statusLine = document.getElementById('status') as HTMLElement;
@@ -13,6 +14,7 @@ const noKeyBanner = document.getElementById('no-key') as HTMLElement;
 const micSlot = document.getElementById('mic-slot') as HTMLElement;
 const dictation = document.getElementById('dictation') as HTMLElement;
 const dictationLevel = document.getElementById('dictation-level') as HTMLElement;
+const keyDot = document.getElementById('key-dot') as HTMLElement;
 
 const view = createChatFeed(feed);
 
@@ -157,8 +159,10 @@ async function refreshKeyState(): Promise<void> {
   try {
     const view = await window.tishka.config.get();
     noKeyBanner.hidden = view.gatewayKeySet;
+    keyDot.classList.toggle('set', view.gatewayKeySet);
   } catch {
     noKeyBanner.hidden = true;
+    keyDot.classList.remove('set');
   }
 }
 
@@ -170,6 +174,7 @@ window.tishka.config.onChanged(() => {
   void refreshKeyState();
 });
 
+initAppShell();
 initEvents();
 initFeed();
 initComposer();

@@ -2,10 +2,11 @@ import type { Panel } from '../../core/types';
 import { markdownToPlain, renderMarkdown } from './markdown';
 
 const COPY_FEEDBACK_MS = 1000;
+const COPY_ERROR_MS = 2000;
 
 export interface PanelActions {
-  onCopy?: (text: string) => void;
-  onCopyRich?: (html: string, text: string) => void;   // текстовая карточка: html и чистый текст сразу
+  onCopy?: (text: string) => void | Promise<void>;
+  onCopyRich?: (html: string, text: string) => void | Promise<void>;   // текстовая карточка: html и чистый текст сразу
   onOpenChat?: () => void;
   onClose?: () => void;
 }
@@ -33,6 +34,36 @@ export function copyTextForPanel(panel: Panel): string {
     return lines.join('\n');
   }
   return panel.path;
+}
+
+function plainCopyText(panel: Panel): string {
+  return panel.kind === 'text' ? markdownToPlain(panel.markdown) : copyTextForPanel(panel);
+}
+
+// Копирует карточку: сначала с оформлением, при сбое — чистым текстом.
+// Бросает ошибку, если не удалось ни то, ни другое.
+async function performCopy(actions: PanelActions, panel: Panel): Promise<void> {
+  const rich = actions.onCopyRich;
+  if (panel.kind === 'text' && rich !== undefined) {
+    try {
+      await rich(renderMarkdown(panel.markdown), markdownToPlain(panel.markdown));
+      return;
+    } catch {
+      // Оформление не прошло — пробуем чистый текст ниже.
+    }
+  }
+  const plain = actions.onCopy;
+  if (plain === undefined) {
+    throw new Error('Не удалось скопировать');
+  }
+  await plain(plainCopyText(panel));
+}
+
+function showCopyResult(button: HTMLButtonElement, text: string, timeout: number): void {
+  button.textContent = text;
+  window.setTimeout(() => {
+    button.textContent = 'Копировать';
+  }, timeout);
 }
 
 function panelBody(panel: Panel): HTMLElement {
@@ -113,23 +144,20 @@ export function panelElement(panel: Panel, actions: PanelActions = {}): HTMLElem
   row.className = 'card-actions';
 
   if (actions.onCopy !== undefined || actions.onCopyRich !== undefined) {
-    const copy = actions.onCopy;
-    const copyRich = actions.onCopyRich;
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
     copyButton.className = 'card-copy';
     copyButton.textContent = 'Копировать';
     copyButton.addEventListener('click', () => {
-      if (panel.kind === 'text' && copyRich !== undefined) {
-        // Заголовок карточки в буфер не попадает: копируется только markdown.
-        copyRich(renderMarkdown(panel.markdown), markdownToPlain(panel.markdown));
-      } else {
-        copy?.(copyTextForPanel(panel));
-      }
-      copyButton.textContent = 'Скопировано';
-      window.setTimeout(() => {
-        copyButton.textContent = 'Копировать';
-      }, COPY_FEEDBACK_MS);
+      // Заголовок карточки в буфер не попадает: копируется только markdown.
+      void (async () => {
+        try {
+          await performCopy(actions, panel);
+          showCopyResult(copyButton, 'Скопировано', COPY_FEEDBACK_MS);
+        } catch {
+          showCopyResult(copyButton, 'Не удалось скопировать', COPY_ERROR_MS);
+        }
+      })();
     });
     row.append(copyButton);
   }

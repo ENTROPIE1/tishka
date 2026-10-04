@@ -7,44 +7,102 @@
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' file: data:; connect-src 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Тишка — чат</title>
+    <title>Тишка</title>
     <link rel="stylesheet" href="./chat.css" />
+    <link rel="stylesheet" href="../settings/settings.css" />
+    <link rel="stylesheet" href="./shell.css" />
   </head>
   <body>
-    <header class="topbar">
-      <span class="topbar-title">Тишка</span>
-      <div class="topbar-actions">
-        <button id="open-settings" type="button" class="ghost-button">Подключения</button>
-        <button id="clear-history" type="button" class="ghost-button">Очистить историю</button>
+    <nav id="nav" class="nav">
+      <button class="nav-item active" data-screen="chat" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
+        <span>Чат</span>
+      </button>
+      <button class="nav-item" data-screen="connections" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6-6M8 8l-2 2a4 4 0 000 6l2 2M16 16l2-2a4 4 0 000-6l-2-2" /></svg>
+        <span>Подключения</span>
+      </button>
+      <button class="nav-item" data-screen="memory" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6c0-1 1.8-2 8-2s8 1 8 2-1.8 2-8 2-8-1-8-2zM4 6v12c0 1 1.8 2 8 2s8-1 8-2V6M4 12c0 1 1.8 2 8 2s8-1 8-2" /></svg>
+        <span>Память</span>
+      </button>
+      <button class="nav-item" data-screen="voice" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 013 3v6a3 3 0 01-6 0V6a3 3 0 013-3zM6 11a6 6 0 0012 0M12 17v4" /></svg>
+        <span>Голос</span>
+      </button>
+      <button class="nav-item" data-screen="persona" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4z" /></svg>
+        <span>Характер</span>
+      </button>
+      <div class="nav-key">
+        <span id="key-dot" class="key-dot"></span>
+        <span>Ключ шлюза</span>
       </div>
-    </header>
+    </nav>
 
-    <main id="feed" class="feed" aria-live="polite"></main>
+    <div class="workspace">
+      <section id="screen-chat" class="screen">
+        <header class="topbar">
+          <span class="topbar-title">Тишка</span>
+          <div class="topbar-actions">
+            <button id="open-settings" type="button" class="ghost-button">Подключения</button>
+            <button id="clear-history" type="button" class="ghost-button">Очистить историю</button>
+          </div>
+        </header>
 
-    <div id="status" class="status" hidden></div>
+        <main id="feed" class="feed" aria-live="polite"></main>
 
-    <div id="no-key" class="banner" hidden>
-      <span>Ключ шлюза не задан</span>
-      <button id="open-settings-banner" type="button" class="ghost-button">Открыть подключения</button>
+        <div id="status" class="status" hidden></div>
+
+        <div id="no-key" class="banner" hidden>
+          <span>Ключ шлюза не задан</span>
+          <button id="open-settings-banner" type="button" class="ghost-button">Открыть подключения</button>
+        </div>
+
+        <footer class="composer">
+          <div class="composer-row">
+            <span id="mic-slot" class="mic-slot"></span>
+            <textarea
+              id="input"
+              class="composer-input"
+              rows="1"
+              placeholder="Написать Тишке…"
+              autofocus
+            ></textarea>
+            <button id="send" type="button" class="send-button">Отправить</button>
+          </div>
+          <div id="dictation" class="dictation" hidden>
+            <div class="level"><div id="dictation-level" class="level-fill"></div></div>
+            <span class="dictation-label">Слушаю…</span>
+          </div>
+        </footer>
+      </section>
+
+      <section id="screen-connections" class="screen settings-screen" hidden>
+        <div class="settings">
+          <section id="model-section" class="section"></section>
+          <section id="connections-section" class="section"></section>
+        </div>
+      </section>
+
+      <section id="screen-memory" class="screen settings-screen" hidden>
+        <div class="settings">
+          <section id="memory-section" class="section"></section>
+        </div>
+      </section>
+
+      <section id="screen-voice" class="screen settings-screen" hidden>
+        <div class="settings">
+          <section id="voice-section" class="section"></section>
+        </div>
+      </section>
+
+      <section id="screen-persona" class="screen settings-screen" hidden>
+        <div class="settings">
+          <section id="persona-section" class="section"></section>
+        </div>
+      </section>
     </div>
-
-    <footer class="composer">
-      <div class="composer-row">
-        <span id="mic-slot" class="mic-slot"></span>
-        <textarea
-          id="input"
-          class="composer-input"
-          rows="1"
-          placeholder="Написать Тишке…"
-          autofocus
-        ></textarea>
-        <button id="send" type="button" class="send-button">Отправить</button>
-      </div>
-      <div id="dictation" class="dictation" hidden>
-        <div class="level"><div id="dictation-level" class="level-fill"></div></div>
-        <span class="dictation-label">Слушаю…</span>
-      </div>
-    </footer>
 
     <script type="module" src="./chat.ts"></script>
   </body>

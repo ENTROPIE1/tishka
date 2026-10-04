@@ -8,12 +8,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function clickCopy(card: HTMLElement): void {
+function copyButton(card: HTMLElement): HTMLButtonElement {
   const button = card.querySelector<HTMLButtonElement>('.card-copy');
   if (button === null) {
     throw new Error('Кнопка копирования не найдена');
   }
-  button.click();
+  return button;
+}
+
+function clickCopy(card: HTMLElement): void {
+  copyButton(card).click();
+}
+
+async function tick(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe('panelElement: копирование', () => {
@@ -42,5 +50,44 @@ describe('panelElement: копирование', () => {
 
     expect(onCopy).toHaveBeenCalledWith('Планёрка\n10:00');
     expect(onCopyRich).not.toHaveBeenCalled();
+  });
+});
+
+describe('panelElement: сообщение о копировании', () => {
+  it('успех показывает «Скопировано»', async () => {
+    const panel: Panel = { kind: 'text', title: 'Итог', markdown: '**важно**' };
+    const onCopyRich = vi.fn(() => Promise.resolve());
+    const onCopy = vi.fn(() => Promise.resolve());
+    const card = panelElement(panel, { onCopy, onCopyRich });
+
+    clickCopy(card);
+    await tick();
+
+    expect(copyButton(card).textContent).toBe('Скопировано');
+  });
+
+  it('сбой оформления и успех текста показывает «Скопировано»', async () => {
+    const panel: Panel = { kind: 'text', title: 'Итог', markdown: '**важно**' };
+    const onCopyRich = vi.fn(() => Promise.reject(new Error('нет html')));
+    const onCopy = vi.fn(() => Promise.resolve());
+    const card = panelElement(panel, { onCopy, onCopyRich });
+
+    clickCopy(card);
+    await tick();
+
+    expect(onCopy).toHaveBeenCalledOnce();
+    expect(copyButton(card).textContent).toBe('Скопировано');
+  });
+
+  it('сбой обоих способов показывает «Не удалось скопировать»', async () => {
+    const panel: Panel = { kind: 'text', title: 'Итог', markdown: '**важно**' };
+    const onCopyRich = vi.fn(() => Promise.reject(new Error('нет html')));
+    const onCopy = vi.fn(() => Promise.reject(new Error('нет текста')));
+    const card = panelElement(panel, { onCopy, onCopyRich });
+
+    clickCopy(card);
+    await tick();
+
+    expect(copyButton(card).textContent).toBe('Не удалось скопировать');
   });
 });

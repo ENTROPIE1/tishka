@@ -1,19 +1,41 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
+import { NAVIGATE_CHANNEL } from './ipc-channels';
 
-const WINDOW_WIDTH = 760;
-const WINDOW_HEIGHT = 600;
+const WINDOW_WIDTH = 900;
+const WINDOW_HEIGHT = 640;
 
-let chatWindow: BrowserWindow | undefined;
+export type MainScreen = 'chat' | 'connections' | 'memory' | 'voice' | 'persona';
 
-// Одно окно чата на приложение: повторный вызов поднимает и фокусирует его.
-export function openChatWindow(): void {
-  if (chatWindow !== undefined && !chatWindow.isDestroyed()) {
-    if (chatWindow.isMinimized()) {
-      chatWindow.restore();
+let mainWindow: BrowserWindow | undefined;
+
+function raise(window: BrowserWindow): void {
+  if (window.isMinimized()) {
+    window.restore();
+  }
+  window.show();
+  window.focus();
+}
+
+// Экран можно показать только после загрузки страницы, иначе сообщение теряется.
+function navigate(window: BrowserWindow, screen: MainScreen): void {
+  if (window.webContents.isLoading()) {
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.send(NAVIGATE_CHANNEL, screen);
+    });
+    return;
+  }
+  window.webContents.send(NAVIGATE_CHANNEL, screen);
+}
+
+// Одно основное окно на приложение. Без имени экрана окно только поднимается,
+// с именем — ещё и переключается на нужный экран.
+export function openMainWindow(screen?: MainScreen): void {
+  if (mainWindow !== undefined && !mainWindow.isDestroyed()) {
+    raise(mainWindow);
+    if (screen !== undefined) {
+      navigate(mainWindow, screen);
     }
-    chatWindow.show();
-    chatWindow.focus();
     return;
   }
 
@@ -39,10 +61,17 @@ export function openChatWindow(): void {
   window.webContents.session.setPermissionCheckHandler((_contents, permission) => permission === 'media');
 
   window.on('closed', () => {
-    if (chatWindow === window) {
-      chatWindow = undefined;
+    if (mainWindow === window) {
+      mainWindow = undefined;
     }
   });
+
+  // Новое окно ещё не загружено: экран отправляется после загрузки страницы.
+  if (screen !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.send(NAVIGATE_CHANNEL, screen);
+    });
+  }
 
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   if (rendererUrl !== undefined) {
@@ -51,5 +80,5 @@ export function openChatWindow(): void {
     void window.loadFile(join(__dirname, '../renderer/chat/index.html'));
   }
 
-  chatWindow = window;
+  mainWindow = window;
 }

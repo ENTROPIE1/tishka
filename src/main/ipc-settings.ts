@@ -5,7 +5,6 @@ import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { Config, SecretStore } from '../core/types';
 import { broadcastConfigChanged } from './ipc';
 import {
-  CLOSE_SETTINGS_CHANNEL,
   CONFIG_GET_CHANNEL,
   CONFIG_SAVE_CHANNEL,
   CONNECTIONS_PLAN_CHANNEL,
@@ -20,7 +19,7 @@ import {
   MEMORY_UPDATE_CHANNEL,
   OPEN_SETTINGS_CHANNEL
 } from './ipc-channels';
-import { closeSettingsWindow, openSettingsWindow } from './settings-window';
+import { openMainWindow } from './chat-window';
 import {
   configView,
   planDraft,
@@ -102,11 +101,7 @@ export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore, hook
   );
 
   ipcMain.handle(OPEN_SETTINGS_CHANNEL, () => {
-    openSettingsWindow();
-  });
-
-  ipcMain.handle(CLOSE_SETTINGS_CHANNEL, () => {
-    closeSettingsWindow();
+    openMainWindow('connections');
   });
 
   ipcMain.handle(MEMORY_LIST_CHANNEL, (): MemoryRecord[] => core.memory());

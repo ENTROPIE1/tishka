@@ -15,7 +15,6 @@ import type {
   VoiceStateView
 } from './ipc-settings';
 import {
-  CLOSE_SETTINGS_CHANNEL,
   CONFIG_CHANGED_CHANNEL,
   CONFIG_GET_CHANNEL,
   CONFIG_SAVE_CHANNEL,
@@ -34,6 +33,7 @@ import {
   MEMORY_REMOVE_CHANNEL,
   MEMORY_SEARCH_CHANNEL,
   MEMORY_UPDATE_CHANNEL,
+  NAVIGATE_CHANNEL,
   OPEN_CHAT_CHANNEL,
   OPEN_EXTERNAL_CHANNEL,
   OPEN_SETTINGS_CHANNEL,
@@ -137,8 +137,14 @@ const api = {
   openSettings(): Promise<void> {
     return ipcRenderer.invoke(OPEN_SETTINGS_CHANNEL);
   },
-  closeSettings(): Promise<void> {
-    return ipcRenderer.invoke(CLOSE_SETTINGS_CHANNEL);
+  onNavigate(listener: (screen: string) => void): () => void {
+    const handler = (_event: Electron.IpcRendererEvent, screen: string): void => {
+      listener(screen);
+    };
+    ipcRenderer.on(NAVIGATE_CHANNEL, handler);
+    return () => {
+      ipcRenderer.removeListener(NAVIGATE_CHANNEL, handler);
+    };
   },
   memory: {
     list: (): Promise<MemoryRecord[]> => ipcRenderer.invoke(MEMORY_LIST_CHANNEL),

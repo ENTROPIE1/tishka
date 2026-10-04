@@ -37,30 +37,6 @@
   display: none !important;
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  font-family: "Segoe UI", system-ui, sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
-  background: var(--bg);
-  color: var(--text);
-}
-
-.topbar {
-  display: flex;
-  align-items: center;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.topbar-title {
-  font-weight: 600;
-}
-
 .settings {
   flex: 1;
   width: 100%;
@@ -253,17 +229,6 @@ body {
   font-size: 13px;
   color: var(--muted);
   margin-bottom: 12px;
-}
-
-.bottombar {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--border);
-  background: var(--surface);
 }
 
 .state {

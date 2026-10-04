@@ -7,7 +7,7 @@ import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { createSttService, type SttService } from '../voice/stt-service';
-import { openChatWindow } from './chat-window';
+import { openMainWindow } from './chat-window';
 import { OPEN_CHAT_CHANNEL } from './ipc-channels';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
@@ -17,7 +17,6 @@ import { registerPetIpc } from './pet-ipc';
 import { createPetListen } from './pet-listen';
 import { createPetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
-import { closeSettingsWindow, openSettingsWindow } from './settings-window';
 import { openStandWindow } from './stand-window';
 
 const bus = createEventBus();
@@ -33,7 +32,7 @@ if (!singleInstance) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    openChatWindow();
+    openMainWindow();
   });
 }
 
@@ -52,7 +51,7 @@ function openStartupWindow(): void {
   if (process.env['TISHKA_STAND'] === '1') {
     openStandWindow();
   } else {
-    openChatWindow();
+    openMainWindow('chat');
   }
 }
 
@@ -89,8 +88,7 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.handle(OPEN_CHAT_CHANNEL, () => {
-    closeSettingsWindow();
-    openChatWindow();
+    openMainWindow('chat');
   });
 
   try {
@@ -119,8 +117,8 @@ app.whenReady().then(async () => {
 
   tray = createPetTray({
     wake: () => pet?.wake('name'),
-    openChat: openChatWindow,
-    openSettings: openSettingsWindow,
+    openChat: () => openMainWindow('chat'),
+    openSettings: () => openMainWindow('connections'),
     openStand: openStandWindow,
     getPetMode: () => tishka.config().petMode,
     setPetMode: (value) => {
