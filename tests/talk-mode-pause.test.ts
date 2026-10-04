@@ -22,22 +22,18 @@ interface Harness {
   apply: (value: ChatTalkState) => void;
   starts: number;
   stops: number;
-  pauses: number;
-  resumes: number;
+  pauses: boolean[];
 }
 
 function harness(): Harness {
-  const result: Harness = { apply: () => undefined, starts: 0, stops: 0, pauses: 0, resumes: 0 };
+  const result: Harness = { apply: () => undefined, starts: 0, stops: 0, pauses: [] };
   const listener: PhraseListener = {
     start: async () => {
       result.starts += 1;
       return true;
     },
-    pause: () => {
-      result.pauses += 1;
-    },
-    resume: () => {
-      result.resumes += 1;
+    pause: (value) => {
+      result.pauses.push(value);
     },
     stop: () => {
       result.stops += 1;
@@ -94,7 +90,7 @@ describe('talk-mode: пауза калибровки', () => {
     expect(mode?.button.classList.contains('active')).toBe(false);
   });
 
-  it('набор текста ставит запись на паузу и снимает её через 2 секунды', async () => {
+  it('набор текста ставит запись на паузу и снимает её через 2 секунды после последнего нажатия', async () => {
     vi.useFakeTimers();
     const h = harness();
     h.apply(state(true, true));
@@ -102,17 +98,18 @@ describe('talk-mode: пауза калибровки', () => {
     expect(h.starts).toBe(1);
 
     mode?.keyboard();
-    expect(h.pauses).toBe(1);
-    expect(h.resumes).toBe(0);
+    expect(h.pauses).toEqual([true]);
     expect(mode?.button.classList.contains('active')).toBe(true);
 
     await vi.advanceTimersByTimeAsync(1500);
     mode?.keyboard();
-    expect(h.pauses).toBe(2);
-    expect(h.resumes).toBe(0);
+    expect(h.pauses).toEqual([true]);
 
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(h.resumes).toBe(1);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(h.pauses).toEqual([true]);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(h.pauses).toEqual([true, false]);
     vi.useRealTimers();
   });
 });

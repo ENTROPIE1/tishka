@@ -23,8 +23,7 @@ export interface PhraseListenerOptions {
 
 export interface PhraseListener {
   start(): Promise<boolean>;
-  pause(): void;
-  resume(): void;
+  pause(active: boolean): void;
   stop(): void;
 }
 
@@ -163,22 +162,20 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     return true;
   }
 
-  // Пауза на время набора текста: микрофон открыт, но кадры не разбираются,
-  // начатая фраза отбрасывается без распознавания.
-  function pause(): void {
-    if (!active) {
+  // Идущая запись отбрасывается без распознавания: при паузе сбрасываем и
+  // накопленные кадры, и состояние детектора речи. Микрофон при этом открыт.
+  function pause(value: boolean): void {
+    if (paused === value) {
       return;
     }
-    paused = true;
-    capturing = false;
-    phraseFrames = [];
-    preRoll = [];
-    preRollMs = 0;
-    vad?.reset();
-  }
-
-  function resume(): void {
-    paused = false;
+    paused = value;
+    if (value) {
+      capturing = false;
+      phraseFrames = [];
+      preRoll = [];
+      preRollMs = 0;
+      vad?.reset();
+    }
   }
 
   function stop(): void {
@@ -193,5 +190,5 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     capture.stop();
   }
 
-  return { start, pause, resume, stop };
+  return { start, pause, stop };
 }

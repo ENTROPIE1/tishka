@@ -151,6 +151,7 @@ function initCharacter(): void {
     dragging = true;
     dragMoved = false;
     dragLastX = event.screenX;
+    wake.beginDrag();
     interactivity.set(true);
     event.preventDefault();
   });
@@ -177,6 +178,7 @@ function initPointer(): void {
     }
     dragging = false;
     window.tishka.pet.dragEnd();
+    wake.endDrag();
     if (!dragMoved) {
       openComposer();
     }

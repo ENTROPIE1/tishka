@@ -68,7 +68,6 @@ describe('тёплое состояние окна-питомца', () => {
         return true;
       },
       pause: () => undefined,
-      resume: () => undefined,
       stop: () => {
         stops.push(1);
       }

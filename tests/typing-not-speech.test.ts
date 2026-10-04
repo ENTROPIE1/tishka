@@ -124,9 +124,9 @@ describe('phrase-listener: пауза на время набора', () => {
     await listener.start();
 
     mic.push(0.1, 30);
-    listener.pause();
+    listener.pause(true);
     mic.push(0.1, 30);
-    listener.resume();
+    listener.pause(false);
     mic.push(0.002, 60);
     expect(phrases).toHaveLength(0);
 

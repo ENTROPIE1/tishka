@@ -1,9 +1,9 @@
 import { createPhraseListener, type PhraseListener, type PhraseListenerOptions } from '../shared/phrase-listener';
+import { createListenPause, DRAG_RESUME_MS, TYPING_RESUME_MS } from '../shared/listen-pause';
 import type { VadSensitivity } from '../../voice/vad';
 
 const MIC_RETRY_MS = 30000;
 const MIC_ERROR = 'Не слышу микрофон';
-const LISTEN_PAUSE_MS = 2000;
 
 export interface WakeListenerDeps {
   onConversation?(on: boolean): void;
@@ -14,6 +14,8 @@ export interface WakeListenerDeps {
 export interface WakeListener {
   setActive(active: boolean): void;
   keyboard(): void;
+  beginDrag(): void;
+  endDrag(): void;
   dispose(): void;
 }
 
@@ -31,34 +33,14 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let threshold: number | undefined;
   let listener: PhraseListener | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
-  let pauseTimer: ReturnType<typeof setTimeout> | undefined;
+  let dragging = false;
+  const pause = createListenPause((value) => listener?.pause(value));
 
   function clearRetry(): void {
     if (retryTimer !== undefined) {
       clearTimeout(retryTimer);
       retryTimer = undefined;
     }
-  }
-
-  function clearPause(): void {
-    if (pauseTimer !== undefined) {
-      clearTimeout(pauseTimer);
-      pauseTimer = undefined;
-    }
-  }
-
-  // Набор текста в строке ежа: запись на паузе, возобновление через 2 секунды
-  // после последнего нажатия. Значок микрофона при этом не меняется.
-  function pauseListening(): void {
-    if (listener === undefined) {
-      return;
-    }
-    listener.pause();
-    clearPause();
-    pauseTimer = setTimeout(() => {
-      pauseTimer = undefined;
-      listener?.resume();
-    }, LISTEN_PAUSE_MS);
   }
 
   function scheduleRetry(): void {
@@ -97,12 +79,14 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       onError
     };
     listener = deps.createListener !== undefined ? deps.createListener(options) : createPhraseListener(options);
+    if (pause.isPaused()) {
+      listener.pause(true);
+    }
     void listener.start();
   }
 
   function stopListener(): void {
     clearRetry();
-    clearPause();
     listener?.stop();
     listener = undefined;
   }
@@ -164,10 +148,27 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       applyUi();
     },
     keyboard(): void {
-      pauseListening();
+      // Набор текста в строке ежа: запись на паузе, возобновление через 2 секунды
+      // после последнего нажатия. Значок микрофона при этом не меняется.
+      pause.hold('typing', TYPING_RESUME_MS);
+    },
+    beginDrag(): void {
+      // Удержание ежа мышью: пауза до отпускания.
+      dragging = true;
+      pause.hold('drag');
+    },
+    endDrag(): void {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      // После отпускания запись молчит ещё секунду: щелчок мыши и стук стола
+      // успевают утихнуть, случайное слово не попадает на распознавание.
+      pause.hold('drag', DRAG_RESUME_MS);
     },
     dispose(): void {
       active = false;
+      pause.dispose();
       stopListener();
     }
   };
