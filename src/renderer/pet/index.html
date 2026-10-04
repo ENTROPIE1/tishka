@@ -15,7 +15,17 @@
     <div id="pet" class="pet">
       <div id="bubble" class="bubble" hidden>
         <div id="say" class="say"></div>
+        <div id="level" class="level" hidden>
+          <div id="level-fill" class="level-fill"></div>
+        </div>
         <form id="composer" class="composer" hidden>
+          <button id="mic" class="mic" type="button" title="Сказать голосом" aria-label="Сказать голосом">
+            <svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
+              <path d="M5 11a7 7 0 0 0 14 0" />
+              <path d="M12 18v3" />
+            </svg>
+          </button>
           <input
             id="input"
             class="composer-input"

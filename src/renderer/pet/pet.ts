@@ -1,5 +1,6 @@
 import type { PetModel, PetState } from '../../pet/state';
 import { clipForState, type Character } from './character';
+import { createListenUi } from './listen-ui';
 import { createPetCard } from './pet-card';
 import { SvgHedgehog } from './svg-hedgehog';
 
@@ -12,6 +13,10 @@ const character = document.getElementById('character') as HTMLElement;
 const stateLabel = document.getElementById('state') as HTMLElement;
 const characterModel: Character = new SvgHedgehog();
 const petCard = createPetCard({ element: cardHost, refreshBusy });
+const listen = createListenUi(() => {
+  composer.hidden = false;
+  updateBubble();
+});
 
 const STATE_LABELS: Record<PetState, string> = {
   hidden: 'спит за краем',
@@ -46,12 +51,12 @@ function refreshBusy(): void {
 
 function updateBubble(): void {
   const text = say.textContent ?? '';
-  bubble.hidden = text === '' && composer.hidden;
+  bubble.hidden = text === '' && composer.hidden && !listen.isListening();
 }
 
 function renderModel(model: PetModel): void {
   stateLabel.textContent = STATE_LABELS[model.state];
-  say.textContent = model.say ?? '';
+  say.textContent = listen.say(model.say, model.state);
   petCard.render(model);
 
   const { clip, flip } = clipForState(model.state);
@@ -61,7 +66,7 @@ function renderModel(model: PetModel): void {
   // Поле ввода живёт, пока Тишка на экране после вызова; появляется вместе с выходом.
   if (!isOnScreen(model.state)) {
     composer.hidden = true;
-  } else if (model.state === 'appear' || model.state === 'listening') {
+  } else if (model.state === 'appear' || model.state === 'listening' || model.state === 'confused') {
     const wasHidden = composer.hidden;
     composer.hidden = false;
     if (wasHidden) {
@@ -137,8 +142,13 @@ function initComposer(): void {
   });
   input.addEventListener('input', refreshBusy);
   input.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
+    if (event.key !== 'Escape') {
+      return;
+    }
+    event.preventDefault();
+    if (listen.isListening()) {
+      listen.escape();
+    } else {
       closeComposer();
     }
   });
@@ -175,6 +185,8 @@ window.tishka.onPetModel(renderModel);
 window.tishka.onEvent((event) => {
   if (event.type === 'speak.level') {
     characterModel.setMouth(event.level);
+  } else if (event.type === 'error') {
+    listen.setError(event.message);
   }
 });
 window.tishka.pet.setInteractive(false);

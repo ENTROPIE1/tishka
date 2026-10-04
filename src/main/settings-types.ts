@@ -1,6 +1,12 @@
 import type { ConnectionTemplate } from '../core/connections';
 import type { McpServerState } from '../core/mcp/manager';
 import type { Config, McpServerConfig } from '../core/types';
+import type { SttStatus } from '../voice/stt-service';
+
+export interface VoiceStateView {
+  state: SttStatus;
+  error?: string;
+}
 
 export interface ConnectionSecretView {
   field: string;

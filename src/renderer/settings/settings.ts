@@ -1,6 +1,7 @@
 import { mountConnectionsSection } from './connections-section';
 import { mountModelSection } from './model-section';
 import { mountPersonaSection } from './persona-section';
+import { mountVoiceSection } from './voice-section';
 
 function section(id: string): HTMLElement {
   const node = document.getElementById(id);
@@ -11,6 +12,7 @@ function section(id: string): HTMLElement {
 }
 
 mountModelSection(section('model-section'));
+mountVoiceSection(section('voice-section'));
 mountConnectionsSection(section('connections-section'));
 mountPersonaSection(section('persona-section'));
 

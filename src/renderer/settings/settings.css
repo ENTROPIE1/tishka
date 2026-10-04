@@ -230,6 +230,14 @@ body {
   color: var(--danger);
 }
 
+.state-ready {
+  color: var(--ok);
+}
+
+.state-starting {
+  color: var(--accent);
+}
+
 .connection-error {
   font-size: 12px;
   color: var(--danger);

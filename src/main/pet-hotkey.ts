@@ -1,16 +1,44 @@
 import { globalShortcut } from 'electron';
 import type { EventBus } from '../core/types';
 
-// Регистрирует глобальную горячую клавишу вызова. Если клавиша занята,
-// приложение продолжает работу, а пользователь видит понятную ошибку.
-export function registerPetHotkey(bus: EventBus, hotkey: string, wake: () => void): void {
-  let registered = false;
-  try {
-    registered = globalShortcut.register(hotkey, wake);
-  } catch {
-    registered = false;
+export interface HotkeyRegistrar {
+  set(hotkey: string, handler: () => void): void;
+  dispose(): void;
+}
+
+// Горячая клавиша вызова: при смене настроек старая снимается, новая ставится.
+export function createHotkeyRegistrar(bus: EventBus): HotkeyRegistrar {
+  let current: string | undefined;
+
+  function release(): void {
+    if (current === undefined) {
+      return;
+    }
+    try {
+      globalShortcut.unregister(current);
+    } catch {
+      // Клавиша уже снята — не страшно.
+    }
+    current = undefined;
   }
-  if (!registered) {
-    bus.emit({ type: 'error', message: `Не удалось назначить горячую клавишу ${hotkey}` });
-  }
+
+  return {
+    set(hotkey: string, handler: () => void): void {
+      release();
+      let registered = false;
+      try {
+        registered = globalShortcut.register(hotkey, handler);
+      } catch {
+        registered = false;
+      }
+      if (registered) {
+        current = hotkey;
+      } else {
+        bus.emit({ type: 'error', message: `Не удалось назначить горячую клавишу ${hotkey}` });
+      }
+    },
+    dispose(): void {
+      release();
+    }
+  };
 }

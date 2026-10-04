@@ -18,6 +18,7 @@ export function defaultConfig(): Config {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],
       sttUrl: 'http://127.0.0.1:8178',
+      stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
       ttsEngine: 'none'
     },
     mcpServers: [],
@@ -44,6 +45,10 @@ function pickStringArray(value: unknown, fallback: string[]): string[] {
     return value;
   }
   return fallback;
+}
+
+function pickNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function pickTtsEngine(value: unknown, fallback: TtsEngine): TtsEngine {
@@ -142,6 +147,7 @@ export function mergeConfig(value: unknown): Config {
   }
   const llm = isRecord(value.llm) ? value.llm : {};
   const voice = isRecord(value.voice) ? value.voice : {};
+  const stt = isRecord(voice.stt) ? voice.stt : {};
   const persona = isRecord(value.persona) ? value.persona : {};
   const pet = isRecord(value.pet) ? value.pet : {};
   return normalizeConfig({
@@ -154,6 +160,12 @@ export function mergeConfig(value: unknown): Config {
       hotkey: pickString(voice.hotkey, defaults.voice.hotkey),
       wakeWords: pickStringArray(voice.wakeWords, defaults.voice.wakeWords),
       sttUrl: pickString(voice.sttUrl, defaults.voice.sttUrl),
+      stt: {
+        exe: pickString(stt.exe, defaults.voice.stt.exe),
+        model: pickString(stt.model, defaults.voice.stt.model),
+        audioCtx: pickNumber(stt.audioCtx, defaults.voice.stt.audioCtx),
+        threads: pickNumber(stt.threads, defaults.voice.stt.threads)
+      },
       ttsEngine: pickTtsEngine(voice.ttsEngine, defaults.voice.ttsEngine)
     },
     mcpServers: parseMcpServers(value.mcpServers),

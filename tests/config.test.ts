@@ -34,6 +34,7 @@ describe('defaultConfig', () => {
     expect(config.voice.hotkey).toBe('Control+Alt+Space');
     expect(config.voice.wakeWords).toEqual(['тишка']);
     expect(config.voice.sttUrl).toBe('http://127.0.0.1:8178');
+    expect(config.voice.stt).toEqual({ exe: '', model: '', audioCtx: 768, threads: 4 });
     expect(config.voice.ttsEngine).toBe('none');
     expect(config.mcpServers).toEqual([]);
     expect(config.petMode).toBe(false);

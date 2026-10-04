@@ -5,12 +5,15 @@ import { saveConfig as persistConfig } from '../core/config';
 import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
+import { createSttService, type SttService } from '../voice/stt-service';
 import { openChatWindow } from './chat-window';
 import { OPEN_CHAT_CHANNEL } from './ipc-channels';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
-import { registerPetHotkey } from './pet-hotkey';
+import { registerVoiceIpc } from './ipc-voice';
+import { createHotkeyRegistrar, type HotkeyRegistrar } from './pet-hotkey';
 import { registerPetIpc } from './pet-ipc';
+import { createPetListen } from './pet-listen';
 import { createPetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
 import { closeSettingsWindow, openSettingsWindow } from './settings-window';
@@ -19,6 +22,8 @@ const bus = createEventBus();
 let core: TishkaCore | undefined;
 let pet: PetWindow | undefined;
 let tray: Tray | undefined;
+let stt: SttService | undefined;
+let hotkeys: HotkeyRegistrar | undefined;
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
@@ -52,13 +57,23 @@ app.whenReady().then(async () => {
     console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);
   }
 
+  const sttService = createSttService({ getConfig: () => tishka.config().voice });
+  stt = sttService;
+
   pet = createPetWindow({
     bus,
     getConfig: () => tishka.config(),
     // Позиция пишется в файл напрямую, чтобы перетаскивание не переподключало MCP.
     savePetX: (x) => persistConfig(dataDir, { ...tishka.config(), pet: { x } })
   });
-  registerPetIpc(pet);
+
+  const listen = createPetListen({
+    bus,
+    core: tishka,
+    stt: sttService,
+    sendCommand: (command) => pet?.listenCommand(command)
+  });
+  registerPetIpc(pet, listen);
 
   tray = createPetTray({
     wake: () => pet?.wake('name'),
@@ -71,7 +86,16 @@ app.whenReady().then(async () => {
     quit: () => app.quit()
   });
 
-  registerPetHotkey(bus, tishka.config().voice.hotkey, () => pet?.wake('hotkey'));
+  const hotkeyRegistrar = createHotkeyRegistrar(bus);
+  hotkeys = hotkeyRegistrar;
+  hotkeyRegistrar.set(tishka.config().voice.hotkey, () => listen.toggle('hotkey'));
+  registerVoiceIpc({
+    stt: sttService,
+    reloadHotkey: (hotkey) => hotkeyRegistrar.set(hotkey, () => listen.toggle('hotkey'))
+  });
+
+  // Служба распознавания поднимается в фоне, чтобы не задерживать окна.
+  void sttService.start().catch(() => undefined);
 
   openChatWindow();
 
@@ -85,6 +109,8 @@ app.on('window-all-closed', () => undefined);
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  hotkeys?.dispose();
+  stt?.stop();
   pet?.dispose();
   tray?.destroy();
   void core?.stop();

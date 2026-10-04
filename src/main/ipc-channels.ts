@@ -30,3 +30,10 @@ export const PET_DRAG_CHANNEL = 'tishka:pet:drag';
 export const PET_DRAG_END_CHANNEL = 'tishka:pet:drag-end';
 export const PET_WAKE_CHANNEL = 'tishka:pet:wake';
 export const PET_FOCUS_CHANNEL = 'tishka:pet:focus';
+export const PET_LISTEN_COMMAND_CHANNEL = 'tishka:pet:listen-command';
+export const PET_LISTEN_TOGGLE_CHANNEL = 'tishka:pet:listen-toggle';
+export const PET_LISTEN_RESULT_CHANNEL = 'tishka:pet:listen-result';
+
+export const VOICE_STATUS_CHANNEL = 'tishka:voice:status';
+export const VOICE_CHECK_CHANNEL = 'tishka:voice:check';
+export const VOICE_APPLY_CHANNEL = 'tishka:voice:apply';

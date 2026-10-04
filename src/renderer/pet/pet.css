@@ -80,9 +80,13 @@ body {
 
 .composer {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .composer-input {
+  flex: 1 1 auto;
   width: 320px;
   max-width: 100%;
   font: inherit;
@@ -96,6 +100,50 @@ body {
 .composer-input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.mic {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mic:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.level {
+  height: 6px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.level-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 80ms linear;
 }
 
 .card-host {

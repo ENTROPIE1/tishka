@@ -36,7 +36,8 @@ export type {
   ConnectionPlanResult,
   ConnectionSaveResult,
   ConnectionSecretView,
-  ConnectionView
+  ConnectionView,
+  VoiceStateView
 } from './settings-types';
 
 export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore): void {

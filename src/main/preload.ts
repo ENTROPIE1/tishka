@@ -4,11 +4,13 @@ import type { HistoryEntry } from '../core/history';
 import type { McpStatus } from '../core/mcp/manager';
 import type { Config, TishkaEvent } from '../core/types';
 import type { PetModel } from '../pet/state';
+import type { ListenCommand, ListenResult } from '../voice/listen';
 import type {
   ConfigView,
   ConnectionPlanResult,
   ConnectionSaveResult,
-  ConnectionView
+  ConnectionView,
+  VoiceStateView
 } from './ipc-settings';
 import {
   CLOSE_SETTINGS_CHANNEL,
@@ -33,13 +35,19 @@ import {
   PET_DRAG_END_CHANNEL,
   PET_FOCUS_CHANNEL,
   PET_INTERACTIVE_CHANNEL,
+  PET_LISTEN_COMMAND_CHANNEL,
+  PET_LISTEN_RESULT_CHANNEL,
+  PET_LISTEN_TOGGLE_CHANNEL,
   PET_MODEL_CHANNEL,
   PET_WAKE_CHANNEL,
   SECRETS_DELETE_CHANNEL,
   SECRETS_HAS_CHANNEL,
   SECRETS_NAMES_CHANNEL,
   SECRETS_SET_CHANNEL,
-  USER_TEXT_CHANNEL
+  USER_TEXT_CHANNEL,
+  VOICE_APPLY_CHANNEL,
+  VOICE_CHECK_CHANNEL,
+  VOICE_STATUS_CHANNEL
 } from './ipc-channels';
 
 const api = {
@@ -154,6 +162,32 @@ const api = {
     },
     focus(): void {
       ipcRenderer.send(PET_FOCUS_CHANNEL);
+    },
+    listenToggle(): void {
+      ipcRenderer.send(PET_LISTEN_TOGGLE_CHANNEL);
+    },
+    listenResult(result: ListenResult): void {
+      ipcRenderer.send(PET_LISTEN_RESULT_CHANNEL, result);
+    },
+    onListenCommand(listener: (command: ListenCommand) => void): () => void {
+      const handler = (_event: Electron.IpcRendererEvent, command: ListenCommand): void => {
+        listener(command);
+      };
+      ipcRenderer.on(PET_LISTEN_COMMAND_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_LISTEN_COMMAND_CHANNEL, handler);
+      };
+    }
+  },
+  voice: {
+    status(): Promise<VoiceStateView> {
+      return ipcRenderer.invoke(VOICE_STATUS_CHANNEL);
+    },
+    check(): Promise<VoiceStateView> {
+      return ipcRenderer.invoke(VOICE_CHECK_CHANNEL);
+    },
+    apply(hotkey: string): Promise<void> {
+      return ipcRenderer.invoke(VOICE_APPLY_CHANNEL, hotkey);
     }
   }
 };

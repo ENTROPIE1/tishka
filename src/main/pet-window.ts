@@ -2,7 +2,8 @@ import { BrowserWindow, screen } from 'electron';
 import { join } from 'node:path';
 import type { Config, EventBus } from '../core/types';
 import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
-import { PET_MODEL_CHANNEL } from './ipc-channels';
+import type { ListenCommand } from '../voice/listen';
+import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL } from './ipc-channels';
 import { Mover, clamp, type Geometry } from './pet-motion';
 
 const WIDTH = 440;
@@ -24,6 +25,7 @@ export interface PetWindow {
   focusWindow(): void;
   dragBy(deltaX: number): void;
   dragEnd(): void;
+  listenCommand(command: ListenCommand): void;
   dispose(): void;
 }
 
@@ -61,6 +63,12 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   window.setMenu(null);
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setIgnoreMouseEvents(true, { forward: true });
+
+  // Запись с микрофона: разрешаем только доступ к медиа, остальное запрещено.
+  window.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {
+    callback(permission === 'media');
+  });
+  window.webContents.session.setPermissionCheckHandler((_contents, permission) => permission === 'media');
 
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   if (rendererUrl !== undefined) {
@@ -167,6 +175,11 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     },
     dragEnd(): void {
       void deps.savePetX(restX);
+    },
+    listenCommand(command): void {
+      if (!window.isDestroyed()) {
+        window.webContents.send(PET_LISTEN_COMMAND_CHANNEL, command);
+      }
     },
     dispose(): void {
       unsubscribe();
