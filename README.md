@@ -15,16 +15,16 @@
 git clone https://github.com/ENTROPIE1/tishka.git
 cd tishka
 npm install
-node node_moduleselectroninstall.js
+node node_modules\electron\install.js
 npm run build:mcp
 npm run dev
 ```
 
 - `npm run build:mcp` собирает серверы подключений (Confluence, Exchange). Повторять после обновления кода серверов.
-- Если при запуске ошибка «Electron failed to install correctly»: `node node_modules\electron\install.js` и снова `npm run dev`.
+- `node node_modules\electron\install.js` доустанавливает сам Electron: новые версии npm не запускают установочные скрипты пакетов, и без этой команды будет ошибка «Electron failed to install correctly». Предупреждения npm про `allow-scripts` можно не трогать.
 - Путь к каталогу проекта может содержать кириллицу; пути к программе и модели распознавания — нет.
 
-Обновление: `git pull`, затем `npm install`, `npm run build:mcp`, `npm run dev`. Проверено на чистой копии.
+Обновление: `git pull`, затем `npm install`, `npm run build:mcp`, `npm run dev`.
 
 ## Первая настройка
 
