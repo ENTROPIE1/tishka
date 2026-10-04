@@ -2,6 +2,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 
 export const PLACEHOLDER_IDLE = 'Написать Тишке…';
 export const PLACEHOLDER_LISTENING = 'Говорите или пишите…';
+export const PLACEHOLDER_WAITING = 'Готовлю микрофон…';
 
 const MIC_PATHS = [
   'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z',
@@ -28,6 +29,7 @@ export interface Composer {
   mic: HTMLButtonElement;
   settings: HTMLButtonElement;
   setListening(listening: boolean): void;
+  setWaiting(waiting: boolean): void;
   setBusy(busy: boolean): void;
   setCollapsed(collapsed: boolean): void;
   isCollapsed(): boolean;
@@ -103,7 +105,14 @@ export function createComposer(actions: ComposerActions): Composer {
 
   let busy = false;
   let collapsed = false;
+  let listening = false;
+  let waiting = false;
   const queue: string[] = [];
+
+  // Подсказка в поле: пока микрофон не готов, честно ждём; затем — говорите или пишите.
+  function applyPlaceholder(): void {
+    input.placeholder = waiting ? PLACEHOLDER_WAITING : listening ? PLACEHOLDER_LISTENING : PLACEHOLDER_IDLE;
+  }
 
   function setCollapsed(value: boolean): void {
     collapsed = value;
@@ -174,8 +183,13 @@ export function createComposer(actions: ComposerActions): Composer {
     input,
     mic,
     settings,
-    setListening(listening): void {
-      input.placeholder = listening ? PLACEHOLDER_LISTENING : PLACEHOLDER_IDLE;
+    setListening(value): void {
+      listening = value;
+      applyPlaceholder();
+    },
+    setWaiting(value): void {
+      waiting = value;
+      applyPlaceholder();
     },
     setBusy,
     setCollapsed,

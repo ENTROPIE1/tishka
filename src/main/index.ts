@@ -5,7 +5,7 @@ import { saveConfig as persistConfig } from '../core/config';
 import type { Config } from '../core/types';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
-import { createSttService, type SttService } from '../voice/stt-service';
+import { createSttService, START_CANCELLED, type SttService } from '../voice/stt-service';
 import { loginItemSettings, startedHidden } from './autostart';
 import { openMainWindow, reloadMainWindow } from './chat-window';
 import { registerChatTalk, type ChatTalk } from './chat-talk';
@@ -171,6 +171,7 @@ app.whenReady().then(async () => {
   const speechOutput = createSpeechOutput({
     bus,
     getConfig: () => tishka.config(),
+    isReady: () => sttService.status() === 'ready',
     play: (message, signal) => speakPlay?.play(message, signal) ?? Promise.resolve(),
     mark
   });
@@ -203,6 +204,13 @@ app.whenReady().then(async () => {
     bus,
     memoryName: () => tishka.memoryName(),
     isReady: () => sttService.status() === 'ready',
+    getStatus: () => sttService.status(),
+    // Ожидание готовности имеет смысл, пока окно-питомец ещё на экране.
+    isVisible: (surface) => (surface === 'pet' ? (pet?.isVisible() ?? false) : true),
+    onWaitingChange: () => {
+      petWake?.broadcast();
+      chatTalk?.broadcast();
+    },
     onMissedSpeech: () => calibrationHint.missed(),
     sendCommand: (command) => {
       if (command === 'listen') {
@@ -317,12 +325,23 @@ app.whenReady().then(async () => {
   memoryWatch.start();
 
   // Служба распознавания поднимается в фоне, чтобы не задерживать окна.
-  void sttService.start()
-    .then(() => {
+  // Отложенное включение записи ждёт её готовности; отмена не считается сбоем.
+  void sttService
+    .start()
+    .then((result) => {
+      if (result.ok) {
+        wakeFlow.noteReady();
+      } else if (result.error !== START_CANCELLED) {
+        wakeFlow.noteFailed(result.error);
+      }
       petWake?.broadcast();
       chatTalk?.broadcast();
     })
-    .catch(() => undefined);
+    .catch(() => {
+      wakeFlow.noteFailed();
+      petWake?.broadcast();
+      chatTalk?.broadcast();
+    });
 
   void runStartup({
     hidden: startedHidden(process.argv),

@@ -6,6 +6,7 @@ const MIC_ERROR = 'Не слышу микрофон';
 
 export interface WakeListenerDeps {
   onConversation?(on: boolean): void;
+  onWaiting?(waiting: boolean): void;
   createListener?(options: PhraseListenerOptions): PhraseListener;
 }
 
@@ -22,6 +23,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   const mic = document.getElementById('mic') as HTMLElement | null;
   let active = false;
   let conversation = false;
+  let waiting = false;
   let soon = false;
   let sensitivity: VadSensitivity = 'normal';
   let threshold: number | undefined;
@@ -99,6 +101,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     }
     if (mic !== null) {
       mic.classList.toggle('on', conversation);
+      mic.classList.toggle('waiting', waiting);
       mic.classList.toggle('soon', active && conversation && soon);
     }
   }
@@ -116,6 +119,11 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     if (state.conversation !== conversation) {
       conversation = state.conversation;
       deps.onConversation?.(conversation);
+    }
+    const nextWaiting = state.waiting === true;
+    if (nextWaiting !== waiting) {
+      waiting = nextWaiting;
+      deps.onWaiting?.(waiting);
     }
     if (active && (!wasActive || sensitivityChanged || thresholdChanged) && listener !== undefined) {
       stopListener();

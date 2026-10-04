@@ -12,6 +12,7 @@ export interface ToggleState {
   owner: TalkSurface | null;
   suppressed: boolean;   // человек выключил микрофон до конца появления
   ready: boolean;        // служба распознавания готова
+  starting: boolean;     // служба ещё поднимается: щелчок ждёт готовности, а не ошибка
 }
 
 export interface TogglePlan {
@@ -23,7 +24,8 @@ export function planToggle(state: ToggleState, by: TalkSurface): TogglePlan {
   if (state.conversation && state.owner === by) {
     return { action: 'disable', suppressed: by === 'pet' ? true : state.suppressed };
   }
-  if (!state.ready && by === 'pet') {
+  // Пока служба поднимается, щелчок не ошибка: включение откладывается до готовности.
+  if (!state.ready && !state.starting && by === 'pet') {
     return { action: 'not-ready', suppressed: state.suppressed };
   }
   // Явное включение щелчком снимает запрет на автоматическое включение.

@@ -1,5 +1,5 @@
 import type { Config, EventBus } from '../core/types';
-import type { TranscribeResult } from './stt-service';
+import type { SttStatus, TranscribeResult } from './stt-service';
 import { NOT_READY_MESSAGE, planToggle } from './talk-toggle';
 import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
 
@@ -17,6 +17,9 @@ export interface WakeFlowDeps {
   hide(): void;
   onSoonChange?(): void;
   isReady?(): boolean;                 // служба распознавания готова
+  getStatus?(): SttStatus;             // 'starting' — служба поднимается, не ошибка
+  isVisible?(surface: TalkSurface): boolean;   // окно ещё на экране: ждать готовности есть смысл
+  onWaitingChange?(): void;            // изменилось ожидание готовности службы
   memoryName?(): string | undefined;   // имя человека из памяти для подсказки
   onMissedSpeech?(): void;             // «Не расслышал» — повод для подсказки о калибровке
 }
@@ -26,6 +29,9 @@ export interface WakeFlow {
   toggleConversation(by?: TalkSurface): void;
   enableConversation(by?: TalkSurface): void;
   disableConversation(hide: boolean, by?: TalkSurface): void;
+  noteReady(): void;                   // служба распознавания стала готова
+  noteFailed(message?: string): void;  // служба не поднялась: ошибка или тайм-аут
+  isWaiting(): boolean;                // запись отложена до готовности службы
   onKeyboardInput(): void;
   escape(): void;
   isConversation(): boolean;
@@ -51,6 +57,9 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   let lastErrorAt = -Infinity;
   // Человек выключил микрофон значком: до конца этого появления не слушаем.
   let suppressed = false;
+  // Обращение пришло, но служба распознавания ещё поднимается: включим запись,
+  // как только она станет готова (один раз и если окно ещё на экране).
+  let waiting: TalkSurface | null = null;
 
   function timeoutMs(): number {
     const seconds = deps.getVoice().talkTimeoutSec;
@@ -97,11 +106,40 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     deps.bus.emit({ type: 'error', message });
   }
 
+  function clearWaiting(): void {
+    if (waiting === null) {
+      return;
+    }
+    waiting = null;
+    deps.onWaitingChange?.();
+  }
+
   function enableConversation(by: TalkSurface = 'pet'): void {
     conversation = true;
     owner = by;
+    waiting = null;
     deps.sendCommand('conversation-on');
     armTimer();
+  }
+
+  // Включить разговор сейчас или, если служба ещё поднимается, дождаться её.
+  function requestListen(by: TalkSurface): void {
+    if (deps.isReady?.() ?? true) {
+      enableConversation(by);
+      return;
+    }
+    if (waiting === by) {
+      return;
+    }
+    waiting = by;
+    deps.onWaitingChange?.();
+  }
+
+  // Служба ещё поднимается: щелчок откладывает включение, а не сообщает об ошибке.
+  // Если состояние неизвестно, ждём только обещанный по умолчанию разговор.
+  function isStarting(): boolean {
+    const status = deps.getStatus?.();
+    return status !== undefined ? status === 'starting' : deps.getVoice().talkByDefault;
   }
 
   // Появление человека: сбрасывает выключенный значок и, если разговор включён
@@ -119,8 +157,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       // Горячую клавишу переключает вызывающий: это явное действие.
       return;
     }
-    if (deps.getVoice().talkByDefault && (deps.isReady?.() ?? true) && owner === null) {
-      enableConversation('pet');
+    if (deps.getVoice().talkByDefault && owner === null) {
+      requestListen('pet');
     }
   }
 
@@ -253,15 +291,61 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     isConversation: () => conversation,
     conversationOwner: () => owner,
     isLeavingSoon: () => soon,
+    isWaiting: () => waiting !== null,
     reportError,
+    // Служба стала готова: одно отложенное включение записи за появление.
+    noteReady(): void {
+      const surface = waiting;
+      if (surface === null) {
+        return;
+      }
+      waiting = null;
+      deps.onWaitingChange?.();
+      if (surface === 'pet' && suppressed) {
+        return;
+      }
+      if (conversation || owner !== null || answering) {
+        return;
+      }
+      if (!(deps.isVisible?.(surface) ?? true)) {
+        return;
+      }
+      enableConversation(surface);
+    },
+    // Служба не поднялась: запись не включается, сообщаем один раз.
+    noteFailed(message?: string): void {
+      if (waiting === null) {
+        return;
+      }
+      waiting = null;
+      deps.onWaitingChange?.();
+      if (deps.isReady?.() ?? true) {
+        return;
+      }
+      reportError(message ?? 'Распознавание речи не настроено');
+    },
     toggleConversation(by: TalkSurface = 'pet'): void {
       const plan = planToggle(
-        { conversation, owner, suppressed, ready: deps.isReady?.() ?? true },
+        {
+          conversation,
+          owner,
+          suppressed,
+          ready: deps.isReady?.() ?? true,
+          starting: isStarting()
+        },
         by
       );
       suppressed = plan.suppressed;
       if (plan.action === 'disable') {
         disableConversation(false);
+        return;
+      }
+      if (waiting === by) {
+        // Значок нажали, пока ждали службу: до конца появления не слушаем.
+        clearWaiting();
+        if (by === 'pet') {
+          suppressed = true;
+        }
         return;
       }
       if (plan.action === 'not-ready') {
@@ -270,7 +354,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
         deps.sendCommand('conversation-off');
         return;
       }
-      enableConversation(by);
+      // Готово — включить сразу; служба поднимается — дождаться готовности.
+      requestListen(by);
     },
     enableConversation,
     disableConversation,
@@ -282,6 +367,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     },
     stop(): void {
       clearTimer();
+      waiting = null;
       pending = undefined;
       unsubscribe();
     }

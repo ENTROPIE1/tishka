@@ -22,6 +22,7 @@ export interface PetLifecycle {
   sendLayout(): void;
   setBusy(busy: boolean): void;
   leave(): void;
+  isVisible(): boolean;
   dispose(): void;
 }
 
@@ -128,6 +129,9 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
     leave(): void {
       // Уход по просьбе: сначала договаривается ответ, затем анимация ухода.
       applyModel(requestLeave(model, Date.now()));
+    },
+    isVisible(): boolean {
+      return model.state !== 'hidden' && model.state !== 'leave';
     },
     dispose(): void {
       unsubscribe();

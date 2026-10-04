@@ -111,6 +111,9 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     leave(): void {
       lifecycle.leave();
     },
+    isVisible(): boolean {
+      return lifecycle.isVisible();
+    },
     reload(): void {
       deps.onReload?.();
       if (!window.isDestroyed()) {

@@ -25,6 +25,7 @@ const characterModel: Character = createCharacter('svg');
 
 let mirrored = false;
 let currentState: PetState = 'hidden';
+let waiting = false;
 let dragging = false;
 let dragMoved = false;
 let dragLastX = 0;
@@ -64,6 +65,11 @@ createWakeListener({
   onConversation: (on) => {
     listen.setConversation(on);
     composer.setListening(on);
+  },
+  onWaiting: (value) => {
+    waiting = value;
+    composer.setWaiting(value);
+    updateStateLabel();
   }
 });
 
@@ -80,6 +86,10 @@ function refreshBusy(): void {
 function updateBubble(): void {
   const text = say.textContent ?? '';
   bubble.hidden = text === '' && !listen.isListening();
+}
+
+function updateStateLabel(): void {
+  stateLabelEl.textContent = stateLabel(currentState, waiting);
 }
 
 function applyComposer(state: PetState, visible: boolean): void {
@@ -103,7 +113,7 @@ function applyFlip(): void {
 function renderModel(model: PetModel): void {
   currentState = model.state;
   character.dataset.state = model.state;
-  stateLabelEl.textContent = stateLabel(model.state);
+  updateStateLabel();
   say.textContent = listen.say(model.say, model.state);
   petCard.render(model);
 
