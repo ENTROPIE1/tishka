@@ -7,6 +7,12 @@ import { createComposer, PLACEHOLDER_IDLE, PLACEHOLDER_LISTENING } from '../src/
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(resolve(root, 'src/renderer/pet/index.html'), 'utf8');
+const css = readFileSync(resolve(root, 'src/renderer/pet/pet.css'), 'utf8');
+
+function cssBlock(selector: string): string {
+  const match = css.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`));
+  return match?.[1] ?? '';
+}
 
 function bodyMarkup(): string {
   const match = html.match(/<body>([\s\S]*)<\/body>/);
@@ -69,6 +75,19 @@ describe('разметка окна-питомца', () => {
   it('в разметке строки нет атрибутов style', () => {
     const { composer } = mount();
     expect(composer.element.querySelectorAll('[style]')).toHaveLength(0);
+  });
+
+  it('подпись состояния есть в разметке и видима', () => {
+    mount();
+    const state = document.getElementById('state');
+    expect(state).not.toBeNull();
+    expect(state?.classList.contains('state-label')).toBe(true);
+    expect(state?.parentElement?.id).toBe('character');
+
+    const block = cssBlock('\\.state-label');
+    expect(block).not.toBe('');
+    expect(block).not.toContain('display: none');
+    expect(block).not.toContain('visibility: hidden');
   });
 });
 

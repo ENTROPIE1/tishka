@@ -4,6 +4,7 @@ import type { VadSensitivity } from '../../voice/vad';
 export interface VoiceControls {
   hotkey: HTMLInputElement;
   wakeEnabled: HTMLInputElement;
+  talkByDefault: HTMLInputElement;
   wakeWords: HTMLInputElement;
   talkTimeout: HTMLInputElement;
   sensitivity: HTMLSelectElement;
@@ -33,6 +34,7 @@ export async function saveVoice(controls: VoiceControls): Promise<void> {
       ...view.config.voice,
       hotkey: controls.hotkey.value.trim(),
       wakeEnabled: controls.wakeEnabled.checked,
+      talkByDefault: controls.talkByDefault.checked,
       wakeWords: parseWords(controls.wakeWords.value, view.config.voice.wakeWords),
       talkTimeoutSec: parseTimeout(controls.talkTimeout.value, view.config.voice.talkTimeoutSec),
       sensitivity: controls.sensitivity.value as VadSensitivity,

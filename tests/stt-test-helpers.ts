@@ -10,6 +10,7 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
     hotkey: 'Control+Alt+Space',
     wakeWords: ['тишка'],
     wakeEnabled: false,
+    talkByDefault: true,
     talkTimeoutSec: 30,
     sensitivity: 'normal',
     sttUrl: 'http://127.0.0.1:8178',

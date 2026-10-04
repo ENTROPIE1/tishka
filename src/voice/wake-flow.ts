@@ -15,6 +15,7 @@ export interface WakeFlowDeps {
   sendCommand(command: WakeCommand): void;
   hide(): void;
   onSoonChange?(): void;
+  isReady?(): boolean;                 // служба распознавания готова
   memoryName?(): string | undefined;   // имя человека из памяти для подсказки
 }
 
@@ -46,6 +47,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let soonTimer: ReturnType<typeof setTimeout> | undefined;
   let lastErrorAt = -Infinity;
+  // Человек выключил микрофон значком: до конца этого появления не слушаем.
+  let suppressed = false;
 
   function timeoutMs(): number {
     const seconds = deps.getVoice().talkTimeoutSec;
@@ -99,6 +102,22 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     armTimer();
   }
 
+  // Появление человека: сбрасывает выключенный значок и, если разговор включён
+  // по умолчанию, сразу переводит в режим разговора. Уведомление не в счёт.
+  function appear(source: 'name' | 'hotkey' | 'click' | 'trigger'): void {
+    if (source === 'trigger') {
+      return;
+    }
+    suppressed = false;
+    if (source === 'hotkey') {
+      // Горячую клавишу переключает вызывающий: это явное действие.
+      return;
+    }
+    if (deps.getVoice().talkByDefault && (deps.isReady?.() ?? true) && owner === null) {
+      enableConversation('pet');
+    }
+  }
+
   function disableConversation(hide: boolean, by?: TalkSurface): void {
     const surface = by ?? owner;
     conversation = false;
@@ -140,6 +159,9 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     }
     deps.bus.emit({ type: 'wake', source: 'name' });
     if (match.rest === '') {
+      if (conversation) {
+        return;
+      }
       deps.bus.emit({ type: 'listen.start' });
       deps.sendCommand('listen');
       return;
@@ -150,7 +172,9 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     }
     deps.bus.emit({ type: 'listen.start' });
     answering = true;
-    enableConversation();
+    if (!conversation) {
+      enableConversation();
+    }
     void deps.core
       .handleUserText(match.rest)
       .catch(() => undefined)
@@ -203,6 +227,12 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     });
   }
 
+  const unsubscribe = deps.bus.on((event) => {
+    if (event.type === 'wake') {
+      appear(event.source);
+    }
+  });
+
   return {
     handlePhrase,
     isConversation: () => conversation,
@@ -212,7 +242,10 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     toggleConversation(by: TalkSurface = 'pet'): void {
       if (conversation && owner === by) {
         disableConversation(false);
-      } else {
+        if (by === 'pet') {
+          suppressed = true;
+        }
+      } else if (!(by === 'pet' && suppressed)) {
         enableConversation(by);
       }
     },
@@ -227,6 +260,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     stop(): void {
       clearTimer();
       pending = undefined;
+      unsubscribe();
     }
   };
 }

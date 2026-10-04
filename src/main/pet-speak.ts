@@ -15,6 +15,7 @@ export interface SpeechOutputDeps {
 export interface SpeechOutput {
   health(): Promise<TtsHealth>;
   sayExample(): void;
+  warm(): void;
   stopSpeaking(): void;
   dispose(): void;
 }
@@ -133,6 +134,18 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     health: () => client().health(),
     sayExample(): void {
       schedule(EXAMPLE_TEXT, true);
+    },
+    // Заготовленные фразы синтезируются заранее и лежат в памяти: появление без ожидания.
+    warm(): void {
+      if (!deps.getConfig().voice.tts.enabled) {
+        return;
+      }
+      for (const text of CANNED_TEXTS) {
+        const prepared = prepareForSpeech(text);
+        if (prepared !== '') {
+          void wavFor(text, prepared).catch(() => undefined);
+        }
+      }
     },
     stopSpeaking(): void {
       halt();

@@ -160,13 +160,14 @@ interface SecretStore {
 
 interface Config {
   llm: { baseUrl: string; model: string; visionModel: string };
-  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number }; tts: { enabled: boolean; url: string; volume: number } };
+  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number }; tts: { enabled: boolean; url: string; volume: number } };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран, по умолчанию true
   web: { enabled: boolean };      // разрешено ли читать страницы из интернета, по умолчанию true
+  app: { warmMinutes: number; memoryLimitMb: number; autostart: boolean };   // держать микрофон наготове, предел памяти, запуск вместе с Windows
 }
 
 type McpServerConfig =

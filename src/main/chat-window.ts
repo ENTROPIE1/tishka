@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import { NAVIGATE_CHANNEL } from './ipc-channels';
+import { guardNavigation } from './navigation-guard';
 
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 640;
@@ -53,6 +54,7 @@ export function openMainWindow(screen?: MainScreen): void {
   });
 
   window.setMenu(null);
+  guardNavigation(window);
 
   // Микрофон для диктовки: разрешён только доступ к медиа.
   window.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {
@@ -81,4 +83,11 @@ export function openMainWindow(screen?: MainScreen): void {
   }
 
   mainWindow = window;
+}
+
+// Перезагрузка окна чата: история и настройки хранятся на диске и вернутся сами.
+export function reloadMainWindow(): void {
+  if (mainWindow !== undefined && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.reload();
+  }
 }

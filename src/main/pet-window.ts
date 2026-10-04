@@ -6,6 +6,7 @@ import type { ListenCommand } from '../voice/listen';
 import type { WakeState } from '../voice/wake';
 import type { SpeakMessage } from '../voice/speech-queue';
 import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
+import { guardNavigation } from './navigation-guard';
 import { Mover, clamp, type Geometry } from './pet-motion';
 
 const WIDTH = 440;
@@ -34,6 +35,8 @@ export interface PetWindow {
   stopSpeaking(): void;
   hide(): void;
   show(): void;
+  leave(): void;
+  reload(): void;
   dispose(): void;
 }
 
@@ -60,6 +63,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   window.setMenu(null);
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setIgnoreMouseEvents(true, { forward: true });
+  guardNavigation(window);
 
   // Запись с микрофона: разрешаем только доступ к медиа, остальное запрещено.
   window.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {
@@ -186,6 +190,15 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     show(): void {
       if (!window.isDestroyed()) {
         showAtRest();
+      }
+    },
+    leave(): void {
+      // Уход по просьбе: анимация ухода, затем окно скрывается, процесс живёт.
+      applyModel({ state: 'leave', since: Date.now(), queue: [] });
+    },
+    reload(): void {
+      if (!window.isDestroyed()) {
+        window.webContents.reload();
       }
     },
     dispose(): void {

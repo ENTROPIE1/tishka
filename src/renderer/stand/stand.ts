@@ -1,6 +1,7 @@
 import type { PetState } from '../../pet/state';
 import { CLIP_NAMES, clipForState, type Character, type ClipName } from '../pet/character';
 import { CHARACTER_SOURCES, createCharacter } from '../pet/character-factory';
+import { installLinkGuard } from '../shared/links';
 import { createScriptPlayer, missingClips, scriptSteps, speechLevel, STATE_LABELS, type ScriptPlayer } from './stand-logic';
 
 const TALK_TICK_MS = 90;
@@ -195,4 +196,5 @@ for (const item of CHARACTER_SOURCES) {
 buildStates();
 initControls();
 initScript();
+installLinkGuard(document);
 void mountCharacter();

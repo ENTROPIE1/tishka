@@ -18,6 +18,7 @@ export function defaultConfig(): Config {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],
       wakeEnabled: false,
+      talkByDefault: true,
       talkTimeoutSec: 30,
       sensitivity: 'normal',
       sttUrl: 'http://127.0.0.1:8178',
@@ -29,7 +30,8 @@ export function defaultConfig(): Config {
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },
-    web: { enabled: true }
+    web: { enabled: true },
+    app: { warmMinutes: 30, memoryLimitMb: 1500, autostart: false }
   };
 }
 
@@ -54,6 +56,11 @@ function pickStringArray(value: unknown, fallback: string[]): string[] {
 
 function pickNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function pickPositive(value: unknown, fallback: number): number {
+  const number = pickNumber(value, fallback);
+  return number > 0 ? number : fallback;
 }
 
 function pickVolume(value: unknown, fallback: number): number {
@@ -165,6 +172,7 @@ export function mergeConfig(value: unknown): Config {
   const pet = isRecord(value.pet) ? value.pet : {};
   const screen = isRecord(value.screen) ? value.screen : {};
   const web = isRecord(value.web) ? value.web : {};
+  const app = isRecord(value.app) ? value.app : {};
   return normalizeConfig({
     llm: {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
@@ -175,6 +183,7 @@ export function mergeConfig(value: unknown): Config {
       hotkey: pickString(voice.hotkey, defaults.voice.hotkey),
       wakeWords: pickStringArray(voice.wakeWords, defaults.voice.wakeWords),
       wakeEnabled: pickBoolean(voice.wakeEnabled, defaults.voice.wakeEnabled),
+      talkByDefault: pickBoolean(voice.talkByDefault, defaults.voice.talkByDefault),
       talkTimeoutSec: pickNumber(voice.talkTimeoutSec, defaults.voice.talkTimeoutSec),
       sensitivity: pickSensitivity(voice.sensitivity, defaults.voice.sensitivity),
       sttUrl: pickString(voice.sttUrl, defaults.voice.sttUrl),
@@ -195,7 +204,12 @@ export function mergeConfig(value: unknown): Config {
     pet: { x: pickPetX(pet.x, defaults.pet.x) },
     petMode: pickBoolean(value.petMode, defaults.petMode),
     screen: { enabled: pickBoolean(screen.enabled, defaults.screen.enabled) },
-    web: { enabled: pickBoolean(web.enabled, defaults.web.enabled) }
+    web: { enabled: pickBoolean(web.enabled, defaults.web.enabled) },
+    app: {
+      warmMinutes: pickPositive(app.warmMinutes, defaults.app.warmMinutes),
+      memoryLimitMb: pickPositive(app.memoryLimitMb, defaults.app.memoryLimitMb),
+      autostart: pickBoolean(app.autostart, defaults.app.autostart)
+    }
   });
 }
 
