@@ -20,19 +20,22 @@ function setup(): { shell: Shell; screens: Record<ScreenName, HTMLElement>; navi
       <button data-screen="memory"></button>
       <button data-screen="voice"></button>
       <button data-screen="persona"></button>
+      <button data-screen="automations"></button>
     </nav>
     <section id="screen-chat"></section>
     <section id="screen-connections" hidden></section>
     <section id="screen-memory" hidden></section>
     <section id="screen-voice" hidden></section>
-    <section id="screen-persona" hidden></section>`;
+    <section id="screen-persona" hidden></section>
+    <section id="screen-automations" hidden></section>`;
 
   const screens: Record<ScreenName, HTMLElement> = {
     chat: document.getElementById('screen-chat') as HTMLElement,
     connections: document.getElementById('screen-connections') as HTMLElement,
     memory: document.getElementById('screen-memory') as HTMLElement,
     voice: document.getElementById('screen-voice') as HTMLElement,
-    persona: document.getElementById('screen-persona') as HTMLElement
+    persona: document.getElementById('screen-persona') as HTMLElement,
+    automations: document.getElementById('screen-automations') as HTMLElement
   };
 
   let navigate = (_name: string): void => undefined;

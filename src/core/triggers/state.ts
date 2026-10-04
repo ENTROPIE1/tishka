@@ -8,10 +8,25 @@ export interface Reminder {
   done: boolean;
 }
 
+export interface WatchState {
+  last?: string;
+  errors: number;
+  checkedAt?: string;            // ISO последней фоновой проверки
+}
+
+export interface SkillRunState {
+  lastRunAt?: string;            // ISO последнего запуска навыка
+  lastResult?: string;           // 'ok' или текст ошибки
+  lastCheckAt?: string;          // ISO последней фоновой проверки
+  nextAt?: string;               // ISO следующей проверки или запуска
+  runCount: number;              // число срабатываний
+}
+
 export interface TriggerState {
   reminders: Reminder[];
   firedOnce: string[];
-  watches: Record<string, { last?: string; errors: number }>;
+  watches: Record<string, WatchState>;
+  skills?: Record<string, SkillRunState>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -51,17 +66,59 @@ function parseState(raw: unknown): TriggerState {
       if (!isRecord(value)) {
         continue;
       }
-      const entry: { last?: string; errors: number } = {
+      const entry: WatchState = {
         errors: typeof value.errors === 'number' && Number.isFinite(value.errors) ? value.errors : 0
       };
       if (typeof value.last === 'string') {
         entry.last = value.last;
       }
+      if (typeof value.checkedAt === 'string') {
+        entry.checkedAt = value.checkedAt;
+      }
       state.watches[key] = entry;
     }
   }
 
+  if (isRecord(raw.skills)) {
+    const skills: Record<string, SkillRunState> = {};
+    for (const [key, value] of Object.entries(raw.skills)) {
+      if (!isRecord(value)) {
+        continue;
+      }
+      const entry: SkillRunState = {
+        runCount: typeof value.runCount === 'number' && Number.isFinite(value.runCount) ? value.runCount : 0
+      };
+      if (typeof value.lastRunAt === 'string') {
+        entry.lastRunAt = value.lastRunAt;
+      }
+      if (typeof value.lastResult === 'string') {
+        entry.lastResult = value.lastResult;
+      }
+      if (typeof value.lastCheckAt === 'string') {
+        entry.lastCheckAt = value.lastCheckAt;
+      }
+      if (typeof value.nextAt === 'string') {
+        entry.nextAt = value.nextAt;
+      }
+      skills[key] = entry;
+    }
+    state.skills = skills;
+  }
+
   return state;
+}
+
+export function skillState(state: TriggerState, id: string): SkillRunState {
+  if (state.skills === undefined) {
+    state.skills = {};
+  }
+  const existing = state.skills[id];
+  if (existing !== undefined) {
+    return existing;
+  }
+  const created: SkillRunState = { runCount: 0 };
+  state.skills[id] = created;
+  return created;
 }
 
 export function createTriggerState(filePath: string): {

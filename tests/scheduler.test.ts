@@ -178,6 +178,22 @@ describe('createScheduler — навыки', () => {
     expect(h.runs).toHaveLength(1);
   });
 
+  it('выключенный навык не запускается по расписанию', async () => {
+    const skill = makeSkill({
+      id: 'off',
+      name: 'Выключенный',
+      enabled: false,
+      trigger: { type: 'schedule', cron: '* * * * *' }
+    });
+    const h = setup({ skills: [skill], startNow: local(2026, 10, 5, 10, 0) });
+
+    await h.scheduler.tick();
+    h.setNow(local(2026, 10, 5, 10, 1));
+    await h.scheduler.tick();
+
+    expect(h.runs).toHaveLength(0);
+  });
+
   it('разовый навык после срабатывания не запускается снова', async () => {
     const skill = makeSkill({
       id: 'once',

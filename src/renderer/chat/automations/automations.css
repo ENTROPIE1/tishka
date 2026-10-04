@@ -1,0 +1,252 @@
+#screen-automations {
+  overflow-y: auto;
+}
+
+.automations-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 18px 0;
+}
+
+.automations-title {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.automations-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.automations-tab {
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  padding: 8px 16px;
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+}
+
+.automations-tab.active {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.automations-body {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skill-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.skill-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.skill-kind {
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--accent);
+}
+
+.skill-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.skill-name {
+  font-weight: 600;
+}
+
+.skill-summary {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.skill-state {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.state-active {
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+}
+
+.state-paused,
+.state-available {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.state-error {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
+.skill-when {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.skill-does {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.skill-needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.need {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.need-ok {
+  background: color-mix(in srgb, var(--ok) 15%, transparent);
+  color: var(--ok);
+}
+
+.need-missing {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  color: var(--danger);
+}
+
+.need-none {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.skill-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.skill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.skill-extra {
+  flex-basis: 100%;
+}
+
+.skill-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.skill-input-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.skill-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.skill-form-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-form-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skill-installed {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.skill-form-steps .field-label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.preset-preview {
+  border-color: var(--accent);
+}
+
+.presets-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.presets-message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.message-ok {
+  color: var(--ok);
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .automations-header {
+    background: var(--bg);
+  }
+}

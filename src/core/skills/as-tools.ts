@@ -48,7 +48,7 @@ export function syncSkillTools(registry: ToolRegistry, skills: Skill[], runner: 
   registry.unregisterSource('skill');
 
   for (const skill of skills) {
-    if (skill.trigger.type !== 'manual') {
+    if (skill.trigger.type !== 'manual' || skill.enabled === false) {
       continue;
     }
     const def: ToolDef = {

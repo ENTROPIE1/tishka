@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEventBus } from '../src/core/events';
-import type { RunResult } from '../src/core/skills/runner';
+import { createSkillRunner, type RunResult } from '../src/core/skills/runner';
 import { validateSkill } from '../src/core/skills/validate';
 import { createToolRegistry } from '../src/core/tools/registry';
 import { createTriggerState, emptyTriggerState } from '../src/core/triggers/state';
@@ -200,6 +200,88 @@ describe('createWatcher', () => {
 
     expect(h.runs).toHaveLength(1);
     expect(h.runs[0].inputs).toEqual({ previous: 'a', current: 'b' });
+  });
+
+  it('фоновая проверка шлёт background.tick и не шлёт tool.start и tool.end', async () => {
+    const skill = makeSkill();
+    const h = setup({ skills: [skill], results: [{ ok: true, content: 'one' }] });
+
+    await h.watcher.tick();
+
+    expect(h.events).toContainEqual({ type: 'background.tick', tool: TOOL });
+    expect(h.events.some((event) => event.type === 'tool.start' || event.type === 'tool.end')).toBe(false);
+  });
+
+  it('сработавшее наблюдение запускает реальный навык: notify и реплика, без tool.start', async () => {
+    const skill = makeSkill({
+      id: 'changes',
+      steps: [{ id: 'tell', say: 'Страница изменилась' }]
+    });
+    const bus = createEventBus();
+    const events: TishkaEvent[] = [];
+    bus.on((event) => events.push(event));
+    const registry = createToolRegistry(bus);
+    let value = 'one';
+    registry.register(
+      { name: TOOL, description: 'версия', inputSchema: { type: 'object' }, source: 'builtin', readOnly: true },
+      async () => ({ ok: true, content: value })
+    );
+    const runner = createSkillRunner({ registry, ask: vi.fn(), events: bus, now: () => local(2026, 10, 5, 9, 0) });
+    const state = createTriggerState(join(dir, 'triggers.json'));
+    states.push(state);
+    let now = local(2026, 10, 5, 9, 0);
+    const watcher = createWatcher({
+      skills: { list: async () => [skill] },
+      registry,
+      runner,
+      state,
+      events: bus,
+      now: () => now
+    });
+    watchers.push(watcher);
+
+    await watcher.tick();
+    now = local(2026, 10, 5, 9, 1);
+    value = 'two';
+    await watcher.tick();
+
+    expect(events).toContainEqual({ type: 'notify', title: 'Следи', skillId: 'changes' });
+    expect(events.some((event) => event.type === 'reply')).toBe(true);
+    expect(events.some((event) => event.type === 'tool.start' || event.type === 'tool.end')).toBe(false);
+  });
+
+  it('наблюдение раз в 15 минут: за час 4 вызова, после перезапуска без лишних', async () => {
+    const skill = makeSkill({ trigger: { type: 'watch', tool: TOOL, args: {}, everyMinutes: 15 } });
+    const h = setup({ skills: [skill], results: () => ({ ok: true, content: 'same' }) });
+
+    await h.watcher.tick();
+    h.setNow(local(2026, 10, 5, 9, 1));
+    await h.watcher.tick();
+
+    for (const minute of [15, 30, 45]) {
+      h.setNow(local(2026, 10, 5, 9, minute));
+      await h.watcher.tick();
+    }
+    expect(h.calls).toHaveLength(4);
+
+    const restarted = h.spawnWatcher();
+    h.setNow(local(2026, 10, 5, 9, 46));
+    await restarted.tick();
+    expect(h.calls).toHaveLength(4);
+
+    h.setNow(local(2026, 10, 5, 10, 0));
+    await restarted.tick();
+    expect(h.calls).toHaveLength(5);
+  });
+
+  it('выключенное наблюдение не проверяется', async () => {
+    const skill = makeSkill({ enabled: false });
+    const h = setup({ skills: [skill], results: [{ ok: true, content: 'one' }] });
+
+    h.setNow(local(2026, 10, 5, 9, 2));
+    await h.watcher.tick();
+
+    expect(h.calls).toHaveLength(0);
   });
 
   it('проверка не чаще everyMinutes: три tick за одну минуту — один вызов инструмента', async () => {

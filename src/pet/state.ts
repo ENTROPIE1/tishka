@@ -36,6 +36,9 @@ const TALK_PER_CHAR_MS = 60;
 const TALK_MAX_MS = 12000;
 const IDLE_LEAVE_MS = 30000;
 const IDLE_SLEEP_MS = 300000;
+// thinking и working не могут длиться дольше: молчание фоновой проверки не должно
+// навсегда оставлять Тишку «думающим».
+const BUSY_LIMIT_MS = 90_000;
 
 export function initialPet(now: number): PetModel {
   return { state: 'hidden', since: now, queue: [] };
@@ -147,6 +150,9 @@ export function onTick(model: PetModel, now: number, opts: PetOpts): PetModel {
       return elapsed >= MOOD_MS ? advance(model, now) : model;
     case 'talking':
       return elapsed >= talkingDuration(model.say) ? advance(model, now) : model;
+    case 'thinking':
+    case 'working':
+      return elapsed >= BUSY_LIMIT_MS ? enter(model, 'idle', now) : model;
     case 'idle': {
       // Пока открыта карточка или идёт ввод, простой не отсчитывается.
       if (opts.busy === true) {

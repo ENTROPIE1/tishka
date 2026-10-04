@@ -109,3 +109,20 @@ export function cronMatches(spec: CronSpec, date: Date): boolean {
     spec.dayOfWeek.includes(date.getDay())
   );
 }
+
+const MAX_SEARCH_MINUTES = 366 * 24 * 60;
+
+// Ближайший момент после from, подходящий под выражение. Ограничение поиска
+// годом защищает от выражений без будущих срабатываний.
+export function nextCronOccurrence(spec: CronSpec, from: Date): Date | undefined {
+  const candidate = new Date(from);
+  candidate.setSeconds(0, 0);
+  candidate.setMinutes(candidate.getMinutes() + 1);
+  for (let step = 0; step < MAX_SEARCH_MINUTES; step += 1) {
+    if (cronMatches(spec, candidate)) {
+      return new Date(candidate);
+    }
+    candidate.setMinutes(candidate.getMinutes() + 1);
+  }
+  return undefined;
+}

@@ -1,10 +1,13 @@
 import type { EventBus, Skill, ToolResult, ToolRegistry } from '../types';
 import type { RunResult } from '../skills/runner';
 import { renderTemplate, type TemplateContext } from '../skills/template';
-import type { createTriggerState, TriggerState } from './state';
+import { skillState, type createTriggerState, type TriggerState } from './state';
 
 const CHECK_INTERVAL_MS = 30_000;
 const ERROR_THRESHOLD = 3;
+// После (пере)запуска первая проверка — не раньше минуты, чтобы старт приложения
+// не дёргал все наблюдения сразу.
+const MIN_FIRST_CHECK_MS = 60_000;
 
 type WatchTrigger = Extract<Skill['trigger'], { type: 'watch' }>;
 
@@ -105,7 +108,7 @@ function valueFor(trigger: WatchTrigger, result: ToolResult): { ok: true; value:
 }
 
 export function createWatcher(deps: WatcherDeps): Watcher {
-  const lastCheck = new Map<string, number>();
+  const createdAt = deps.now().getTime();
   let timer: ReturnType<typeof setInterval> | undefined;
 
   function renderArgs(skill: Skill, trigger: WatchTrigger): Record<string, unknown> | undefined {
@@ -147,7 +150,7 @@ export function createWatcher(deps: WatcherDeps): Watcher {
       return { changed: false, touched: false };
     }
 
-    const result = await deps.registry.call(trigger.tool, args);
+    const result = await deps.registry.call(trigger.tool, args, { background: true });
     if (!result.ok) {
       countFailure(skill, state);
       return { changed: false, error: result.error ?? result.content, touched: true };
@@ -186,15 +189,23 @@ export function createWatcher(deps: WatcherDeps): Watcher {
     state.watches[skill.id] = entry;
 
     deps.events.emit({ type: 'wake', source: 'trigger' });
+    const runState = skillState(state, skill.id);
     try {
       const run = await deps.runner.run(skill, { previous, current: value });
+      runState.lastRunAt = deps.now().toISOString();
+      runState.runCount += 1;
+      runState.lastResult = run.ok ? 'ok' : run.error ?? `Навык не выполнен: ${skill.name}`;
       if (run.ok) {
         deps.events.emit({ type: 'notify', title: skill.name, skillId: skill.id });
       } else {
         deps.events.emit({ type: 'error', message: run.error ?? `Навык не выполнен: ${skill.name}` });
       }
     } catch (error) {
-      deps.events.emit({ type: 'error', message: errorMessage(error) });
+      const message = errorMessage(error);
+      runState.lastRunAt = deps.now().toISOString();
+      runState.runCount += 1;
+      runState.lastResult = message;
+      deps.events.emit({ type: 'error', message });
     }
 
     return { changed: true, value, touched: true };
@@ -215,13 +226,28 @@ export function createWatcher(deps: WatcherDeps): Watcher {
     }
 
     for (const skill of watchSkills) {
-      const trigger = skill.trigger as WatchTrigger;
-      const previousAt = lastCheck.get(skill.id);
-      const intervalMs = trigger.everyMinutes * 60_000;
-      if (previousAt !== undefined && nowMs - previousAt < intervalMs) {
+      if (skill.enabled === false) {
         continue;
       }
-      lastCheck.set(skill.id, nowMs);
+      const trigger = skill.trigger as WatchTrigger;
+      const intervalMs = trigger.everyMinutes * 60_000;
+      const previousStamp = state.watches[skill.id]?.checkedAt;
+      const previousAt = previousStamp === undefined ? Number.NaN : Date.parse(previousStamp);
+      const hasPrevious = Number.isFinite(previousAt);
+      if (hasPrevious && nowMs - previousAt < intervalMs) {
+        continue;
+      }
+      if (hasPrevious && nowMs - createdAt < MIN_FIRST_CHECK_MS) {
+        continue;
+      }
+
+      const entry = state.watches[skill.id] ?? { errors: 0 };
+      entry.checkedAt = deps.now().toISOString();
+      state.watches[skill.id] = entry;
+      const runState = skillState(state, skill.id);
+      runState.lastCheckAt = entry.checkedAt;
+      runState.nextAt = new Date(nowMs + intervalMs).toISOString();
+      changed = true;
 
       try {
         const result = await evaluate(skill, state);
@@ -276,8 +302,10 @@ export function createWatcher(deps: WatcherDeps): Watcher {
         if (skill === undefined) {
           return { changed: false, error: `Наблюдение не найдено: ${skillId}` };
         }
-        lastCheck.set(skillId, deps.now().getTime());
         const state = await deps.state.load();
+        const entry = state.watches[skillId] ?? { errors: 0 };
+        entry.checkedAt = deps.now().toISOString();
+        state.watches[skillId] = entry;
         const result = await evaluate(skill, state);
         if (result.touched) {
           await deps.state.save(state);

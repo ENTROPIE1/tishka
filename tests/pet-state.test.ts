@@ -130,6 +130,37 @@ describe('pet state', () => {
     expect(model.state).toBe('leave');
   });
 
+  it('thinking дольше 90 секунд без событий → idle', () => {
+    let model = fire(initialPet(0), { type: 'listen.end', text: 'привет' }, 0);
+    expect(model.state).toBe('thinking');
+
+    model = onTick(model, 89_999, MODE_OFF);
+    expect(model.state).toBe('thinking');
+
+    model = onTick(model, 90_000, MODE_OFF);
+    expect(model.state).toBe('idle');
+  });
+
+  it('working дольше 90 секунд без событий → idle', () => {
+    let model = fire(initialPet(0), { type: 'tool.start', tool: 't' }, 0);
+    expect(model.state).toBe('working');
+
+    model = onTick(model, 90_000, MODE_OFF);
+    expect(model.state).toBe('idle');
+  });
+
+  it('новое событие сбрасывает отсчёт страховки', () => {
+    let model = fire(initialPet(0), { type: 'tool.start', tool: 't' }, 0);
+    model = fire(model, { type: 'tool.start', tool: 't' }, 89_000);
+    expect(model.state).toBe('working');
+
+    model = onTick(model, 90_000, MODE_OFF);
+    expect(model.state).toBe('working');
+
+    model = onTick(model, 179_000, MODE_OFF);
+    expect(model.state).toBe('idle');
+  });
+
   it('error → confused → idle', () => {
     let model = fire(initialPet(0), { type: 'error', message: 'беда' }, 0);
     expect(model.state).toBe('confused');

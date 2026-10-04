@@ -21,6 +21,7 @@ export interface SkillStore {
   get(id: string): Promise<Skill | undefined>;
   save(skill: Skill): Promise<void>;
   remove(id: string): Promise<void>;
+  previewFile(path: string): Promise<ValidationResult>;
   importFile(path: string): Promise<ValidationResult>;
   exportFile(id: string, targetPath: string): Promise<void>;
   loadPresets(presetsDir: string): Promise<number>;
@@ -76,6 +77,22 @@ export function createSkillStore(dir: string): SkillStore {
     }
   }
 
+  async function previewSkillFile(path: string): Promise<ValidationResult> {
+    let raw: string;
+    try {
+      raw = await readFile(path, 'utf8');
+    } catch {
+      return { ok: false, errors: ['Не удалось прочитать файл навыка'] };
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { ok: false, errors: ['Файл навыка не является корректным JSON'] };
+    }
+    return validateSkill(parsed);
+  }
+
   return {
     async list(): Promise<Skill[]> {
       let entries;
@@ -123,20 +140,12 @@ export function createSkillStore(dir: string): SkillStore {
       }
     },
 
+    async previewFile(path: string): Promise<ValidationResult> {
+      return previewSkillFile(path);
+    },
+
     async importFile(path: string): Promise<ValidationResult> {
-      let raw: string;
-      try {
-        raw = await readFile(path, 'utf8');
-      } catch {
-        return { ok: false, errors: ['Не удалось прочитать файл навыка'] };
-      }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        return { ok: false, errors: ['Файл навыка не является корректным JSON'] };
-      }
-      const result = validateSkill(parsed);
+      const result = await previewSkillFile(path);
       if (!result.ok) {
         return result;
       }

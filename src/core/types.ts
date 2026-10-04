@@ -15,11 +15,15 @@ export interface ToolResult {
 
 export type ToolHandler = (args: Record<string, unknown>) => Promise<ToolResult>;
 
+export interface ToolCallOptions {
+  background?: boolean;         // true — не слать tool.start и tool.end, вместо них background.tick
+}
+
 export interface ToolRegistry {
   register(def: ToolDef, handler: ToolHandler): void;
   unregisterSource(source: ToolDef['source']): void;
   list(): ToolDef[];
-  call(name: string, args: Record<string, unknown>): Promise<ToolResult>;
+  call(name: string, args: Record<string, unknown>, opts?: ToolCallOptions): Promise<ToolResult>;
 }
 
 export type Mood = 'neutral' | 'happy' | 'confused';
@@ -48,7 +52,9 @@ export type TishkaEvent =
   | { type: 'speak.level'; level: number }   // 0..1
   | { type: 'speak.end' }
   | { type: 'notify'; title: string; skillId?: string }
+  | { type: 'background.tick'; tool: string }
   | { type: 'skill.saved'; skillId: string }
+  | { type: 'skill.removed'; skillId: string }
   | { type: 'error'; message: string }
   | { type: 'idle' };
 
@@ -67,6 +73,7 @@ export interface Skill {
   inputs?: SkillInput[];
   steps: Step[];
   requires?: string[];           // имена серверов из mcpServers: "confluence", "exchange"
+  enabled?: boolean;             // нет поля — включён; выключенный не запускается сам и не идёт агенту
 }
 
 export type Trigger =

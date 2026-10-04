@@ -58,11 +58,13 @@ interface ToolRegistry {
   register(def: ToolDef, handler: ToolHandler): void;
   unregisterSource(source: ToolDef['source']): void;
   list(): ToolDef[];
-  call(name: string, args: Record<string, unknown>): Promise<ToolResult>;
+  call(name: string, args: Record<string, unknown>, opts?: { background?: boolean }): Promise<ToolResult>;
 }
 ```
 
 `call` никогда не бросает исключение: ошибка возвращается как `{ ok: false, error }`.
+
+При `opts.background === true` события `tool.start` и `tool.end` не отправляются, вместо них — `background.tick` с именем вызванного инструмента. Так фоновые проверки наблюдений и расписания не переводят окно-питомец в состояние «работает».
 
 ## Ответ Тишки
 
@@ -97,7 +99,9 @@ type TishkaEvent =
   | { type: 'speak.level'; level: number }   // 0..1
   | { type: 'speak.end' }
   | { type: 'notify'; title: string; skillId?: string }
+  | { type: 'background.tick'; tool: string }
   | { type: 'skill.saved'; skillId: string }
+  | { type: 'skill.removed'; skillId: string }
   | { type: 'error'; message: string }
   | { type: 'idle' };
 
@@ -122,6 +126,7 @@ interface Skill {
   inputs?: SkillInput[];
   steps: Step[];
   requires?: string[];           // имена серверов из mcpServers: "confluence", "exchange"
+  enabled?: boolean;             // нет поля — включён; выключенный не запускается сам и не идёт агенту
 }
 
 type Trigger =

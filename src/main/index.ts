@@ -9,6 +9,7 @@ import { createSecretStore } from '../core/secrets/store';
 import { createSttService, type SttService } from '../voice/stt-service';
 import { openMainWindow } from './chat-window';
 import { OPEN_CHAT_CHANNEL } from './ipc-channels';
+import { registerAutomationIpc } from './ipc-automations';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
 import { registerVoiceIpc } from './ipc-voice';
@@ -77,6 +78,7 @@ app.whenReady().then(async () => {
   core = tishka;
 
   registerIpc(bus, tishka, secrets);
+  registerAutomationIpc(tishka);
   registerSettingsIpc(tishka, secrets, {
     // Голос перезапускается сам, если изменились программа, модель или адрес.
     onConfigSaved: (previous, next) => {

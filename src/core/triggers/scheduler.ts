@@ -1,15 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { EventBus, Skill } from '../types';
-import type { RunResult } from '../skills/runner';
-import { cronMatches, parseCron, type CronSpec } from './cron';
-import type { createTriggerState, Reminder, TriggerState } from './state';
+import type { RunResult, SkillRunOptions } from '../skills/runner';
+import { cronMatches, nextCronOccurrence, parseCron, type CronSpec } from './cron';
+import { skillState, type createTriggerState, type Reminder, type TriggerState } from './state';
 
 const MISSED_LIMIT_MS = 12 * 60 * 60 * 1000;
 const CHECK_INTERVAL_MS = 20_000;
 
 export interface SchedulerDeps {
   skills: { list(): Promise<Skill[]> };
-  runner: { run(skill: Skill, inputs?: Record<string, unknown>): Promise<RunResult> };
+  runner: { run(skill: Skill, inputs?: Record<string, unknown>, opts?: SkillRunOptions): Promise<RunResult> };
   state: ReturnType<typeof createTriggerState>;
   events: EventBus;
   now: () => Date;
@@ -51,17 +51,35 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     deps.events.emit({ type: 'reply', reply: { say: reminder.text } });
   }
 
-  async function runSkill(skill: Skill): Promise<void> {
+  function setNext(state: TriggerState, id: string, value: string | undefined): boolean {
+    if (value === undefined) {
+      return false;
+    }
+    const runState = skillState(state, id);
+    if (runState.nextAt === value) {
+      return false;
+    }
+    runState.nextAt = value;
+    return true;
+  }
+
+  async function runSkill(skill: Skill, state: TriggerState): Promise<void> {
     deps.events.emit({ type: 'wake', source: 'trigger' });
+    const runState = skillState(state, skill.id);
+    runState.lastRunAt = deps.now().toISOString();
+    runState.runCount += 1;
     try {
-      const result = await deps.runner.run(skill);
+      const result = await deps.runner.run(skill, undefined, { background: true });
+      runState.lastResult = result.ok ? 'ok' : result.error ?? `Навык не выполнен: ${skill.name}`;
       if (result.ok) {
         deps.events.emit({ type: 'notify', title: skill.name, skillId: skill.id });
       } else {
         deps.events.emit({ type: 'error', message: result.error ?? `Навык не выполнен: ${skill.name}` });
       }
     } catch (error) {
-      deps.events.emit({ type: 'error', message: errorMessage(error) });
+      const message = errorMessage(error);
+      runState.lastResult = message;
+      deps.events.emit({ type: 'error', message });
     }
   }
 
@@ -97,7 +115,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
 
     const skills = await deps.skills.list();
     for (const skill of skills) {
-      if (skill.trigger.type !== 'schedule') {
+      if (skill.trigger.type !== 'schedule' || skill.enabled === false) {
         continue;
       }
 
@@ -107,6 +125,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         }
         const at = Date.parse(skill.trigger.at);
         if (Number.isNaN(at) || nowMs < at) {
+          if (!Number.isNaN(at) && setNext(state, skill.id, skill.trigger.at)) {
+            changed = true;
+          }
           continue;
         }
         state.firedOnce.push(skill.id);
@@ -114,7 +135,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         if (nowMs - at > MISSED_LIMIT_MS) {
           continue;
         }
-        await runSkill(skill);
+        await runSkill(skill, state);
         continue;
       }
 
@@ -131,6 +152,11 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         continue;
       }
 
+      const next = nextCronOccurrence(spec, now);
+      if (setNext(state, skill.id, next?.toISOString())) {
+        changed = true;
+      }
+
       if (!cronMatches(spec, now)) {
         continue;
       }
@@ -139,7 +165,8 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         continue;
       }
       firedMinutes.add(key);
-      await runSkill(skill);
+      await runSkill(skill, state);
+      changed = true;
     }
 
     if (changed) {

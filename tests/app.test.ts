@@ -387,6 +387,46 @@ describe('createTishkaCore', () => {
     expect(dividers()).toBe(baseline + 1);
   });
 
+  it('skills.overview отдаёт навыки с описанием и состоянием', async () => {
+    const { core } = await setup();
+
+    const entries = await core.skills.overview();
+    const watch = entries.find((entry) => entry.skill.id === 'watch-page');
+
+    expect(entries.length).toBeGreaterThan(0);
+    expect(watch?.description.kind).toBe('watch');
+    expect(watch?.description.when).toContain('каждые');
+    expect(watch?.state.runCount).toBe(0);
+  });
+
+  it('skills.setEnabled выключает навык, экспорт не содержит состояния запусков', async () => {
+    const { core, dataDir } = await setup();
+
+    await expect(core.skills.setEnabled('watch-page', false)).resolves.toBe(true);
+    const off = (await core.skills.overview()).find((entry) => entry.skill.id === 'watch-page');
+    expect(off?.skill.enabled).toBe(false);
+
+    const target = join(dataDir, 'watch-page.export.json');
+    await core.skills.export('watch-page', target);
+    const exported = JSON.parse(await readFile(target, 'utf8')) as Record<string, unknown>;
+
+    expect(exported).not.toHaveProperty('runCount');
+    expect(exported).not.toHaveProperty('lastRunAt');
+    expect(exported).not.toHaveProperty('nextAt');
+    expect(exported).not.toHaveProperty('state');
+  });
+
+  it('skills.save отвергает неверный навык со списком ошибок', async () => {
+    const { core } = await setup();
+
+    const result = await core.skills.save({ format: 'tishka-skill/1', id: 'bad id!', name: '' } as never);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.join(' ')).toContain('id');
+    }
+  });
+
   it('длинное сообщение человека сокращено в контексте и полно в истории', async () => {
     const bodies: string[] = [];
     const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {

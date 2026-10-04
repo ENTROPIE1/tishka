@@ -304,6 +304,9 @@ export function validateSkill(input: unknown, knownTools?: string[]): Validation
   if (isStringArray(input.requires)) {
     skill.requires = input.requires;
   }
+  if (typeof input.enabled === 'boolean') {
+    skill.enabled = input.enabled;
+  }
 
   return { ok: true, skill };
 }
