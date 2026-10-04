@@ -1,11 +1,14 @@
+import { readFile } from 'node:fs/promises';
 import { BrowserWindow, clipboard, ClipboardItem, ipcMain, shell } from 'electron';
 import type { TishkaCore } from '../core/app';
 import type { EventBus, SecretStore, TishkaEvent } from '../core/types';
 import {
   CONFIG_CHANGED_CHANNEL,
+  COPY_IMAGE_CHANNEL,
   COPY_RICH_CHANNEL,
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
+  OPEN_IMAGE_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
   HISTORY_SEARCH_CHANNEL,
@@ -93,6 +96,25 @@ export function registerIpc(bus: EventBus, core: TishkaCore, secrets: SecretStor
       return;
     }
     return clipboard.write([new ClipboardItem({ 'text/html': html, 'text/plain': text })]);
+  });
+
+  // Карточка-картинка: в буфер кладётся сама картинка, а не путь к файлу.
+  ipcMain.handle(COPY_IMAGE_CHANNEL, async (_event, path: unknown) => {
+    if (typeof path !== 'string' || path === '') {
+      return;
+    }
+    const bytes = await readFile(path);
+    await clipboard.write([
+      new ClipboardItem({ 'image/png': new Blob([bytes], { type: 'image/png' }) })
+    ]);
+  });
+
+  // Щелчок по картинке открывает её в программе просмотра файлов.
+  ipcMain.handle(OPEN_IMAGE_CHANNEL, (_event, path: unknown) => {
+    if (typeof path !== 'string' || path === '') {
+      return;
+    }
+    return shell.openPath(path);
   });
 
   ipcMain.handle(SECRETS_SET_CHANNEL, async (_event, name: unknown, value: unknown) => {

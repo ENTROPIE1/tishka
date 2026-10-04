@@ -86,6 +86,8 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       return enter(model, 'working', now);
     case 'tool.end':
       return enter(model, 'thinking', now);
+    case 'status':
+      return { ...model, say: event.text };
     case 'reply': {
       // Новый ответ заменяет прежнюю карточку: показывается либо результат, либо ввод.
       const base: PetModel = { since: now, queue: [], say: event.reply.say, state: model.state };

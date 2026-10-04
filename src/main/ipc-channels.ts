@@ -7,6 +7,8 @@ export const NEW_CONVERSATION_CHANNEL = 'tishka:new-conversation';
 export const OPEN_EXTERNAL_CHANNEL = 'tishka:open-external';
 export const COPY_TEXT_CHANNEL = 'tishka:copy-text';
 export const COPY_RICH_CHANNEL = 'tishka:copy-rich';
+export const COPY_IMAGE_CHANNEL = 'tishka:copy-image';
+export const OPEN_IMAGE_CHANNEL = 'tishka:open-image';
 
 export const SECRETS_SET_CHANNEL = 'tishka:secrets:set';
 export const SECRETS_HAS_CHANNEL = 'tishka:secrets:has';

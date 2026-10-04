@@ -51,6 +51,18 @@ describe('panelElement: копирование', () => {
     expect(onCopy).toHaveBeenCalledWith('Планёрка\n10:00');
     expect(onCopyRich).not.toHaveBeenCalled();
   });
+
+  it('карточка image кладёт в буфер картинку, а не путь', () => {
+    const panel: Panel = { kind: 'image', title: 'Снимок экрана', path: 'C:/shots/снимок.png' };
+    const onCopy = vi.fn<(text: string) => void>();
+    const onCopyImage = vi.fn<(path: string) => void>();
+    const card = panelElement(panel, { onCopy, onCopyImage });
+
+    clickCopy(card);
+
+    expect(onCopyImage).toHaveBeenCalledWith('C:/shots/снимок.png');
+    expect(onCopy).not.toHaveBeenCalled();
+  });
 });
 
 describe('panelElement: сообщение о копировании', () => {

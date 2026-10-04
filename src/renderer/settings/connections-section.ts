@@ -1,7 +1,7 @@
 import type { ConnectionTemplate } from '../../core/connections';
 import type { ConnectionView } from '../../main/ipc-settings';
 import { openEditor, TEMPLATE_OPTIONS, templateLabel } from './connection-editor';
-import { button, clear, el, runWithFeedback, sectionTitle, selectInput, type SettingsSection } from './dom';
+import { button, clear, el, field, runWithFeedback, sectionTitle, selectInput, type SettingsSection } from './dom';
 
 const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
 
@@ -27,7 +27,15 @@ export function mountConnectionsSection(root: HTMLElement): SettingsSection {
   const addRow = el('div', 'row');
   addRow.append(templateSelect, addButton);
 
-  root.append(list, addRow, addHost, messages);
+  const screenEnabled = el('input', 'checkbox-input');
+  screenEnabled.type = 'checkbox';
+  const screenField = field(
+    'Разрешить смотреть на экран',
+    screenEnabled,
+    'Снимок делается только по вашей просьбе и уходит в локальную модель ДКС; на диск не сохраняется'
+  );
+
+  root.append(list, screenField, addRow, addHost, messages);
 
   let views: ConnectionView[] = [];
 
@@ -48,6 +56,27 @@ export function mountConnectionsSection(root: HTMLElement): SettingsSection {
       showError(error);
     }
   }
+
+  async function refreshScreen(): Promise<void> {
+    const view = await window.tishka.config.get();
+    screenEnabled.checked = view.config.screen.enabled;
+  }
+
+  screenEnabled.addEventListener('change', () => {
+    void (async () => {
+      try {
+        const view = await window.tishka.config.get();
+        await window.tishka.config.save({ ...view.config, screen: { enabled: screenEnabled.checked } });
+        clear(messages);
+        messages.append(
+          el('div', 'message-ok', screenEnabled.checked ? 'Смотреть на экран разрешено' : 'Смотреть на экран запрещено')
+        );
+      } catch (error) {
+        screenEnabled.checked = !screenEnabled.checked;
+        showError(error);
+      }
+    })();
+  });
 
   function card(view: ConnectionView): HTMLElement {
     const box = el('div', 'connection');
@@ -147,6 +176,16 @@ export function mountConnectionsSection(root: HTMLElement): SettingsSection {
   });
 
   void refresh();
+  void refreshScreen().catch((error: unknown) => {
+    showError(error);
+  });
 
-  return { refresh: () => void refresh() };
+  return {
+    refresh: () => {
+      void refresh();
+      void refreshScreen().catch((error: unknown) => {
+        showError(error);
+      });
+    }
+  };
 }

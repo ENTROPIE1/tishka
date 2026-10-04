@@ -12,6 +12,7 @@ const settingsButton = document.getElementById('open-settings') as HTMLButtonEle
 const bannerButton = document.getElementById('open-settings-banner') as HTMLButtonElement;
 const noKeyBanner = document.getElementById('no-key') as HTMLElement;
 const micSlot = document.getElementById('mic-slot') as HTMLElement;
+const screenLookButton = document.getElementById('screen-look') as HTMLButtonElement;
 const dictation = document.getElementById('dictation') as HTMLElement;
 const dictationLevel = document.getElementById('dictation-level') as HTMLElement;
 const dictationLabel = dictation.querySelector('.dictation-label') as HTMLElement;
@@ -123,6 +124,17 @@ function initTalkMode(): void {
   micSlot.append(talkMode.button);
 }
 
+// Кнопка с глазом отправляет набранный вопрос вместе с просьбой посмотреть на экран.
+function initScreenLookButton(): void {
+  screenLookButton.addEventListener('click', () => {
+    const question = input.value.trim();
+    const text = question === '' ? 'Посмотри, что у меня на экране' : `Посмотри на экран. ${question}`;
+    window.tishka.sendUserText(text);
+    input.value = '';
+    input.focus();
+  });
+}
+
 function initClearButton(): void {
   clearButton.addEventListener('click', () => {
     if (!window.confirm('Очистить всю переписку с Тишкой?')) {
@@ -175,6 +187,7 @@ initEvents();
 initFeed();
 initComposer();
 initTalkMode();
+initScreenLookButton();
 initClearButton();
 mountChatToolbar({ feed: view, reload: reloadFeed, loadAll: () => window.tishka.history(2000) });
 initSettingsButtons();

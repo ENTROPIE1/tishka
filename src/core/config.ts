@@ -27,7 +27,8 @@ export function defaultConfig(): Config {
     mcpServers: [],
     persona: { fyr: 'sometimes' },
     pet: { x: null },
-    petMode: false
+    petMode: false,
+    screen: { enabled: true }
   };
 }
 
@@ -161,6 +162,7 @@ export function mergeConfig(value: unknown): Config {
   const tts = isRecord(voice.tts) ? voice.tts : {};
   const persona = isRecord(value.persona) ? value.persona : {};
   const pet = isRecord(value.pet) ? value.pet : {};
+  const screen = isRecord(value.screen) ? value.screen : {};
   return normalizeConfig({
     llm: {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
@@ -189,7 +191,8 @@ export function mergeConfig(value: unknown): Config {
     mcpServers: parseMcpServers(value.mcpServers),
     persona: { fyr: pickFyr(persona.fyr, defaults.persona.fyr) },
     pet: { x: pickPetX(pet.x, defaults.pet.x) },
-    petMode: pickBoolean(value.petMode, defaults.petMode)
+    petMode: pickBoolean(value.petMode, defaults.petMode),
+    screen: { enabled: pickBoolean(screen.enabled, defaults.screen.enabled) }
   });
 }
 

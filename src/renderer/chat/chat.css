@@ -278,6 +278,10 @@ body {
   border-radius: 8px;
 }
 
+.card-image-open {
+  cursor: pointer;
+}
+
 .card-actions {
   flex: none;
   display: flex;
@@ -414,6 +418,12 @@ body {
 .mic-slot {
   flex: none;
   display: flex;
+}
+
+.screen-look-button {
+  flex: none;
+  width: 34px;
+  height: 34px;
 }
 
 .mic-button {

@@ -101,6 +101,12 @@ function messageElement(entry: HistoryEntry): HTMLElement {
         },
         onCopyRich: (html, text) => {
           void window.tishka.copyRich(html, text);
+        },
+        onCopyImage: (path) => {
+          void window.tishka.copyImage(path);
+        },
+        onOpenImage: (path) => {
+          void window.tishka.openImage(path);
         }
       })
     );

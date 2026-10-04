@@ -31,9 +31,11 @@ import {
   CONNECTIONS_REMOVE_CHANNEL,
   CONNECTIONS_SAVE_CHANNEL,
   CONNECTIONS_STATUS_CHANNEL,
+  COPY_IMAGE_CHANNEL,
   COPY_RICH_CHANNEL,
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
+  OPEN_IMAGE_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
   HISTORY_SEARCH_CHANNEL,
@@ -111,6 +113,12 @@ const api = {
   },
   copyRich(html: string, text: string): Promise<void> {
     return ipcRenderer.invoke(COPY_RICH_CHANNEL, html, text);
+  },
+  copyImage(path: string): Promise<void> {
+    return ipcRenderer.invoke(COPY_IMAGE_CHANNEL, path);
+  },
+  openImage(path: string): Promise<void> {
+    return ipcRenderer.invoke(OPEN_IMAGE_CHANNEL, path);
   },
   secrets: {
     set(name: string, value: string): Promise<void> {

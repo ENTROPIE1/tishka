@@ -21,6 +21,7 @@ import { createSpeechOutput, type SpeechOutput } from './pet-speak';
 import { createPetTray, type PetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
 import { registerPetWake, type PetWake } from './pet-wake';
+import { createScreenCapture } from './screen-capture';
 import { openStandWindow } from './stand-window';
 import { createWakeFlow } from '../voice/wake-flow';
 
@@ -69,6 +70,17 @@ app.whenReady().then(async () => {
   const appRoot = app.isPackaged ? app.getAppPath() : join(__dirname, '..', '..');
   const secrets = createSecretStore(join(dataDir, 'secrets.bin'), electronCrypto);
 
+  // Окно-питомец создаётся ниже, а снимок запрашивается уже после запуска,
+  // поэтому замыкание обращается к pet по ссылке.
+  const screenCapture = createScreenCapture({
+    hidePet: async () => {
+      pet?.hide();
+    },
+    showPet: () => {
+      pet?.show();
+    }
+  });
+
   const tishka = createTishkaCore({
     dataDir,
     presetsDir: join(appRoot, 'presets'),
@@ -78,7 +90,8 @@ app.whenReady().then(async () => {
     openExternal: (url) => shell.openExternal(url),
     // Панели приходят в составе ответа, отдельного показа пока не нужно.
     showPanel: () => undefined,
-    now: () => new Date()
+    now: () => new Date(),
+    captureScreen: (target) => screenCapture.capture(target)
   });
   core = tishka;
 
