@@ -2,6 +2,7 @@ import type { BrowserWindow } from 'electron';
 import type { Config, EventBus } from '../core/types';
 import { initialPet, onEvent, onTick, type PetModel, type TalkSource } from '../pet/state';
 import { PET_LAYOUT_CHANNEL, PET_MODEL_CHANNEL } from './ipc-channels';
+import type { PetActivation } from './pet-activation';
 import type { Mover } from './pet-motion';
 import type { PetPlacement } from './pet-placement';
 
@@ -11,6 +12,7 @@ export interface PetLifecycleDeps {
   window: BrowserWindow;
   mover: Mover;
   placement: PetPlacement;
+  activation: PetActivation;
   bus: EventBus & { source?(): TalkSource };   // источник текущего обращения: чат или ёж
   getConfig: () => Config;
 }
@@ -24,7 +26,7 @@ export interface PetLifecycle {
 
 // Состояние ёжика: показ, уход, анимация появления и подписка на события.
 export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
-  const { window, mover, placement, bus } = deps;
+  const { window, mover, placement, activation, bus } = deps;
   let model: PetModel = initialPet(Date.now());
   let busy = false;
   let tickTimer: NodeJS.Timeout | undefined;
@@ -41,6 +43,7 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
     placement.ensureOnScreen();
     window.setBounds(placement.bounds());
     window.showInactive();
+    activation.sendPointer();
   }
 
   function applyState(previous: PetModel, next: PetModel): void {
@@ -55,6 +58,8 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
         placement.ensureOnScreen();
         window.setBounds(placement.bounds());
         window.showInactive();
+        // Когда окно встало на место, считаем интерактивность по курсору.
+        activation.sendPointer();
         break;
       case 'leave':
         // Уход — тоже на месте: окно не двигается, персонаж уходит сам,
@@ -96,6 +101,8 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
   window.webContents.on('did-finish-load', () => {
     sendModel();
     sendLayout();
+    // Перезагрузка окна: курсор мог уже стоять над строкой ввода.
+    activation.sendPointer();
   });
 
   return {

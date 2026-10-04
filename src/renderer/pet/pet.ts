@@ -2,8 +2,10 @@ import type { PetModel, PetState } from '../../pet/state';
 import { clipForState, type Character } from './character';
 import { createCharacter } from './character-factory';
 import { createComposer } from './composer';
+import { composerBusy, composerCollapsed } from './composer-state';
 import { applyPetLayout } from './layout-view';
 import { createListenUi } from './listen-ui';
+import { createInteractivity, hitTestRegions } from './interactivity';
 import { micThreshold } from '../shared/mic-threshold';
 import { createPetCard } from './pet-card';
 import { createSpeaker } from './speaker';
@@ -22,7 +24,6 @@ const characterModel: Character = createCharacter('svg');
 
 let mirrored = false;
 let currentState: PetState = 'hidden';
-let interactive = false;
 let dragging = false;
 let dragMoved = false;
 let dragLastX = 0;
@@ -37,9 +38,17 @@ const composer = createComposer({
     }
     window.tishka.pet.wakeEscape();
   },
-  onExpand: () => openComposer()
+  onExpand: () => openComposer(),
+  onFocus: () => window.tishka.pet.focus()
 });
 composerHost.append(composer.element);
+
+const regions = [character, bubble, cardHost, composer.element];
+const interactivity = createInteractivity({
+  isVisible: () => onScreen,
+  hitTest: (x, y) => hitTestRegions(regions, x, y),
+  setInteractive: (value) => window.tishka.pet.setInteractive(value)
+});
 
 const speaker = createSpeaker({
   setMouth: (level) => characterModel.setMouth(level),
@@ -75,11 +84,8 @@ function applyComposer(state: PetState, visible: boolean): void {
     return;
   }
   // В состоянии сна и при уведомлении строка свёрнута в полочку.
-  composer.setCollapsed(state === 'sleep' || state === 'notify');
-  composer.setBusy(state === 'thinking' || state === 'working');
-  if (!onScreen) {
-    composer.focus();
-  }
+  composer.setCollapsed(composerCollapsed(state));
+  composer.setBusy(composerBusy(state));
 }
 
 // Ёжик смотрит на колонку ответов: в обычной раскладке — влево, в зеркальной —
@@ -109,27 +115,6 @@ function renderModel(model: PetModel): void {
   refreshBusy();
 }
 
-function isInteractiveAt(x: number, y: number): boolean {
-  const element = document.elementFromPoint(x, y);
-  if (element === null) {
-    return false;
-  }
-  return (
-    character.contains(element) ||
-    bubble.contains(element) ||
-    cardHost.contains(element) ||
-    composer.element.contains(element)
-  );
-}
-
-function setInteractive(value: boolean): void {
-  if (value === interactive) {
-    return;
-  }
-  interactive = value;
-  window.tishka.pet.setInteractive(value);
-}
-
 function openComposer(): void {
   window.tishka.pet.wake('click');
   window.tishka.pet.focus();
@@ -149,7 +134,7 @@ function initCharacter(): void {
     dragging = true;
     dragMoved = false;
     dragLastX = event.screenX;
-    setInteractive(true);
+    interactivity.set(true);
     event.preventDefault();
   });
 }
@@ -167,7 +152,7 @@ function initPointer(): void {
       }
       return;
     }
-    setInteractive(isInteractiveAt(event.clientX, event.clientY));
+    interactivity.set(hitTestRegions(regions, event.clientX, event.clientY));
   });
   window.addEventListener('mouseup', () => {
     if (!dragging) {
@@ -190,6 +175,12 @@ window.tishka.onEvent((event) => {
   }
 });
 window.tishka.pet.setInteractive(false);
+window.tishka.pet.onPointer((point) => interactivity.recalc(point));
+window.tishka.pet.onFocusInput(() => {
+  if (!composer.element.hidden) {
+    composer.focus();
+  }
+});
 window.tishka.pet.onLayout((layout) => {
   mirrored = layout.mirrored;
   applyPetLayout(pet, layout);

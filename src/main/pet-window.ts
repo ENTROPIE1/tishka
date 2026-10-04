@@ -1,40 +1,14 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
-import type { Config, EventBus } from '../core/types';
-import type { TalkSource } from '../pet/state';
-import type { ListenCommand } from '../voice/listen';
-import type { WakeState } from '../voice/wake';
-import type { SpeakMessage } from '../voice/speech-queue';
 import { PET_LISTEN_COMMAND_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
 import { guardNavigation } from './navigation-guard';
+import { createPetActivation } from './pet-activation';
 import { createPetLifecycle, type PetLifecycle } from './pet-lifecycle';
 import { Mover } from './pet-motion';
 import { PetPlacement } from './pet-placement';
+import type { PetWindow, PetWindowDeps } from './pet-window-types';
 
-export interface PetWindowDeps {
-  bus: EventBus & { source?(): TalkSource };   // источник текущего обращения: чат или ёж
-  getConfig: () => Config;
-  savePetX: (x: number | null) => Promise<void>;
-  onReload?: () => void;
-}
-
-export interface PetWindow {
-  wake(source: 'name' | 'hotkey' | 'click' | 'trigger'): void;
-  setInteractive(interactive: boolean): void;
-  setBusy(busy: boolean): void;
-  focusWindow(): void;
-  dragBy(deltaX: number): void;
-  dragEnd(): void;
-  listenCommand(command: ListenCommand): void;
-  wakeState(state: WakeState): void;
-  speak(message: SpeakMessage): void;
-  stopSpeaking(): void;
-  hide(): void;
-  show(): void;
-  leave(): void;
-  reload(): void;
-  dispose(): void;
-}
+export type { PetWindow, PetWindowDeps } from './pet-window-types';
 
 export function createPetWindow(deps: PetWindowDeps): PetWindow {
   const placement = new PetPlacement(deps.getConfig().pet.x, {});
@@ -65,7 +39,10 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   }
 
   const mover = new Mover(window, placement.geometry);
-  const lifecycle: PetLifecycle = createPetLifecycle({ window, mover, placement, bus: deps.bus, getConfig: deps.getConfig });
+  const activation = createPetActivation(window);
+  const lifecycle: PetLifecycle = createPetLifecycle({
+    window, mover, placement, activation, bus: deps.bus, getConfig: deps.getConfig
+  });
 
   function send(channel: string, payload?: unknown): void {
     if (!window.isDestroyed()) window.webContents.send(channel, payload);
@@ -75,15 +52,17 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     placement.ensureOnScreen();
     window.setBounds(placement.bounds());
     window.showInactive();
+    // Курсор мог уже стоять над строкой ввода: интерактивность считаем сразу.
+    activation.sendPointer();
   }
 
   return {
     wake(source): void {
-      // Фокус окна забирают только вызов по клавише и щелчок.
-      const focus = source === 'hotkey' || source === 'click';
+      // Фокус окна забирают только вызов по клавише и щелчок;
+      // при вызове по имени и уведомлении окно остаётся без фокуса.
       deps.bus.emit({ type: 'wake', source });
-      if (focus && !window.isDestroyed() && window.isVisible()) {
-        window.focus();
+      if ((source === 'hotkey' || source === 'click') && !window.isDestroyed()) {
+        activation.focus();
       }
     },
     setInteractive(value): void {
@@ -95,7 +74,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     focusWindow(): void {
       if (window.isDestroyed()) return;
       if (!window.isVisible()) showAtRest();
-      window.focus();
+      activation.focus();
     },
     dragBy(deltaX): void {
       if (window.isDestroyed()) return;
@@ -103,6 +82,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
       placement.dragBy(deltaX);
       window.setBounds(placement.bounds());
       lifecycle.sendLayout();
+      activation.sendPointer();
     },
     dragEnd(): void {
       void deps.savePetX(placement.layout.petX);

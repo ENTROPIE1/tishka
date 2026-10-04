@@ -4,11 +4,22 @@ import type { Config } from '../src/core/types';
 interface FakeWindow {
   visible: boolean;
   hidden: number;
+  focused: number;
   bounds: { x: number; y: number; width: number; height: number };
   models: string[];
+  cursor: { x: number; y: number };
+  sent: { channel: string; payload: unknown }[];
 }
 
-const fake: FakeWindow = { visible: false, hidden: 0, bounds: { x: 0, y: 0, width: 0, height: 0 }, models: [] };
+const fake: FakeWindow = {
+  visible: false,
+  hidden: 0,
+  focused: 0,
+  bounds: { x: 0, y: 0, width: 0, height: 0 },
+  models: [],
+  cursor: { x: 0, y: 0 },
+  sent: []
+};
 const listeners = new Map<string, (payload: unknown) => void>();
 
 vi.mock('electron', () => {
@@ -22,6 +33,7 @@ vi.mock('electron', () => {
       getURL: () => 'file:///app/renderer/pet/index.html',
       setWindowOpenHandler: () => undefined,
       send: (channel: string, payload: unknown) => {
+        fake.sent.push({ channel, payload });
         if (channel === 'tishka:pet:model') {
           fake.models.push((payload as { state: string }).state);
         }
@@ -59,7 +71,9 @@ vi.mock('electron', () => {
     isVisible(): boolean {
       return fake.visible;
     }
-    focus(): void {}
+    focus(): void {
+      fake.focused += 1;
+    }
     isDestroyed(): boolean {
       return false;
     }
@@ -69,7 +83,8 @@ vi.mock('electron', () => {
     BrowserWindow: MockBrowserWindow,
     screen: {
       getPrimaryDisplay: () => ({ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }),
-      getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }]
+      getAllDisplays: () => [{ workArea: { x: 0, y: 0, width: 1920, height: 1080 } }],
+      getCursorScreenPoint: () => fake.cursor
     },
     shell: { openExternal: () => undefined }
   };
@@ -90,8 +105,11 @@ beforeEach(() => {
   vi.useFakeTimers();
   fake.visible = false;
   fake.hidden = 0;
+  fake.focused = 0;
   fake.bounds = { x: 2000, y: 0, width: 440, height: 884 };
   fake.models = [];
+  fake.cursor = { x: 0, y: 0 };
+  fake.sent = [];
   listeners.clear();
 });
 
@@ -136,6 +154,43 @@ describe('окно-питомец: уход по просьбе', () => {
 
     expect(visibleAfterFirst).toBe(true);
     expect(fake.visible).toBe(true);
+    pet.dispose();
+  });
+
+  it('по клавише и щелчку окно забирает фокус, по имени — нет', () => {
+    const bus = createEventBus();
+    const pet = createPetWindow({
+      bus,
+      getConfig: () => config(false),
+      savePetX: async () => undefined
+    });
+
+    pet.wake('click');
+    expect(fake.focused).toBeGreaterThan(0);
+
+    const before = fake.focused;
+    pet.wake('name');
+    expect(fake.focused).toBe(before);
+    pet.dispose();
+  });
+
+  it('при показе окна отдаёт текущее положение курсора', () => {
+    const bus = createEventBus();
+    const pet = createPetWindow({
+      bus,
+      getConfig: () => config(false),
+      savePetX: async () => undefined
+    });
+
+    fake.cursor = { x: 1234, y: 321 };
+    pet.wake('name');
+    vi.advanceTimersByTime(1000);
+
+    const pointer = fake.sent.filter((message) => message.channel === 'tishka:pet:pointer').at(-1);
+    expect(pointer).toBeDefined();
+    const point = pointer?.payload as { x: number; y: number };
+    expect(point.x).toBe(1234 - fake.bounds.x);
+    expect(point.y).toBe(321 - fake.bounds.y);
     pet.dispose();
   });
 });
