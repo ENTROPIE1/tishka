@@ -5,17 +5,13 @@ import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
 import type { ListenCommand } from '../voice/listen';
 import type { WakeState } from '../voice/wake';
 import type { SpeakMessage } from '../voice/speech-queue';
-import {
-  PET_LISTEN_COMMAND_CHANNEL,
-  PET_MODEL_CHANNEL,
-  PET_SPEAK_CHANNEL,
-  PET_SPEAK_STOP_CHANNEL,
-  PET_WAKE_STATE_CHANNEL
-} from './ipc-channels';
+import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
 import { Mover, clamp, type Geometry } from './pet-motion';
 
 const WIDTH = 440;
-const HEIGHT = 820;
+const CONTENT_HEIGHT = 820;
+const COMPOSER_HEIGHT = 64;
+const HEIGHT = CONTENT_HEIGHT + COMPOSER_HEIGHT;
 const TICK_MS = 250;
 const MIN_VISIBLE = 80;
 
@@ -60,7 +56,6 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
       contextIsolation: true, nodeIntegration: false, backgroundThrottling: false
     }
   });
-
   window.setMenu(null);
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setIgnoreMouseEvents(true, { forward: true });
@@ -81,12 +76,11 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   const mover = new Mover(window, geometry);
   let model: PetModel = initialPet(Date.now());
   let busy = false;
+  let focusOnAppear = false;
   let tickTimer: NodeJS.Timeout | undefined;
 
   function sendModel(): void {
-    if (!window.isDestroyed()) {
-      window.webContents.send(PET_MODEL_CHANNEL, model);
-    }
+    if (!window.isDestroyed()) window.webContents.send(PET_MODEL_CHANNEL, model);
   }
 
   function showAtRest(): void {
@@ -106,18 +100,14 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
         mover.to(restX);
         break;
       case 'leave':
-        mover.to(geometry.hiddenX, () => {
-          window.hide();
-        });
+        mover.to(geometry.hiddenX, () => window.hide());
         break;
       case 'hidden':
         mover.stop();
         window.hide();
         break;
       default:
-        if (!window.isVisible()) {
-          showAtRest();
-        }
+        if (!window.isVisible()) showAtRest();
         break;
     }
   }
@@ -141,16 +131,20 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   }
 
   const unsubscribe = deps.bus.on(handleEvent);
-
   tickTimer = setInterval(() => {
     applyModel(onTick(model, Date.now(), { petMode: petMode(), busy }));
   }, TICK_MS);
-
   window.webContents.on('did-finish-load', sendModel);
 
   return {
     wake(source): void {
+      // Фокус окна забирают только вызов по клавише и щелчок;
+      // при вызове по имени и уведомлении окно остаётся без фокуса.
+      focusOnAppear = source === 'hotkey' || source === 'click';
       deps.bus.emit({ type: 'wake', source });
+      if (focusOnAppear && !window.isDestroyed() && window.isVisible()) {
+        window.focus();
+      }
     },
     setInteractive(value): void {
       window.setIgnoreMouseEvents(!value, { forward: true });
@@ -159,49 +153,34 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
       busy = value;
     },
     focusWindow(): void {
-      if (window.isDestroyed()) {
-        return;
-      }
-      if (!window.isVisible()) {
-        showAtRest();
-      }
+      if (window.isDestroyed()) return;
+      if (!window.isVisible()) showAtRest();
       window.focus();
     },
     dragBy(deltaX): void {
-      if (window.isDestroyed()) {
-        return;
+      if (!window.isDestroyed()) {
+        restX = clamp(window.getBounds().x + deltaX, minX, maxX);
+        window.setPosition(restX, geometry.y);
       }
-      restX = clamp(window.getBounds().x + deltaX, minX, maxX);
-      window.setPosition(restX, geometry.y);
     },
     dragEnd(): void {
       void deps.savePetX(restX);
     },
     listenCommand(command): void {
-      if (!window.isDestroyed()) {
-        window.webContents.send(PET_LISTEN_COMMAND_CHANNEL, command);
-      }
+      if (!window.isDestroyed()) window.webContents.send(PET_LISTEN_COMMAND_CHANNEL, command);
     },
     wakeState(state): void {
-      if (!window.isDestroyed()) {
-        window.webContents.send(PET_WAKE_STATE_CHANNEL, state);
-      }
+      if (!window.isDestroyed()) window.webContents.send(PET_WAKE_STATE_CHANNEL, state);
     },
     speak(message): void {
-      if (!window.isDestroyed()) {
-        window.webContents.send(PET_SPEAK_CHANNEL, message);
-      }
+      if (!window.isDestroyed()) window.webContents.send(PET_SPEAK_CHANNEL, message);
     },
     stopSpeaking(): void {
-      if (!window.isDestroyed()) {
-        window.webContents.send(PET_SPEAK_STOP_CHANNEL);
-      }
+      if (!window.isDestroyed()) window.webContents.send(PET_SPEAK_STOP_CHANNEL);
     },
     hide(): void {
       mover.stop();
-      if (!window.isDestroyed()) {
-        window.hide();
-      }
+      if (!window.isDestroyed()) window.hide();
     },
     dispose(): void {
       unsubscribe();
@@ -210,9 +189,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
         clearInterval(tickTimer);
         tickTimer = undefined;
       }
-      if (!window.isDestroyed()) {
-        window.destroy();
-      }
+      if (!window.isDestroyed()) window.destroy();
     }
   };
 }

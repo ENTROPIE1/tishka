@@ -1,0 +1,170 @@
+.mic-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mic-button:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mic-button.recording {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ask-tools {
+  display: flex;
+}
+
+.card {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.card-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.card-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.card-body ul {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.item-title {
+  font-weight: 500;
+}
+
+.item-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.item-link {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.card-image {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+.card-actions {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.card-copy,
+.card-close {
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.card-close {
+  font-size: 14px;
+  line-height: 1;
+  padding: 3px 9px;
+}
+
+.card-copy:hover,
+.card-close:hover {
+  color: var(--text);
+}
+
+.card-copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ask-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ask-input {
+  width: 100%;
+  min-height: calc(8 * 1.45em);
+  max-height: 200px;
+  overflow-y: auto;
+  resize: none;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.ask-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ask-hint {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.ask-sent {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.card-body pre {
+  margin: 4px 0;
+  padding: 8px 10px;
+  background: var(--code-bg);
+  border-radius: 8px;
+  overflow-x: auto;
+}
