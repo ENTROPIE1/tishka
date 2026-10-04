@@ -92,6 +92,7 @@ type TishkaEvent =
   | { type: 'think.start' }
   | { type: 'tool.start'; tool: string }
   | { type: 'tool.end'; tool: string; ok: boolean }
+  | { type: 'status'; text: string }   // текст в облачке, состояние не меняется
   | { type: 'reply'; reply: Reply }
   | { type: 'speak.start'; text: string }
   | { type: 'speak.level'; level: number }   // 0..1
@@ -159,6 +160,7 @@ interface Config {
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
+  screen: { enabled: boolean };   // разрешено ли смотреть на экран, по умолчанию true
 }
 
 type McpServerConfig =

@@ -20,7 +20,9 @@ import { registerTriggerTools } from './triggers/tools';
 import { createWatcher, type Watcher } from './triggers/watcher';
 import { registerBuiltinTools } from './tools/builtin';
 import { createToolRegistry } from './tools/registry';
+import { registerScreenTools } from './tools/screen';
 import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore } from './types';
+import { createVisionLook, type CaptureResult, type ScreenTarget } from './vision/look';
 
 export interface CoreDeps {
   dataDir: string;                 // каталог данных пользователя
@@ -32,6 +34,7 @@ export interface CoreDeps {
   showPanel(panel: Panel): void;
   now: () => Date;
   fetch?: typeof fetch;            // для тестов
+  captureScreen?(target: ScreenTarget): Promise<CaptureResult>;   // снимок экрана из главного процесса
 }
 
 export interface TishkaCore {
@@ -221,6 +224,27 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       getApiKey: gatewayKey,
       fetch: deps.fetch
     });
+
+    const capture = deps.captureScreen;
+    if (capture !== undefined) {
+      const visionLook = createVisionLook({
+        capture,
+        chat: (req) => llm.chat(req),
+        visionModel: config.llm.visionModel
+      });
+      registerScreenTools(
+        registry,
+        {
+          capture,
+          look: (question, target) => visionLook.look(question, target),
+          screenshotsDir: join(deps.dataDir, 'screenshots'),
+          now: deps.now,
+          events: deps.events
+        },
+        config.screen.enabled
+      );
+    }
+
     const runner = createSkillRunner({
       registry,
       ask: async (prompt) => {

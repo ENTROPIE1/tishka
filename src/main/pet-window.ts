@@ -37,6 +37,7 @@ export interface PetWindow {
   speak(message: SpeakMessage): void;
   stopSpeaking(): void;
   hide(): void;
+  show(): void;
   dispose(): void;
 }
 
@@ -201,6 +202,11 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
       mover.stop();
       if (!window.isDestroyed()) {
         window.hide();
+      }
+    },
+    show(): void {
+      if (!window.isDestroyed()) {
+        showAtRest();
       }
     },
     dispose(): void {

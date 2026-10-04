@@ -7,6 +7,8 @@ const COPY_ERROR_MS = 2000;
 export interface PanelActions {
   onCopy?: (text: string) => void | Promise<void>;
   onCopyRich?: (html: string, text: string) => void | Promise<void>;   // текстовая карточка: html и чистый текст сразу
+  onCopyImage?: (path: string) => void | Promise<void>;                // карточка-картинка: в буфер идёт сама картинка
+  onOpenImage?: (path: string) => void | Promise<void>;                // щелчок по картинке открывает её в просмотрщике
   onOpenChat?: () => void;
   onClose?: () => void;
 }
@@ -43,6 +45,13 @@ function plainCopyText(panel: Panel): string {
 // Копирует карточку: сначала с оформлением, при сбое — чистым текстом.
 // Бросает ошибку, если не удалось ни то, ни другое.
 async function performCopy(actions: PanelActions, panel: Panel): Promise<void> {
+  if (panel.kind === 'image') {
+    const copyImage = actions.onCopyImage;
+    if (copyImage !== undefined) {
+      await copyImage(panel.path);
+      return;
+    }
+  }
   const rich = actions.onCopyRich;
   if (panel.kind === 'text' && rich !== undefined) {
     try {
@@ -66,7 +75,7 @@ function showCopyResult(button: HTMLButtonElement, text: string, timeout: number
   }, timeout);
 }
 
-function panelBody(panel: Panel): HTMLElement {
+function panelBody(panel: Panel, actions: PanelActions): HTMLElement {
   const body = document.createElement('div');
   body.className = 'card-body';
   if (panel.kind === 'text') {
@@ -101,6 +110,13 @@ function panelBody(panel: Panel): HTMLElement {
     image.className = 'card-image';
     image.src = fileUrl(panel.path);
     image.alt = panel.title;
+    if (actions.onOpenImage !== undefined) {
+      const open = actions.onOpenImage;
+      image.classList.add('card-image-open');
+      image.addEventListener('click', () => {
+        void open(panel.path);
+      });
+    }
     body.append(image);
   }
   return body;
@@ -133,17 +149,20 @@ export function panelElement(panel: Panel, actions: PanelActions = {}): HTMLElem
     head.append(closeButton);
   }
 
-  card.append(head);
-  card.append(panelBody(panel));
+  const canCopy =
+    actions.onCopy !== undefined || actions.onCopyRich !== undefined || actions.onCopyImage !== undefined;
 
-  if (actions.onCopy === undefined && actions.onCopyRich === undefined && actions.onOpenChat === undefined) {
+  card.append(head);
+  card.append(panelBody(panel, actions));
+
+  if (!canCopy && actions.onOpenChat === undefined) {
     return card;
   }
 
   const row = document.createElement('div');
   row.className = 'card-actions';
 
-  if (actions.onCopy !== undefined || actions.onCopyRich !== undefined) {
+  if (canCopy) {
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
     copyButton.className = 'card-copy';
