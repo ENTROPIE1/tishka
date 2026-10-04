@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createAgent } from '../src/core/agent/agent';
-import { replyFromToolArgs } from '../src/core/agent/reply';
+import { EMPTY_REPLY, replyFromText, replyFromToolArgs } from '../src/core/agent/reply';
 import { createEventBus } from '../src/core/events';
 import type { ChatRequest, ChatResponse, ToolCall } from '../src/core/llm/client';
 import type { Reply, ToolDef, ToolRegistry, ToolResult, TishkaEvent } from '../src/core/types';
@@ -80,6 +80,26 @@ describe('reply с ask', () => {
     const reply = replyFromToolArgs({ say: 'Жду', ask: { title: 'Пришли текст', placeholder: 5 } }, null);
 
     expect(reply.ask).toEqual({ title: 'Пришли текст' });
+  });
+
+  it('reply без say и без панели даёт понятную реплику с mood confused', () => {
+    const reply = replyFromToolArgs({}, null);
+
+    expect(reply).toEqual(EMPTY_REPLY);
+  });
+
+  it('reply с пустым say, но с панелью — панель показывается, say не подменяется', () => {
+    const panel = { kind: 'text', title: 'Черновик', markdown: 'текст' } as const;
+    const reply = replyFromToolArgs({ say: '', show: panel }, null);
+
+    expect(reply.show).toEqual(panel);
+    expect(reply.say).toBe('');
+    expect(reply.say).not.toBe(EMPTY_REPLY.say);
+  });
+
+  it('пустой текст модели превращается в понятную реплику', () => {
+    expect(replyFromText('')).toEqual(EMPTY_REPLY);
+    expect(replyFromText('   ')).toEqual(EMPTY_REPLY);
   });
 
   it('системное сообщение содержит правило про ask', async () => {
