@@ -1,6 +1,7 @@
 import type { PetModel, PetState } from '../../pet/state';
 import { clipForState, type Character } from './character';
 import { createCharacter } from './character-factory';
+import { createComposer } from './composer';
 import { createListenUi } from './listen-ui';
 import { createPetCard } from './pet-card';
 import { createSpeaker } from './speaker';
@@ -8,22 +9,11 @@ import { createWakeListener } from './wake-listener';
 
 const bubble = document.getElementById('bubble') as HTMLElement;
 const say = document.getElementById('say') as HTMLElement;
-const composer = document.getElementById('composer') as HTMLFormElement;
-const input = document.getElementById('input') as HTMLInputElement;
 const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
 const stateLabel = document.getElementById('state') as HTMLElement;
+const composerHost = document.getElementById('composer-host') as HTMLElement;
 const characterModel: Character = createCharacter('svg');
-const speaker = createSpeaker({
-  setMouth: (level) => characterModel.setMouth(level),
-  onDone: () => window.tishka.pet.speakDone()
-});
-const petCard = createPetCard({ element: cardHost, refreshBusy });
-const listen = createListenUi(() => {
-  composer.hidden = false;
-  updateBubble();
-});
-createWakeListener({ onConversation: (on) => listen.setConversation(on) });
 
 const STATE_LABELS: Record<PetState, string> = {
   hidden: 'спит за краем',
@@ -40,11 +30,37 @@ const STATE_LABELS: Record<PetState, string> = {
   sleep: 'спит'
 };
 
-let lastSay = '';
 let interactive = false;
 let dragging = false;
 let dragMoved = false;
 let dragLastX = 0;
+let onScreen = false;
+
+const composer = createComposer({
+  onSend: (text) => window.tishka.sendUserText(text),
+  onEscape: () => {
+    if (listen.isListening()) {
+      listen.escape();
+      return;
+    }
+    window.tishka.pet.wakeEscape();
+  },
+  onExpand: () => openComposer()
+});
+composerHost.append(composer.element);
+
+const speaker = createSpeaker({
+  setMouth: (level) => characterModel.setMouth(level),
+  onDone: () => window.tishka.pet.speakDone()
+});
+const petCard = createPetCard({ element: cardHost, refreshBusy });
+const listen = createListenUi(() => updateBubble());
+createWakeListener({
+  onConversation: (on) => {
+    listen.setConversation(on);
+    composer.setListening(on);
+  }
+});
 
 function isOnScreen(state: PetState): boolean {
   return state !== 'hidden' && state !== 'leave';
@@ -52,13 +68,26 @@ function isOnScreen(state: PetState): boolean {
 
 function refreshBusy(): void {
   const cardOpen = !cardHost.hidden;
-  const typing = !composer.hidden && input.value !== '';
+  const typing = !composer.element.hidden && composer.input.value !== '';
   window.tishka.pet.setBusy(cardOpen || typing);
 }
 
 function updateBubble(): void {
   const text = say.textContent ?? '';
-  bubble.hidden = text === '' && composer.hidden && !listen.isListening();
+  bubble.hidden = text === '' && !listen.isListening();
+}
+
+function applyComposer(state: PetState, visible: boolean): void {
+  composer.element.hidden = !visible;
+  if (!visible) {
+    return;
+  }
+  // В состоянии сна и при уведомлении строка свёрнута в полочку.
+  composer.setCollapsed(state === 'sleep' || state === 'notify');
+  composer.setBusy(state === 'thinking' || state === 'working');
+  if (!onScreen) {
+    composer.focus();
+  }
 }
 
 function renderModel(model: PetModel): void {
@@ -70,25 +99,12 @@ function renderModel(model: PetModel): void {
   characterModel.setClip(clip);
   characterModel.setFlip(flip);
 
-  // Поле ввода живёт, пока Тишка на экране после вызова; появляется вместе с выходом.
-  if (!isOnScreen(model.state)) {
-    composer.hidden = true;
-  } else if (model.state === 'appear' || model.state === 'listening' || model.state === 'confused') {
-    const wasHidden = composer.hidden;
-    composer.hidden = false;
-    if (wasHidden) {
-      input.focus();
-    }
-  }
+  const visible = isOnScreen(model.state);
+  applyComposer(model.state, visible);
+  onScreen = visible;
 
   updateBubble();
   refreshBusy();
-
-  const sayText = model.say ?? '';
-  if (sayText !== lastSay && sayText !== '' && !composer.hidden) {
-    input.focus();
-  }
-  lastSay = sayText;
 }
 
 function isInteractiveAt(x: number, y: number): boolean {
@@ -96,7 +112,12 @@ function isInteractiveAt(x: number, y: number): boolean {
   if (element === null) {
     return false;
   }
-  return character.contains(element) || bubble.contains(element) || cardHost.contains(element);
+  return (
+    character.contains(element) ||
+    bubble.contains(element) ||
+    cardHost.contains(element) ||
+    composer.element.contains(element)
+  );
 }
 
 function setInteractive(value: boolean): void {
@@ -109,17 +130,13 @@ function setInteractive(value: boolean): void {
 
 function openComposer(): void {
   window.tishka.pet.wake('click');
-  composer.hidden = false;
-  input.value = '';
+  window.tishka.pet.focus();
+  composer.element.hidden = false;
+  composer.setCollapsed(false);
+  composer.clear();
   updateBubble();
   refreshBusy();
-  input.focus();
-}
-
-function closeComposer(): void {
-  composer.hidden = true;
-  updateBubble();
-  refreshBusy();
+  composer.focus();
 }
 
 function initCharacter(): void {
@@ -132,33 +149,6 @@ function initCharacter(): void {
     dragLastX = event.screenX;
     setInteractive(true);
     event.preventDefault();
-  });
-}
-
-function initComposer(): void {
-  composer.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const text = input.value.trim();
-    if (text === '') {
-      return;
-    }
-    window.tishka.sendUserText(text);
-    input.value = '';
-    updateBubble();
-    refreshBusy();
-  });
-  input.addEventListener('input', refreshBusy);
-  input.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') {
-      return;
-    }
-    event.preventDefault();
-    if (listen.isListening()) {
-      listen.escape();
-    } else {
-      window.tishka.pet.wakeEscape();
-      closeComposer();
-    }
   });
 }
 
@@ -202,5 +192,4 @@ window.tishka.pet.onSpeak((message) => speaker.play(message));
 window.tishka.pet.onSpeakStop(() => speaker.stop());
 void characterModel.mount(character).catch(() => undefined);
 initCharacter();
-initComposer();
 initPointer();

@@ -9,37 +9,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Тишка</title>
     <link rel="stylesheet" href="./pet.css" />
+    <link rel="stylesheet" href="./composer.css" />
+    <link rel="stylesheet" href="./pet-card.css" />
     <link rel="stylesheet" href="./svg-hedgehog.css" />
   </head>
   <body>
     <div id="pet" class="pet">
+      <div id="card-host" class="card-host" hidden></div>
       <div id="bubble" class="bubble" hidden>
         <div id="say" class="say"></div>
-        <div id="level" class="level" hidden>
-          <div id="level-fill" class="level-fill"></div>
-          <div class="level-mark"></div>
-        </div>
-        <form id="composer" class="composer" hidden>
-          <button id="mic" class="mic" type="button" title="Сказать голосом" aria-label="Сказать голосом">
-            <svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" />
-              <path d="M5 11a7 7 0 0 0 14 0" />
-              <path d="M12 18v3" />
-            </svg>
-          </button>
-          <input
-            id="input"
-            class="composer-input"
-            type="text"
-            placeholder="Написать Тишке…"
-            autocomplete="off"
-          />
-        </form>
       </div>
-      <div id="card-host" class="card-host" hidden></div>
       <div id="character" class="character">
         <span id="state" class="state-label"></span>
       </div>
+      <div id="composer-host" class="composer-host"></div>
     </div>
     <script type="module" src="./pet.ts"></script>
   </body>

@@ -1,0 +1,148 @@
+.composer-host {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 100%;
+}
+
+.composer {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -8px 0 0;
+  padding: 8px 10px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.composer.collapsed {
+  min-height: 10px;
+  padding: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.composer.collapsed .mic,
+.composer.collapsed .composer-input,
+.composer.collapsed .composer-send,
+.composer.collapsed .level {
+  display: none;
+}
+
+.composer .level {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 3px;
+  height: 2px;
+  background: var(--surface-soft);
+  border: 0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.level-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 80ms linear;
+}
+
+.composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.composer-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.composer-send {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: #ffffff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.composer-send:hover {
+  opacity: 0.9;
+}
+
+.send-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mic {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mic:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic.on {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic.soon {
+  animation: mic-soon 1s ease-in-out infinite;
+}
+
+.mic-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+@keyframes mic-soon {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
