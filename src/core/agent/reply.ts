@@ -2,6 +2,8 @@ import type { Mood, Panel, Reply, ToolDef } from '../types';
 
 export const REPLY_TOOL_NAME = 'reply';
 
+export const EMPTY_REPLY: Reply = { say: 'Не получилось ответить, попробуй ещё раз', mood: 'confused' };
+
 const panelSchema = {
   description: 'Панель с подробностями, ровно один из трёх видов',
   oneOf: [
@@ -90,6 +92,9 @@ function splitSentences(text: string): string[] {
 
 export function replyFromText(text: string): Reply {
   const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return { ...EMPTY_REPLY };
+  }
   const sentences = splitSentences(trimmed);
   if (sentences.length <= 2) {
     return { say: trimmed, mood: 'neutral' };
@@ -137,6 +142,9 @@ export function replyFromToolArgs(args: Record<string, unknown>, fallbackText: s
   const say = typeof args.say === 'string' && args.say.length > 0 ? args.say : (fallbackText ?? '').trim();
   const show = parsePanel(args.show);
   const ask = parseAsk(args.ask);
+  if (say.length === 0 && show === undefined && ask === undefined) {
+    return { ...EMPTY_REPLY };
+  }
   const mood = parseMood(args.mood);
   const reply: Reply = { say, mood };
   if (show !== undefined) {

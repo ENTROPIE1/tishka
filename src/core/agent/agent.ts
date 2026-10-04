@@ -128,6 +128,9 @@ export function createAgent(deps: AgentDeps): Agent {
       const calls = response.toolCalls;
       if (calls.length === 0) {
         const text = response.text ?? '';
+        if (text.trim().length === 0) {
+          return finish(replyFromText(text));
+        }
         push({ role: 'assistant', content: text });
         return finish(replyFromText(text));
       }
