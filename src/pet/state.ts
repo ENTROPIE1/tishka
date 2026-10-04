@@ -1,4 +1,5 @@
 import type { Panel, TishkaEvent } from '../core/types';
+import { greetingFor } from '../voice/canned';
 
 export type PetState =
   | 'hidden'
@@ -23,6 +24,7 @@ export interface PetModel {
   queue: PetState[];             // состояния, которые нужно показать после текущего
   replies?: number;              // сколько раз приходил ответ; признак новой реплики
   leaving?: boolean;             // уход отложен: сначала договорить текущий ответ
+  greeting?: boolean;            // показываем приветствие: облачко и подпись согласованы
 }
 
 export type TalkSource = 'chat' | 'pet';
@@ -31,6 +33,7 @@ export interface PetOpts {
   petMode: boolean;
   busy?: boolean;                // открыта карточка или пользователь вводит текст
   source?: TalkSource;           // 'chat' — реплика из окна чата основного окна
+  ready?: boolean;               // служба распознавания готова: выбор приветствия
 }
 
 function isQuiet(opts: PetOpts): boolean {
@@ -63,6 +66,7 @@ function enter(model: PetModel, state: PetState, now: number, queue: PetState[] 
     if (model.say !== undefined) next.say = model.say;
     if (model.panel !== undefined) next.panel = model.panel;
     if (model.ask !== undefined) next.ask = model.ask;
+    if (model.greeting === true && (state === 'appear' || state === 'listening')) next.greeting = true;
   }
   if (model.leaving === true && state !== 'leave') next.leaving = true;
   return next;
@@ -81,8 +85,12 @@ function advance(model: PetModel, now: number): PetModel {
 // Просьба уйти: пока ёж показывает или договаривает ответ, уход ждёт конца реплики.
 export function requestLeave(model: PetModel, now: number): PetModel {
   if (isAway(model)) return model;
-  const showing = REPLY_STATES.includes(model.state) || (model.state === 'appear' && model.say !== undefined);
-  return showing ? { ...model, leaving: true } : enter(model, 'leave', now);
+  const showing =
+    REPLY_STATES.includes(model.state) ||
+    (model.state === 'appear' && model.say !== undefined && model.greeting !== true);
+  if (showing) return { ...model, leaving: true };
+  // Приветствие не ответ: уход его не дожидается, облачко очищается.
+  return enter(endGreeting(model), 'leave', now);
 }
 
 // Состояния, во время которых уведомление ждёт своей очереди, а не перебивает текущее.
@@ -95,23 +103,35 @@ function show(model: PetModel, target: PetState, now: number, rest: PetState[] =
   return enter(model, target, now, rest);
 }
 
+// Конец приветствия: облачко и подпись снова про запись, а не про сказанное.
+function endGreeting(model: PetModel): PetModel {
+  return model.greeting === true ? { ...model, greeting: undefined, say: undefined } : model;
+}
+
 export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: PetOpts): PetModel {
   const quiet = isQuiet(opts);
   switch (event.type) {
-    case 'wake':
-    case 'listen.start':
+    case 'wake': {
       // Новый вызов отменяет отложенный уход.
+      const base = { ...model, leaving: false };
+      if (event.source === 'trigger') {
+        return show(base, 'listening', now);
+      }
+      // Пока звучит приветствие, в облачке ровно тот же текст, что и вслух.
+      return show({ ...base, say: greetingFor(opts.ready !== false), greeting: true }, 'listening', now);
+    }
+    case 'listen.start':
       return show({ ...model, leaving: false }, 'listening', now);
     case 'listen.end':
-      return quiet && isAway(model) ? model : show(model, 'thinking', now);
+      return quiet && isAway(model) ? model : show(endGreeting(model), 'thinking', now);
     case 'think.start':
-      return quiet && isAway(model) ? model : show(model, 'thinking', now);
+      return quiet && isAway(model) ? model : show(endGreeting(model), 'thinking', now);
     case 'tool.start':
-      return quiet && isAway(model) ? model : show(model, 'working', now);
+      return quiet && isAway(model) ? model : show(endGreeting(model), 'working', now);
     case 'tool.end':
-      return quiet && isAway(model) ? model : show(model, 'thinking', now);
+      return quiet && isAway(model) ? model : show(endGreeting(model), 'thinking', now);
     case 'status':
-      return { ...model, say: event.text };
+      return { ...endGreeting(model), say: event.text };
     case 'reply': {
       if (quiet) {
         const replies = (model.replies ?? 0) + 1;
@@ -135,17 +155,22 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       return show(base, 'talking', now);
     }
     case 'speak.start':
+      // Приветствие уже показано вместе с вызовом: состояние не меняем.
+      if (model.greeting === true) return model;
       return quiet && isAway(model) ? model : show(model, 'talking', now);
     case 'speak.end':
+      // Конец приветствия: в облачке и подписи снова запись — «Слушаю…».
+      if (model.greeting === true) return endGreeting(model);
       return isAway(model) ? model : settle(model, now);
     case 'notify': {
-      if (BUSY_STATES.includes(model.state)) return { ...model, queue: [...model.queue, 'notify'] };
-      return show({ ...model, say: event.title }, 'notify', now);
+      const base = endGreeting(model);
+      if (BUSY_STATES.includes(base.state)) return { ...base, queue: [...base.queue, 'notify'] };
+      return show({ ...base, say: event.title }, 'notify', now);
     }
     case 'skill.saved':
       return event.source === 'dialog' ? show(model, 'happy', now, ['idle']) : model;
     case 'error':
-      return quiet && isAway(model) ? model : show(model, 'confused', now);
+      return quiet && isAway(model) ? model : show(endGreeting(model), 'confused', now);
     case 'idle':
       // Простой вне разговора не поднимает скрытого ежа.
       return isAway(model) || model.state === 'talking' ? model : settle(model, now);
@@ -174,6 +199,9 @@ export function onTick(model: PetModel, now: number, opts: PetOpts): PetModel {
     case 'thinking':
     case 'working':
       return elapsed >= BUSY_LIMIT_MS ? enter(model, 'idle', now) : model;
+    case 'listening':
+      // Речь выключена: приветствие держим столько, сколько звучало бы.
+      return model.greeting === true && elapsed >= talkingDuration(model.say) ? endGreeting(model) : model;
     case 'idle': {
       // Пока открыта карточка или идёт ввод, простой не отсчитывается.
       if (opts.busy === true) return model.since === now ? model : { ...model, since: now };

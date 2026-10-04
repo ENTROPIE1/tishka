@@ -25,6 +25,7 @@ const characterModel: Character = createCharacter('svg');
 
 let mirrored = false;
 let currentState: PetState = 'hidden';
+let greeting = false;
 let waiting = false;
 let dragging = false;
 let dragMoved = false;
@@ -89,7 +90,7 @@ function updateBubble(): void {
 }
 
 function updateStateLabel(): void {
-  stateLabelEl.textContent = stateLabel(currentState, waiting);
+  stateLabelEl.textContent = stateLabel(currentState, waiting, greeting);
 }
 
 function applyComposer(state: PetState, visible: boolean): void {
@@ -112,6 +113,7 @@ function applyFlip(): void {
 
 function renderModel(model: PetModel): void {
   currentState = model.state;
+  greeting = model.greeting === true;
   character.dataset.state = model.state;
   updateStateLabel();
   say.textContent = listen.say(model.say, model.state);

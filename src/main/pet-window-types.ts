@@ -9,6 +9,7 @@ export interface PetWindowDeps {
   getConfig: () => Config;
   savePetX: (x: number | null) => Promise<void>;
   onReload?: () => void;
+  isReady?(): boolean;   // служба распознавания готова: выбор приветствия
 }
 
 export interface PetWindow {

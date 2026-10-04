@@ -16,6 +16,7 @@ export interface PetLifecycleDeps {
   activation: PetActivation;
   bus: EventBus & { source?(): TalkSource };   // источник текущего обращения: чат или ёж
   getConfig: () => Config;
+  isReady?(): boolean;   // служба распознавания готова: выбор приветствия
 }
 
 export interface PetLifecycle {
@@ -107,7 +108,14 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
   }
 
   function handleEvent(event: Parameters<typeof onEvent>[1]): void {
-    applyModel(onEvent(model, event, Date.now(), { petMode: petMode(), busy, source: bus.source?.() }));
+    applyModel(
+      onEvent(model, event, Date.now(), {
+        petMode: petMode(),
+        busy,
+        source: bus.source?.(),
+        ready: deps.isReady?.()
+      })
+    );
   }
 
   const unsubscribe = bus.on(handleEvent);

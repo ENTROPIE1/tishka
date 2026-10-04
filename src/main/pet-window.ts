@@ -41,7 +41,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   const mover = new Mover(window, placement.geometry);
   const activation = createPetActivation(window);
   const lifecycle: PetLifecycle = createPetLifecycle({
-    window, mover, placement, activation, bus: deps.bus, getConfig: deps.getConfig
+    window, mover, placement, activation, bus: deps.bus, getConfig: deps.getConfig, isReady: deps.isReady
   });
 
   function send(channel: string, payload?: unknown): void {

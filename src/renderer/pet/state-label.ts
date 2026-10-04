@@ -11,7 +11,11 @@ const LABELS: Partial<Record<PetState, string>> = {
 };
 
 // Пока служба распознавания не готова, «слушает» обещать нельзя.
-export function stateLabel(state: PetState, waiting = false): string {
+// Во время приветствия подпись согласована с облачком: «говорит».
+export function stateLabel(state: PetState, waiting = false, greeting = false): string {
+  if (greeting) {
+    return 'говорит';
+  }
   if (waiting && state === 'listening') {
     return 'ждёт';
   }
