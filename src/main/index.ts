@@ -22,6 +22,7 @@ import { createHotkeyRegistrar, type HotkeyRegistrar } from './pet-hotkey';
 import { registerPetIpc } from './pet-ipc';
 import { createPetListen } from './pet-listen';
 import { createSpeechOutput, type SpeechOutput } from './pet-speak';
+import { createPetSpeakPlay, type PetSpeakPlay } from './pet-speak-play';
 import { createPetTray, type PetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
 import { registerPetWake, type PetWake } from './pet-wake';
@@ -39,7 +40,7 @@ let stt: SttService | undefined;
 let hotkeys: HotkeyRegistrar | undefined;
 let petWake: PetWake | undefined;
 let speech: SpeechOutput | undefined;
-let speechDone: (() => void) | undefined;
+let speakPlay: PetSpeakPlay | undefined;
 let chatTalk: ChatTalk | undefined;
 let webReader: WebReaderHandle | undefined;
 let memoryWatch: MemoryWatch | undefined;
@@ -143,29 +144,25 @@ app.whenReady().then(async () => {
     bus,
     getConfig: () => tishka.config(),
     // Позиция пишется в файл напрямую, чтобы перетаскивание не переподключало MCP.
-    savePetX: (x) => persistConfig(dataDir, { ...tishka.config(), pet: { x } })
+    savePetX: (x) => persistConfig(dataDir, { ...tishka.config(), pet: { x } }),
+    // Перезагрузка окна уничтожает звук: ожидающее обещание речи завершается.
+    onReload: () => speakPlay?.abort()
   });
 
   // Звук, отправленный в окно-питомец, считается проигранным после ответа speak-done.
-  ipcMain.on(PET_SPEAK_DONE_CHANNEL, () => {
-    const resolve = speechDone;
-    speechDone = undefined;
-    resolve?.();
+  ipcMain.on(PET_SPEAK_DONE_CHANNEL, (_event, id: number | undefined) => {
+    speakPlay?.done(id);
+  });
+
+  speakPlay = createPetSpeakPlay({
+    speak: (message) => pet?.speak(message),
+    stopSpeaking: () => pet?.stopSpeaking()
   });
 
   const speechOutput = createSpeechOutput({
     bus,
     getConfig: () => tishka.config(),
-    play: (message, signal) =>
-      new Promise<void>((resolve) => {
-        if (pet === undefined) {
-          resolve();
-          return;
-        }
-        speechDone = resolve;
-        pet.speak(message);
-        signal.addEventListener('abort', () => pet?.stopSpeaking(), { once: true });
-      })
+    play: (message, signal) => speakPlay?.play(message, signal) ?? Promise.resolve()
   });
   speech = speechOutput;
   registerSpeechIpc(speechOutput);
@@ -273,7 +270,7 @@ app.whenReady().then(async () => {
   app.setLoginItemSettings(loginItemSettings(tishka.config().app.autostart));
 
   bus.on((event) => {
-    if (event.type === 'think.start' || event.type === 'tool.start') {
+    if (event.type === 'think.start' || event.type === 'tool.start' || event.type === 'speak.start') {
       processing = true;
     } else if (event.type === 'idle' || event.type === 'speak.end') {
       processing = false;

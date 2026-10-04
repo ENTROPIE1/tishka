@@ -43,7 +43,7 @@ composerHost.append(composer.element);
 
 const speaker = createSpeaker({
   setMouth: (level) => characterModel.setMouth(level),
-  onDone: () => window.tishka.pet.speakDone()
+  onDone: (id) => window.tishka.pet.speakDone(id)
 });
 const petCard = createPetCard({ element: cardHost, refreshBusy });
 const listen = createListenUi(() => updateBubble(), micThreshold);
