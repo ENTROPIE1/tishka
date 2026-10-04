@@ -161,7 +161,7 @@ interface SecretStore {
 
 interface Config {
   llm: { baseUrl: string; model: string; visionModel: string; api: 'chat' | 'responses' };   // api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses, формат OpenAI Responses)
-  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number }; tts: { enabled: boolean; url: string; volume: number } };
+  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края

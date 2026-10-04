@@ -16,7 +16,7 @@ function makeConfig(): Config {
       sensitivity: 'normal',
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: '',
-      stt: { exe: '', model: '', audioCtx: 0, threads: 0 },
+      stt: { exe: '', model: '', audioCtx: 0, threads: 0, mode: 'remote' },
       tts: { enabled: false, url: '', volume: 1 }
     },
     mcpServers: [],
@@ -41,6 +41,7 @@ function install(view: VoiceStateView): void {
     voice: {
       status: vi.fn(async () => view),
       check,
+      checkUrl: vi.fn(async () => ({ ok: true, ms: 12 })),
       apply: vi.fn(async () => undefined),
       dictate: vi.fn()
     }
@@ -84,14 +85,39 @@ describe('mountVoiceSection', () => {
     expect(root.querySelector<HTMLElement>('.mic-check')?.hidden).toBe(true);
   });
 
-  it('одна кнопка «Сохранить» внизу раздела', async () => {
+  it('внизу раздела есть «Сохранить», «Перезапустить службу» и «Проверить»', async () => {
     install({ state: 'ready' });
     const root = document.createElement('div');
     mountVoiceSection(root);
     await flush();
 
     expect(buttonWith(root, 'Сохранить')).toBeDefined();
-    expect(buttonWith(root, 'Проверить')).toBeUndefined();
+    expect(buttonWith(root, 'Перезапустить службу')).toBeDefined();
+    expect(buttonWith(root, 'Проверить')).toBeDefined();
+  });
+
+  it('в режиме готовой службы поля программы скрыты, показан адрес', async () => {
+    install({ state: 'ready' });
+    const root = document.createElement('div');
+    mountVoiceSection(root);
+    await flush();
+
+    expect(root.querySelector<HTMLElement>('.local-fields')?.hidden).toBe(true);
+    expect(root.querySelector<HTMLElement>('.remote-fields')?.hidden).toBe(false);
+  });
+
+  it('переключение на «Запускать на этом компьютере» показывает поля программы', async () => {
+    install({ state: 'ready' });
+    const root = document.createElement('div');
+    mountVoiceSection(root);
+    await flush();
+
+    const mode = root.querySelector<HTMLSelectElement>('select.stt-mode')!;
+    mode.value = 'local';
+    mode.dispatchEvent(new Event('change'));
+
+    expect(root.querySelector<HTMLElement>('.local-fields')?.hidden).toBe(false);
+    expect(root.querySelector<HTMLElement>('.remote-fields')?.hidden).toBe(true);
   });
 
   it('«Перезапустить службу» вызывает проверку службы', async () => {

@@ -20,6 +20,7 @@ import type {
   ConnectionPlanResult,
   ConnectionSaveResult,
   ConnectionView,
+  SttCheckView,
   VoiceStateView
 } from './ipc-settings';
 import type { ExportSkillResult, ImportSkillResult } from './ipc-automations';
@@ -95,6 +96,7 @@ import {
   VOICE_APPLY_CHANNEL,
   VOICE_CALIBRATION_CHANNEL,
   VOICE_CHECK_CHANNEL,
+  VOICE_CHECK_URL_CHANNEL,
   VOICE_DICTATE_CHANNEL,
   VOICE_STATUS_CHANNEL,
   SPEECH_HEALTH_CHANNEL,
@@ -391,6 +393,9 @@ const api = {
     },
     check(): Promise<VoiceStateView> {
       return ipcRenderer.invoke(VOICE_CHECK_CHANNEL);
+    },
+    checkUrl(url: string): Promise<SttCheckView> {
+      return ipcRenderer.invoke(VOICE_CHECK_URL_CHANNEL, url);
     },
     apply(hotkey: string): Promise<void> {
       return ipcRenderer.invoke(VOICE_APPLY_CHANNEL, hotkey);

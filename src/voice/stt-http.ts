@@ -87,6 +87,55 @@ export async function probe(
   }
 }
 
+export interface SttCheckView {
+  ok: boolean;
+  ms: number;
+  error?: string;
+}
+
+// Проверка адреса для кнопки «Проверить»: сколько миллисекунд отвечала служба
+// или почему ответа нет. Чужой процесс не трогаем — только запрос.
+export async function checkSttUrl(
+  fetchFn: typeof fetch,
+  url: string,
+  timeoutMs: number = PROBE_TIMEOUT_MS
+): Promise<SttCheckView> {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const request = fetchFn(`${resolveBaseUrl(url)}/`, {
+      method: 'GET',
+      signal: controller.signal
+    }).then(
+      (response) => ({ kind: 'responded' as const, response }),
+      (error: unknown) => ({ kind: 'failed' as const, error })
+    );
+    const expired = new Promise<{ kind: 'timeout' }>((resolve) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        resolve({ kind: 'timeout' });
+      }, timeoutMs);
+    });
+    const outcome = await Promise.race([request, expired]);
+    const ms = Date.now() - startedAt;
+    if (outcome.kind === 'timeout') {
+      return { ok: false, ms, error: 'Служба не ответила вовремя' };
+    }
+    if (outcome.kind === 'failed') {
+      return { ok: false, ms, error: 'Служба не отвечает по адресу' };
+    }
+    if (!outcome.response.ok) {
+      return { ok: false, ms, error: `Служба ответила с ошибкой ${outcome.response.status}` };
+    }
+    return { ok: true, ms };
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
 function readNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }

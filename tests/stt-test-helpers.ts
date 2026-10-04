@@ -15,14 +15,14 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
     sensitivity: 'normal',
     mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
     sttUrl: 'http://127.0.0.1:8178',
-    stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
+    stt: { exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' },
     tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 },
     ...overrides
   };
 }
 
 export function configWith(exe: string, model = 'model.bin'): Config['voice'] {
-  return voice({ stt: { exe, model, audioCtx: 768, threads: 4 } });
+  return voice({ stt: { exe, model, audioCtx: 768, threads: 4, mode: 'local' } });
 }
 
 export interface FakeChild {
