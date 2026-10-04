@@ -14,8 +14,10 @@ export interface PanelActions {
 }
 
 function fileUrl(path: string): string {
-  const normalized = path.replace(/\\/g, '/').replace(/^\/+/, '');
-  return encodeURI(`file:///${normalized}`);
+  const segments = path.replace(/\\/g, '/').replace(/^\/+/, '').split('/');
+  const encoded = segments.map((part, index) =>
+    index === 0 && /^[A-Za-z]:$/.test(part) ? part : encodeURIComponent(part));
+  return `file:///${encoded.join('/')}`;
 }
 
 export function copyTextForPanel(panel: Panel): string {
