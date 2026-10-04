@@ -4,6 +4,9 @@ import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
 
 export type WakeCommand = 'listen' | 'conversation-on' | 'conversation-off';
 
+// Окно, владеющее режимом разговора: микрофон слушает только оно.
+export type TalkSurface = 'pet' | 'chat';
+
 export interface WakeFlowDeps {
   getVoice(): Config['voice'];
   stt: { transcribe(wav: Uint8Array, prompt?: string): Promise<TranscribeResult> };
@@ -12,16 +15,18 @@ export interface WakeFlowDeps {
   sendCommand(command: WakeCommand): void;
   hide(): void;
   onSoonChange?(): void;
+  memoryName?(): string | undefined;   // имя человека из памяти для подсказки
 }
 
 export interface WakeFlow {
   handlePhrase(wav: Uint8Array): void;
-  toggleConversation(): void;
-  enableConversation(): void;
-  disableConversation(hide: boolean): void;
+  toggleConversation(by?: TalkSurface): void;
+  enableConversation(by?: TalkSurface): void;
+  disableConversation(hide: boolean, by?: TalkSurface): void;
   onKeyboardInput(): void;
   escape(): void;
   isConversation(): boolean;
+  conversationOwner(): TalkSurface | null;
   isLeavingSoon(): boolean;
   reportError(message: string): void;
   stop(): void;
@@ -33,6 +38,7 @@ const SOON_MS = 5000;
 
 export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   let conversation = false;
+  let owner: TalkSurface | null = null;
   let recognizing = false;
   let answering = false;
   let soon = false;
@@ -86,17 +92,22 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     deps.bus.emit({ type: 'error', message });
   }
 
-  function enableConversation(): void {
+  function enableConversation(by: TalkSurface = 'pet'): void {
     conversation = true;
+    owner = by;
     deps.sendCommand('conversation-on');
     armTimer();
   }
 
-  function disableConversation(hide: boolean): void {
+  function disableConversation(hide: boolean, by?: TalkSurface): void {
+    const surface = by ?? owner;
     conversation = false;
+    owner = null;
     clearTimer();
     deps.sendCommand('conversation-off');
-    if (hide) {
+    // Скрывается только окно-питомец: уход по тишине или просьбе в чате
+    // выключает разговор, но не прячет питомца.
+    if (hide && surface === 'pet') {
       deps.hide();
     }
   }
@@ -158,7 +169,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   }
 
   async function transcribe(wav: Uint8Array): Promise<void> {
-    const result = await deps.stt.transcribe(wav, wakePrompt(deps.getVoice().wakeWords));
+    const result = await deps.stt.transcribe(wav, wakePrompt(deps.getVoice().wakeWords, deps.memoryName?.()));
     if (!result.ok) {
       if (result.error !== 'Не расслышал') {
         reportError(result.error);
@@ -195,13 +206,14 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   return {
     handlePhrase,
     isConversation: () => conversation,
+    conversationOwner: () => owner,
     isLeavingSoon: () => soon,
     reportError,
-    toggleConversation(): void {
-      if (conversation) {
+    toggleConversation(by: TalkSurface = 'pet'): void {
+      if (conversation && owner === by) {
         disableConversation(false);
       } else {
-        enableConversation();
+        enableConversation(by);
       }
     },
     enableConversation,

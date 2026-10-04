@@ -49,6 +49,7 @@ export type TishkaEvent =
   | { type: 'speak.end' }
   | { type: 'notify'; title: string; skillId?: string }
   | { type: 'skill.saved'; skillId: string }
+  | { type: 'memory.changed' }
   | { type: 'error'; message: string }
   | { type: 'idle' };
 
@@ -96,6 +97,7 @@ export interface Config {
     wakeWords: string[];
     wakeEnabled: boolean;                // откликаться на имя
     talkTimeoutSec: number;              // уход по тишине в режиме разговора
+    sensitivity: 'low' | 'normal' | 'high';   // порог слышимости микрофона
     sttUrl: string;                      // адрес службы распознавания
     stt: { exe: string; model: string; audioCtx: number; threads: number };   // автозапуск службы; пустой exe — не запускать
     ttsEngine: 'piper' | 'silero' | 'none';

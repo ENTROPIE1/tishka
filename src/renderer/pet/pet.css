@@ -194,6 +194,7 @@ body {
 }
 
 .level {
+  position: relative;
   height: 6px;
   background: var(--surface-soft);
   border: 1px solid var(--border);
@@ -206,6 +207,16 @@ body {
   height: 100%;
   background: var(--accent);
   transition: width 80ms linear;
+}
+
+.level-mark {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--muted);
+  opacity: 0.6;
 }
 
 .card-host {

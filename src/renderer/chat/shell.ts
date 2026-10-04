@@ -10,6 +10,7 @@ export interface ShellOptions {
   screens: Record<ScreenName, HTMLElement>;
   nav: HTMLElement;
   subscribe?: (listener: (screen: string) => void) => (() => void) | void;
+  onShow?: (name: ScreenName) => void;
   doc?: Document;
   initial?: ScreenName;
 }
@@ -38,6 +39,7 @@ export function createShell(options: ShellOptions): Shell {
       options.screens[key].hidden = key !== name;
     }
     markButtons();
+    options.onShow?.(name);
   }
 
   function onNavClick(event: Event): void {

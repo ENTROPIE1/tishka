@@ -1,16 +1,30 @@
 export const WAKE_PROMPT = 'Разговор с помощником по имени Тишка.';
 export const DISMISS_REPLY = 'Фыр. Я рядом.';
 
-// Подсказка распознаванию: имя в ней помогает службе не потерять обращение.
-export function wakePrompt(wakeWords: string[]): string {
+const PERSON_NAME_LIMIT = 100;
+
+// Подсказка распознаванию: имя помощника и, если человек сохранил своё имя в
+// памяти, оно тоже — служба реже путает имена вроде «Эвелина» и «Ивелина».
+export function wakePrompt(wakeWords: string[], personName?: string): string {
   const name = wakeWords.map((word) => word.trim()).find((word) => word !== '') ?? 'Тишка';
-  return `Разговор с помощником по имени ${name}.`;
+  const base = `Разговор с помощником по имени ${name}.`;
+  const suffix = personName?.trim().slice(0, PERSON_NAME_LIMIT) ?? '';
+  return suffix === '' ? base : `${base} ${suffix}`;
 }
 
 export interface WakeState {
   active: boolean;
   conversation: boolean;
   soon: boolean;
+  sensitivity?: 'low' | 'normal' | 'high';
+}
+
+// Состояние режима разговора в окне чата.
+export interface ChatTalkState {
+  active: boolean;
+  conversation: boolean;
+  soon: boolean;
+  sensitivity: 'low' | 'normal' | 'high';
 }
 
 export interface WakeMatch {

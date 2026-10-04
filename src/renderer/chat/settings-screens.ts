@@ -1,8 +1,10 @@
+import { combineSections, type SettingsSection } from '../settings/dom';
 import { mountConnectionsSection } from '../settings/connections-section';
 import { mountMemorySection } from '../settings/memory-section';
 import { mountModelSection } from '../settings/model-section';
 import { mountPersonaSection } from '../settings/persona-section';
 import { mountVoiceSection } from '../settings/voice-section';
+import type { ScreenName } from './shell';
 
 function section(id: string): HTMLElement {
   const node = document.getElementById(id);
@@ -12,11 +14,16 @@ function section(id: string): HTMLElement {
   return node;
 }
 
-// Разделы настроек монтируются в экраны одного окна без изменения их содержимого.
-export function mountSettingsScreens(): void {
-  mountModelSection(section('model-section'));
-  mountConnectionsSection(section('connections-section'));
-  mountPersonaSection(section('persona-section'));
-  mountMemorySection(section('memory-section'));
-  mountVoiceSection(section('voice-section'));
+// Разделы настроек монтируются в экраны одного окна. Каждый возвращает refresh,
+// чтобы экран перечитывал данные при каждом показе.
+export function mountSettingsScreens(): Partial<Record<ScreenName, SettingsSection>> {
+  return {
+    connections: combineSections([
+      mountModelSection(section('model-section')),
+      mountConnectionsSection(section('connections-section'))
+    ]),
+    memory: mountMemorySection(section('memory-section')),
+    voice: mountVoiceSection(section('voice-section')),
+    persona: mountPersonaSection(section('persona-section'))
+  };
 }

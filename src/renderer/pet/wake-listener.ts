@@ -1,5 +1,5 @@
-import { createVad, type Vad } from '../../voice/vad';
-import { encodeWav, resample } from '../../voice/wav';
+import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
+import { encodeWav, normalizePeak, resample } from '../../voice/wav';
 
 const PROCESSOR_BUFFER = 4096;
 const TARGET_RATE = 16000;
@@ -42,11 +42,12 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let chunks: Float32Array[] = [];
   let sourceRate = TARGET_RATE;
   let runId = 0;
+  let sensitivity: VadSensitivity = 'normal';
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
   function resetPhrase(): void {
     chunks = [];
-    vad = createVad({ silenceMs: SILENCE_MS, maxMs: MAX_PHRASE_MS, noSpeechMs: 0 });
+    vad = createVad({ silenceMs: SILENCE_MS, maxMs: MAX_PHRASE_MS, noSpeechMs: 0, sensitivity });
   }
 
   function clearRetry(): void {
@@ -94,6 +95,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     }
     const collected = chunks;
     const rate = sourceRate;
+    const activeVad = vad;
     resetPhrase();
     if (total === 0 || (total / rate) * 1000 < MIN_PHRASE_MS) {
       return;
@@ -104,14 +106,18 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       merged.set(part, offset);
       offset += part.length;
     }
-    window.tishka.pet.wakePhrase(encodeWav(resample(merged, rate, TARGET_RATE), TARGET_RATE));
+    const trimmed = activeVad === undefined ? merged : activeVad.result(merged, rate);
+    const normalized = normalizePeak(trimmed);
+    window.tishka.pet.wakePhrase(encodeWav(resample(normalized, rate, TARGET_RATE), TARGET_RATE));
   }
 
   async function open(): Promise<void> {
     const id = (runId += 1);
     let media: MediaStream;
     try {
-      media = await navigator.mediaDevices.getUserMedia({ audio: true });
+      media = await navigator.mediaDevices.getUserMedia({
+      audio: { autoGainControl: true, noiseSuppression: true, echoCancellation: true, channelCount: 1 }
+    });
     } catch {
       if (id === runId && active) {
         scheduleRetry(id);
@@ -179,6 +185,9 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   window.tishka.pet.onWakeState((state) => {
     active = state.active;
     soon = state.soon;
+    if (state.sensitivity !== undefined) {
+      sensitivity = state.sensitivity;
+    }
     if (state.conversation !== conversation) {
       conversation = state.conversation;
       deps.onConversation?.(conversation);

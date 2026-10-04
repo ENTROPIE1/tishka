@@ -1,9 +1,10 @@
-import type { ListenResult } from '../../voice/listen';
 import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
 import { encodeWav, normalizePeak, resample } from '../../voice/wav';
 
 const PROCESSOR_BUFFER = 1024;
 const TARGET_RATE = 16000;
+const DEFAULT_SILENCE_MS = 800;
+const DEFAULT_MAX_PHRASE_MS = 12000;
 
 const MIC_CONSTRAINTS: MediaStreamConstraints = {
   audio: {
@@ -14,19 +15,18 @@ const MIC_CONSTRAINTS: MediaStreamConstraints = {
   }
 };
 
-export interface RecorderOptions {
-  onLevel(level: number): void;
-  onResult(result: ListenResult): void;
+export interface PhraseListenerOptions {
+  onPhrase(wav: Uint8Array): void;
+  onLevel?(level: number): void;
+  onError?(message: string): void;
   sensitivity?: VadSensitivity;
-  getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
-  makeVad?: () => Vad;
-  targetRate?: number;
+  silenceMs?: number;
+  maxPhraseMs?: number;
 }
 
-export interface Recorder {
+export interface PhraseListener {
   start(): Promise<boolean>;
   stop(): void;
-  cancel(): void;
 }
 
 function stopTracks(stream: MediaStream | undefined): void {
@@ -38,22 +38,24 @@ function stopTracks(stream: MediaStream | undefined): void {
   }
 }
 
-// Запись фразы: микрофон → кадры в VAD → WAV 16 кГц для главного процесса.
-export function createRecorder(options: RecorderOptions): Recorder {
-  const getUserMedia =
-    options.getUserMedia ?? ((constraints: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(constraints));
-  const makeVad = options.makeVad ?? (() => createVad({ sensitivity: options.sensitivity }));
-  const targetRate = options.targetRate ?? TARGET_RATE;
-
+// Постоянное прослушивание для режима разговора: микрофон открыт, речь режется
+// на фразы тем же VAD, готовые фразы уходят наружу.
+export function createPhraseListener(options: PhraseListenerOptions): PhraseListener {
+  const silenceMs = options.silenceMs ?? DEFAULT_SILENCE_MS;
+  const maxPhraseMs = options.maxPhraseMs ?? DEFAULT_MAX_PHRASE_MS;
   let stream: MediaStream | undefined;
   let context: AudioContext | undefined;
   let processor: ScriptProcessorNode | undefined;
   let vad: Vad | undefined;
   let chunks: Float32Array[] = [];
-  let sourceRate = targetRate;
+  let sourceRate = TARGET_RATE;
   let active = false;
-  let starting = false;
   let runId = 0;
+
+  function resetPhrase(): void {
+    chunks = [];
+    vad = createVad({ silenceMs, maxMs: maxPhraseMs, noSpeechMs: 0, sensitivity: options.sensitivity });
+  }
 
   function teardown(): void {
     if (processor !== undefined) {
@@ -68,23 +70,16 @@ export function createRecorder(options: RecorderOptions): Recorder {
     stopTracks(stream);
     stream = undefined;
     vad = undefined;
-    active = false;
-    starting = false;
-  }
-
-  function reset(): void {
     chunks = [];
-    options.onLevel(0);
+    active = false;
   }
 
-  function finalize(): void {
+  function emitPhrase(): void {
     const collected = chunks;
     const rate = sourceRate;
     const activeVad = vad;
-    teardown();
-    reset();
+    resetPhrase();
     if (collected.length === 0) {
-      options.onResult({ kind: 'nospeech' });
       return;
     }
     let total = 0;
@@ -99,88 +94,58 @@ export function createRecorder(options: RecorderOptions): Recorder {
     }
     const trimmed = activeVad === undefined ? merged : activeVad.result(merged, rate);
     const normalized = normalizePeak(trimmed);
-    const resampled = resample(normalized, rate, targetRate);
-    options.onResult({ kind: 'wav', data: encodeWav(resampled, targetRate) });
-  }
-
-  // Повторное нажатие до фактического начала записи отменяет запуск.
-  function stop(): void {
-    if (starting) {
-      runId += 1;
-      starting = false;
-      options.onResult({ kind: 'cancel' });
-      return;
-    }
-    if (!active) {
-      return;
-    }
-    finalize();
-  }
-
-  function cancel(): void {
-    if (!starting && !active) {
-      return;
-    }
-    runId += 1;
-    teardown();
-    reset();
-    options.onResult({ kind: 'cancel' });
+    options.onPhrase(encodeWav(resample(normalized, rate, TARGET_RATE), TARGET_RATE));
   }
 
   async function start(): Promise<boolean> {
-    if (active || starting) {
+    if (active) {
       return true;
     }
     const id = (runId += 1);
-    starting = true;
     let media: MediaStream;
     try {
-      media = await getUserMedia(MIC_CONSTRAINTS);
+      media = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
     } catch {
-      starting = false;
-      options.onResult({ kind: 'error', message: 'Нет доступа к микрофону' });
+      options.onError?.('Не слышу микрофон');
       return false;
     }
     if (id !== runId) {
       stopTracks(media);
-      starting = false;
       return false;
     }
     stream = media;
     context = new AudioContext();
     sourceRate = context.sampleRate;
-    vad = makeVad();
-    reset();
-
+    resetPhrase();
     const source = context.createMediaStreamSource(stream);
     processor = context.createScriptProcessor(PROCESSOR_BUFFER, 1, 1);
     processor.onaudioprocess = (event) => {
-      if (!active || vad === undefined) {
+      if (vad === undefined) {
         return;
       }
-      const input = event.inputBuffer.getChannelData(0);
-      const frame = new Float32Array(input);
+      const frame = new Float32Array(event.inputBuffer.getChannelData(0));
       chunks.push(frame);
       const verdict = vad.push(frame, (frame.length / sourceRate) * 1000);
-      options.onLevel(vad.level());
+      options.onLevel?.(vad.level());
       if (verdict === 'end' || verdict === 'timeout') {
-        finalize();
+        emitPhrase();
       } else if (verdict === 'nospeech') {
-        teardown();
-        reset();
-        options.onResult({ kind: 'nospeech' });
+        resetPhrase();
       }
     };
-
     const sink = context.createGain();
     sink.gain.value = 0;
     source.connect(processor);
     processor.connect(sink);
     sink.connect(context.destination);
     active = true;
-    starting = false;
     return true;
   }
 
-  return { start, stop, cancel };
+  function stop(): void {
+    runId += 1;
+    teardown();
+  }
+
+  return { start, stop };
 }

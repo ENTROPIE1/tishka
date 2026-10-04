@@ -10,6 +10,7 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
     wakeWords: ['тишка'],
     wakeEnabled: true,
     talkTimeoutSec: 30,
+    sensitivity: 'normal',
     sttUrl: 'http://127.0.0.1:8178',
     stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
     ttsEngine: 'none',
@@ -34,7 +35,11 @@ export interface Harness {
 
 export const wav = new Uint8Array([1, 2, 3, 4]);
 
-export function makeHarness(scripts: PhraseScript[], initial: Config['voice'] = voice()): Harness {
+export function makeHarness(
+  scripts: PhraseScript[],
+  initial: Config['voice'] = voice(),
+  memoryName?: string
+): Harness {
   let voiceConfig = initial;
   let index = 0;
   let hiddenCount = 0;
@@ -86,7 +91,8 @@ export function makeHarness(scripts: PhraseScript[], initial: Config['voice'] = 
     hide: () => {
       hiddenCount += 1;
     },
-    onSoonChange: () => soonChanges.push(flow.isLeavingSoon())
+    onSoonChange: () => soonChanges.push(flow.isLeavingSoon()),
+    memoryName: () => memoryName
   });
 
   return {

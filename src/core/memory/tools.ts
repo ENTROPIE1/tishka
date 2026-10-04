@@ -1,4 +1,4 @@
-import type { ToolRegistry, ToolResult } from '../types';
+import type { EventBus, ToolRegistry, ToolResult } from '../types';
 import { confirmTool, forgetTool, saveTool, searchTool, updateTool } from './tool-defs';
 import type { AddMemoryInput, MemoryStore, UpdateMemoryPatch } from './types';
 
@@ -30,7 +30,9 @@ function describe(record: { id: string; text: string; tags: string[]; reviewAt?:
   return `${record.id}: ${record.text}${tags}${review}`;
 }
 
-export function registerMemoryTools(registry: ToolRegistry, store: MemoryStore): void {
+export function registerMemoryTools(registry: ToolRegistry, store: MemoryStore, events?: EventBus): void {
+  const changed = (): void => events?.emit({ type: 'memory.changed' });
+
   registry.register(saveTool, async (args) => {
     const items = args.items;
     if (!Array.isArray(items) || items.length === 0) {
@@ -63,6 +65,9 @@ export function registerMemoryTools(registry: ToolRegistry, store: MemoryStore):
       } catch (error) {
         errors.push({ text: raw.text, error: errorMessage(error) });
       }
+    }
+    if (added + updated > 0) {
+      changed();
     }
     const lines = [`Добавлено: ${added}, обновлено: ${updated}`];
     for (const item of errors) {
@@ -107,6 +112,7 @@ export function registerMemoryTools(registry: ToolRegistry, store: MemoryStore):
       if (record === undefined) {
         return fail(`Запись не найдена: ${id}`);
       }
+      changed();
       return ok(`Запомнил по-новому: ${record.text}`, record);
     } catch (error) {
       return fail(errorMessage(error));
@@ -122,6 +128,7 @@ export function registerMemoryTools(registry: ToolRegistry, store: MemoryStore):
     if (!removed) {
       return fail(`Запись не найдена: ${id}`);
     }
+    changed();
     return ok('Забыл эту запись');
   });
 
@@ -136,6 +143,9 @@ export function registerMemoryTools(registry: ToolRegistry, store: MemoryStore):
       if (record !== undefined) {
         confirmed += 1;
       }
+    }
+    if (confirmed > 0) {
+      changed();
     }
     return ok(`Подтверждено записей: ${confirmed}`, { confirmed });
   });

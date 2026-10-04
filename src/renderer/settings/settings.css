@@ -301,6 +301,44 @@
   font-size: 13px;
 }
 
+.mic-check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mic-check .level {
+  position: relative;
+  height: 6px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mic-check .level-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 80ms linear;
+}
+
+.mic-check .level-mark {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--muted);
+}
+
+.mic-check-text {
+  font-size: 13px;
+  color: var(--text);
+  min-height: 1.2em;
+}
+
 .memory-list {
   display: flex;
   flex-direction: column;

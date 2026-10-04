@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeWav, resample } from '../src/voice/wav';
+import { encodeWav, normalizePeak, resample } from '../src/voice/wav';
 
 function ascii(view: DataView, offset: number, length: number): string {
   let text = '';
@@ -34,6 +34,24 @@ describe('encodeWav', () => {
     expect(view.getInt16(44, true)).toBe(32767);
     expect(view.getInt16(46, true)).toBe(-32768);
     expect(view.getInt16(48, true)).toBe(0);
+  });
+});
+
+describe('normalizePeak', () => {
+  it('поднимает пик тихой записи до 0,9', () => {
+    const result = normalizePeak(new Float32Array([0.05, -0.05, 0.025]));
+    expect(Math.max(...result.map(Math.abs))).toBeCloseTo(0.9, 5);
+  });
+
+  it('усиление ограничено двадцатью', () => {
+    const result = normalizePeak(new Float32Array([0.001]));
+    expect(result[0]).toBeCloseTo(0.02, 5);
+  });
+
+  it('тишину не усиливает', () => {
+    const samples = new Float32Array([0.0005, -0.0002, 0]);
+    const result = normalizePeak(samples);
+    expect(Array.from(result)).toEqual(Array.from(samples));
   });
 });
 

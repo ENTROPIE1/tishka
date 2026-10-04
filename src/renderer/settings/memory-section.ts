@@ -1,5 +1,27 @@
 import type { MemoryRecord } from '../../core/memory/store';
-import { button, clear, el, field, sectionTitle, textInput, textarea } from './dom';
+import { button, clear, el, field, sectionTitle, textInput, textarea, type SettingsSection } from './dom';
+
+const MONTHS = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+];
+
+// Дата изменения: «сегодня, 9:47» для текущего дня, иначе «3 октября».
+export function memoryDate(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+  const time = `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  if (sameDay) {
+    return `сегодня, ${time}`;
+  }
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
 
 function reviewLabel(record: MemoryRecord): string | undefined {
   if (record.reviewAt === undefined) {
@@ -9,10 +31,15 @@ function reviewLabel(record: MemoryRecord): string | undefined {
 }
 
 function metaText(record: MemoryRecord): string {
-  return [record.tags.join(', '), reviewLabel(record)].filter((part) => part !== undefined && part !== '').join(' · ');
+  const parts = [record.tags.join(', '), reviewLabel(record), memoryDate(record.updated)];
+  return parts.filter((part) => part !== undefined && part !== '').join(' · ');
 }
 
-export function mountMemorySection(root: HTMLElement): void {
+function byUpdated(a: MemoryRecord, b: MemoryRecord): number {
+  return Date.parse(b.updated) - Date.parse(a.updated);
+}
+
+export function mountMemorySection(root: HTMLElement): SettingsSection {
   clear(root);
   root.append(sectionTitle('Память'));
 
@@ -65,11 +92,7 @@ export function mountMemorySection(root: HTMLElement): void {
     const buttons = el('div', 'row');
     buttons.append(save, cancel);
     const editor = el('div', 'editor');
-    editor.append(
-      field('Текст', text),
-      field('Метки через запятую', tags),
-      buttons
-    );
+    editor.append(field('Текст', text), field('Метки через запятую', tags), buttons);
 
     save.addEventListener('click', () => {
       void (async () => {
@@ -115,12 +138,16 @@ export function mountMemorySection(root: HTMLElement): void {
   }
 
   function render(records: MemoryRecord[]): void {
+    // Открытый редактор не закрываем и не затираем введённый текст.
+    if (list.querySelector('.editor') !== null) {
+      return;
+    }
     clear(list);
     if (records.length === 0) {
       list.append(el('div', 'empty', 'Записей нет'));
       return;
     }
-    for (const record of records) {
+    for (const record of [...records].sort(byUpdated)) {
       list.append(renderItem(record));
     }
   }
@@ -145,5 +172,14 @@ export function mountMemorySection(root: HTMLElement): void {
     })();
   });
 
+  // Ядро сообщает об изменении памяти: открытый экран обновляется сразу.
+  window.tishka.onEvent((event) => {
+    if (event.type === 'memory.changed') {
+      void refresh();
+    }
+  });
+
   void refresh();
+
+  return { refresh: () => void refresh() };
 }

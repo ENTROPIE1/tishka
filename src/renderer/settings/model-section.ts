@@ -1,12 +1,12 @@
 import type { Config } from '../../core/types';
-import { button, clear, el, field, runWithFeedback, sectionTitle, textInput } from './dom';
+import { button, clear, el, field, runWithFeedback, sectionTitle, textInput, type SettingsSection } from './dom';
 
 const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
 const API_KEY_SECRET = 'DKS_API_KEY';
 const KEY_SET = 'Ключ задан';
 const KEY_MISSING = 'Ключ не задан';
 
-export function mountModelSection(root: HTMLElement): void {
+export function mountModelSection(root: HTMLElement): SettingsSection {
   clear(root);
   root.append(sectionTitle('Модель'));
 
@@ -75,4 +75,6 @@ export function mountModelSection(root: HTMLElement): void {
   });
 
   void refresh();
+
+  return { refresh: () => void refresh() };
 }

@@ -1,7 +1,7 @@
 import type { ConnectionTemplate } from '../../core/connections';
 import type { ConnectionView } from '../../main/ipc-settings';
 import { openEditor, TEMPLATE_OPTIONS, templateLabel } from './connection-editor';
-import { button, clear, el, runWithFeedback, sectionTitle, selectInput } from './dom';
+import { button, clear, el, runWithFeedback, sectionTitle, selectInput, type SettingsSection } from './dom';
 
 const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
 
@@ -15,7 +15,7 @@ function stateLabel(view: ConnectionView): string {
   return 'отключён';
 }
 
-export function mountConnectionsSection(root: HTMLElement): void {
+export function mountConnectionsSection(root: HTMLElement): SettingsSection {
   clear(root);
   root.append(sectionTitle('Подключения'));
 
@@ -121,6 +121,10 @@ export function mountConnectionsSection(root: HTMLElement): void {
   }
 
   function render(): void {
+    // Открытый редактор не закрываем: он живёт внутри карточки списка.
+    if (list.querySelector('.editor') !== null) {
+      return;
+    }
     clear(list);
     if (views.length === 0) {
       list.append(el('div', 'empty', 'Подключений пока нет'));
@@ -143,4 +147,6 @@ export function mountConnectionsSection(root: HTMLElement): void {
   });
 
   void refresh();
+
+  return { refresh: () => void refresh() };
 }

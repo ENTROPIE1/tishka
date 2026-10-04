@@ -12,7 +12,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function setup(): { shell: Shell; screens: Record<ScreenName, HTMLElement>; navigate(name: string): void } {
+function setup(onShow?: (name: ScreenName) => void): { shell: Shell; screens: Record<ScreenName, HTMLElement>; navigate(name: string): void } {
   document.body.innerHTML = `
     <nav id="nav">
       <button data-screen="chat"></button>
@@ -41,7 +41,8 @@ function setup(): { shell: Shell; screens: Record<ScreenName, HTMLElement>; navi
     nav: document.getElementById('nav') as HTMLElement,
     subscribe: (listener) => {
       navigate = (name) => listener(name);
-    }
+    },
+    onShow
   });
   shells.push(shell);
   return { shell, screens, navigate: (name) => navigate(name) };
@@ -102,5 +103,17 @@ describe('createShell: экраны', () => {
     const button = document.querySelector<HTMLButtonElement>('[data-screen="voice"]');
     button?.click();
     expect(shell.current()).toBe('voice');
+  });
+
+  it('показ экрана сообщает наружу, включая начальный показ', () => {
+    const shown: ScreenName[] = [];
+    const { shell, navigate } = setup((name) => shown.push(name));
+
+    expect(shown).toEqual(['chat']);
+
+    shell.show('memory');
+    navigate('voice');
+
+    expect(shown).toEqual(['chat', 'memory', 'voice']);
   });
 });
