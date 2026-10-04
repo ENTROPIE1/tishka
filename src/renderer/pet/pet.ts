@@ -40,7 +40,10 @@ const composer = createComposer({
     window.tishka.pet.wakeEscape();
   },
   onExpand: () => openComposer(),
-  onFocus: () => window.tishka.pet.focus()
+  onFocus: () => window.tishka.pet.focus(),
+  onSettings: () => {
+    void window.tishka.openSettings();
+  }
 });
 composerHost.append(composer.element);
 
