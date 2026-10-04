@@ -21,6 +21,7 @@ import { createTriggerState } from './triggers/state';
 import { registerTriggerTools } from './triggers/tools';
 import { createWatcher, type Watcher } from './triggers/watcher';
 import { registerBuiltinTools } from './tools/builtin';
+import { createToolGroup, type ToolGroup } from './tools/group';
 import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
 import { registerWebTools } from './tools/web';
@@ -127,6 +128,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let skillStore: ReturnType<typeof createSkillStore> | undefined;
   let skillRunner: SkillRunner | undefined;
   let skillOverview: SkillOverviewService | undefined;
+  let webTools: ToolGroup | undefined;
+  let screenTools: ToolGroup | undefined;
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
   const conversation = createConversationClock();
 
@@ -243,7 +246,11 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       now: deps.now
     });
     registerHistoryTools(registry, historyStore);
-    registerWebTools(registry, { read: deps.readWeb, fetch: deps.fetch }, config.web.enabled);
+    const webGroup = createToolGroup(registry, (target) =>
+      registerWebTools(target, { read: deps.readWeb, fetch: deps.fetch }, true)
+    );
+    webTools = webGroup;
+    webGroup.setEnabled(config.web.enabled);
 
     const memoryStore = createMemoryStore({
       filePath: join(deps.dataDir, 'memory.json'),
@@ -254,7 +261,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     registerMemoryTools(registry, memoryStore, deps.events);
 
     const llm = createLlmClient({
-      baseUrl: config.llm.baseUrl,
+      baseUrl: () => config.llm.baseUrl,
       getApiKey: gatewayKey,
       fetch: deps.fetch
     });
@@ -264,19 +271,23 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       const visionLook = createVisionLook({
         capture,
         chat: (req) => llm.chat(req),
-        visionModel: config.llm.visionModel
+        visionModel: () => config.llm.visionModel
       });
-      registerScreenTools(
-        registry,
-        {
-          capture,
-          look: (question, target) => visionLook.look(question, target),
-          screenshotsDir: join(deps.dataDir, 'screenshots'),
-          now: deps.now,
-          events: deps.events
-        },
-        config.screen.enabled
+      const screenGroup = createToolGroup(registry, (target) =>
+        registerScreenTools(
+          target,
+          {
+            capture,
+            look: (question, screenTarget) => visionLook.look(question, screenTarget),
+            screenshotsDir: join(deps.dataDir, 'screenshots'),
+            now: deps.now,
+            events: deps.events
+          },
+          true
+        )
       );
+      screenTools = screenGroup;
+      screenGroup.setEnabled(config.screen.enabled);
     }
 
     const runner = createSkillRunner({
@@ -344,6 +355,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   async function reloadConfig(): Promise<void> {
     config = await loadConfig(deps.dataDir);
     if (started) {
+      webTools?.setEnabled(config.web.enabled);
+      screenTools?.setEnabled(config.screen.enabled);
       await applyMcpServers(config.mcpServers);
     }
   }

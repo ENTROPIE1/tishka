@@ -55,7 +55,7 @@ function toDataUrl(bytes: Uint8Array): string {
 export interface VisionLookDeps {
   capture(target: ScreenTarget): Promise<CaptureResult>;
   chat(req: ChatRequest): Promise<ChatResponse>;
-  visionModel: string;
+  visionModel: string | (() => string);
   timeoutMs?: number;
 }
 
@@ -109,6 +109,8 @@ function visionError(error: unknown): string {
 
 export function createVisionLook(deps: VisionLookDeps): VisionLook {
   const timeoutMs = deps.timeoutMs ?? VISION_TIMEOUT_MS;
+  const visionModel = (): string =>
+    typeof deps.visionModel === 'function' ? deps.visionModel() : deps.visionModel;
 
   return {
     async look(question, target) {
@@ -126,7 +128,7 @@ export function createVisionLook(deps: VisionLookDeps): VisionLook {
         { role: 'user', content }
       ];
       try {
-        const response = await withTimeout(deps.chat({ model: deps.visionModel, messages }), timeoutMs);
+        const response = await withTimeout(deps.chat({ model: visionModel(), messages }), timeoutMs);
         const answer = (response.text ?? '').trim();
         if (answer === '') {
           return { ok: false, content: '', error: 'Модель не разобрала снимок' };
