@@ -14,6 +14,7 @@ export interface PhraseListenerOptions {
   onLevel?(level: number): void;
   onError?(message: string): void;
   sensitivity?: VadSensitivity;
+  threshold?: number;
   silenceMs?: number;
   maxPhraseMs?: number;
   capture?: MicCapture;
@@ -55,6 +56,7 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
       maxMs: maxPhraseMs,
       noSpeechMs: 0,
       sensitivity: options.sensitivity,
+      threshold: options.threshold,
       continuous: true,
       settleMs: SETTLE_MS
     });

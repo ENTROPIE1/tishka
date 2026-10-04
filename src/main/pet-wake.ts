@@ -21,6 +21,7 @@ export interface PetWakeDeps {
 
 export interface PetWake {
   broadcast(): void;
+  setPaused(value: boolean): void;
   isListening(): boolean;
   dispose(): void;
 }
@@ -28,6 +29,7 @@ export interface PetWake {
 // Связка постоянного прослушивания с окном-питомцем: фразы, режим разговора, пауза.
 export function registerPetWake(deps: PetWakeDeps): PetWake {
   let busy = false;
+  let paused = false;
   let listening = false;
 
   function broadcast(): void {
@@ -35,12 +37,13 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
     // Режимом владеет одно окно: пока разговор ведёт чат, питомец не слушает.
     const mine = deps.flow.conversationOwner() === 'pet';
     const idle = deps.flow.conversationOwner() === null;
-    listening = !busy && deps.isReady() && (idle ? voice.wakeEnabled : mine);
+    listening = !paused && !busy && deps.isReady() && (idle ? voice.wakeEnabled : mine);
     deps.pet.wakeState({
       active: listening,
       conversation: mine,
       soon: mine && deps.flow.isLeavingSoon(),
-      sensitivity: voice.sensitivity
+      sensitivity: voice.sensitivity,
+      threshold: voice.mic.threshold
     });
   }
 
@@ -79,5 +82,13 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
     }
   });
 
-  return { broadcast, isListening: () => listening, dispose: unsubscribe };
+  return {
+    broadcast,
+    setPaused(value: boolean): void {
+      paused = value;
+      broadcast();
+    },
+    isListening: () => listening,
+    dispose: unsubscribe
+  };
 }

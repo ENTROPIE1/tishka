@@ -6,6 +6,7 @@ export interface MicButtonOptions {
   onLevel(level: number): void;
   onListeningChange(listening: boolean): void;
   onError?(message: string): void;
+  getThreshold?(): number | null;
 }
 
 export interface MicButton {
@@ -69,7 +70,12 @@ export function createMicButton(options: MicButtonOptions): MicButton {
         options.onError?.('Не расслышал');
       }
     },
-    makeVad: () => createVad({ maxMs: MAX_RECORD_MS, silenceMs: SILENCE_MS })
+    makeVad: () =>
+      createVad({
+        maxMs: MAX_RECORD_MS,
+        silenceMs: SILENCE_MS,
+        threshold: options.getThreshold?.() ?? undefined
+      })
   });
 
   function refresh(): void {

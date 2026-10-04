@@ -22,6 +22,7 @@ export interface ChatTalkDeps {
 
 export interface ChatTalk {
   broadcast(): void;
+  setPaused(value: boolean): void;
   dispose(): void;
 }
 
@@ -39,15 +40,17 @@ function bytes(value: unknown): Uint8Array | undefined {
 // чат. Состояние уходит в окна, а фразы и нажатия — в общий поток.
 export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
   let busy = false;
+  let paused = false;
 
   function state(): ChatTalkState {
     const voice = deps.getVoice();
     const mine = deps.flow.conversationOwner() === 'chat';
     return {
-      active: !busy && deps.isReady() && mine,
+      active: !paused && !busy && deps.isReady() && mine,
       conversation: mine,
       soon: mine && deps.flow.isLeavingSoon(),
-      sensitivity: voice.sensitivity
+      sensitivity: voice.sensitivity,
+      threshold: voice.mic.threshold
     };
   }
 
@@ -92,5 +95,12 @@ export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
     deps.flow.onKeyboardInput();
   });
 
-  return { broadcast, dispose: unsubscribe };
+  return {
+    broadcast,
+    setPaused(value: boolean): void {
+      paused = value;
+      broadcast();
+    },
+    dispose: unsubscribe
+  };
 }

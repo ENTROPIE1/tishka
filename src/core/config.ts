@@ -20,6 +20,7 @@ export function defaultConfig(): Config {
       wakeEnabled: false,
       talkTimeoutSec: 30,
       sensitivity: 'normal',
+      mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: 'http://127.0.0.1:8178',
       stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
       tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
@@ -76,6 +77,26 @@ function pickPetX(value: unknown, fallback: number | null): number | null {
     return null;
   }
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function pickNullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function pickNullableString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+function parseMic(value: unknown, fallback: Config['voice']['mic']): Config['voice']['mic'] {
+  if (!isRecord(value)) {
+    return fallback;
+  }
+  return {
+    threshold: pickNullableNumber(value.threshold),
+    noise: pickNullableNumber(value.noise),
+    speech: pickNullableNumber(value.speech),
+    calibratedAt: pickNullableString(value.calibratedAt)
+  };
 }
 
 function optionalStringRecord(value: unknown): Record<string, string> | undefined {
@@ -161,6 +182,7 @@ export function mergeConfig(value: unknown): Config {
   const voice = isRecord(value.voice) ? value.voice : {};
   const stt = isRecord(voice.stt) ? voice.stt : {};
   const tts = isRecord(voice.tts) ? voice.tts : {};
+  const mic = isRecord(voice.mic) ? voice.mic : {};
   const persona = isRecord(value.persona) ? value.persona : {};
   const pet = isRecord(value.pet) ? value.pet : {};
   const screen = isRecord(value.screen) ? value.screen : {};
@@ -177,6 +199,7 @@ export function mergeConfig(value: unknown): Config {
       wakeEnabled: pickBoolean(voice.wakeEnabled, defaults.voice.wakeEnabled),
       talkTimeoutSec: pickNumber(voice.talkTimeoutSec, defaults.voice.talkTimeoutSec),
       sensitivity: pickSensitivity(voice.sensitivity, defaults.voice.sensitivity),
+      mic: parseMic(mic, defaults.voice.mic),
       sttUrl: pickString(voice.sttUrl, defaults.voice.sttUrl),
       stt: {
         exe: pickString(stt.exe, defaults.voice.stt.exe),

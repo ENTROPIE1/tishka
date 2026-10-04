@@ -72,6 +72,7 @@ export const VOICE_STATUS_CHANNEL = 'tishka:voice:status';
 export const VOICE_CHECK_CHANNEL = 'tishka:voice:check';
 export const VOICE_APPLY_CHANNEL = 'tishka:voice:apply';
 export const VOICE_DICTATE_CHANNEL = 'tishka:voice:dictate';
+export const VOICE_CALIBRATION_CHANNEL = 'tishka:voice:calibration';
 
 export const SPEECH_HEALTH_CHANNEL = 'tishka:speech:health';
 export const SPEECH_SAY_CHANNEL = 'tishka:speech:say';
