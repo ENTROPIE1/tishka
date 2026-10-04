@@ -1,10 +1,11 @@
 import type { BrowserWindow } from 'electron';
 import type { Config, EventBus } from '../core/types';
-import { initialPet, onEvent, onTick, type PetModel, type TalkSource } from '../pet/state';
+import { initialPet, onEvent, onTick, requestLeave, type PetModel, type TalkSource } from '../pet/state';
 import { PET_LAYOUT_CHANNEL, PET_MODEL_CHANNEL } from './ipc-channels';
 import type { PetActivation } from './pet-activation';
 import type { Mover } from './pet-motion';
 import type { PetPlacement } from './pet-placement';
+import { mark } from './timing-log';
 
 const TICK_MS = 250;
 
@@ -30,6 +31,7 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
   const { window, mover, placement, activation, bus } = deps;
   let model: PetModel = initialPet(Date.now());
   let busy = false;
+  let shown = false;
   let tickTimer: NodeJS.Timeout | undefined;
 
   function sendModel(): void {
@@ -61,18 +63,29 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
         window.showInactive();
         // Когда окно встало на место, считаем интерактивность по курсору.
         activation.sendPointer();
+        if (!shown) {
+          shown = true;
+          mark('pet.window.shown');
+        }
         break;
       case 'leave':
         // Уход — тоже на месте: окно не двигается, персонаж уходит сам,
-        // а окно скрывается при переходе в hidden.
+        // а окно скрывается при переходе в hidden. Строка ввода гаснет вместе с ежом.
         mover.stop();
+        activation.sendPointer();
         break;
       case 'hidden':
         mover.stop();
         window.hide();
         break;
       default:
-        if (!window.isVisible()) showAtRest();
+        if (!window.isVisible()) {
+          showAtRest();
+        } else if (previous.state === 'leave' || previous.state === 'hidden' || previous.state === 'sleep') {
+          // Возврат из ухода к видимому состоянию: окно уже на экране, но
+          // интерактивность нужно пересчитать, как при появлении.
+          activation.sendPointer();
+        }
         break;
     }
   }
@@ -83,8 +96,10 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
     }
     const previous = model;
     model = next;
-    applyState(previous, next);
+    // Состояние уходит в окно раньше показа: к моменту пересчёта
+    // интерактивности страница уже знает, виден ёж или уходит.
     sendModel();
+    applyState(previous, next);
   }
 
   function petMode(): boolean {
@@ -112,8 +127,8 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
       busy = value;
     },
     leave(): void {
-      // Уход по просьбе: анимация, затем окно скрывается, процесс живёт.
-      applyModel({ state: 'leave', since: Date.now(), queue: [] });
+      // Уход по просьбе: сначала договаривается ответ, затем анимация ухода.
+      applyModel(requestLeave(model, Date.now()));
     },
     isVisible(): boolean {
       return model.state !== 'hidden' && model.state !== 'leave';

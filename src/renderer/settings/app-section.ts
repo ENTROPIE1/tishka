@@ -17,6 +17,7 @@ export function mountAppSection(root: HTMLElement): SettingsSection {
   const warmMinutes = textInput('', 'number');
   const memoryLimit = textInput('', 'number');
   const save = button('Сохранить');
+  const openTiming = button('Открыть журнал времени');
   const messages = el('div', 'messages');
 
   root.append(
@@ -25,7 +26,7 @@ export function mountAppSection(root: HTMLElement): SettingsSection {
     field('Предел памяти приложения и службы, МБ', memoryLimit, 'При превышении в простое окна перезагружаются, затем приложение перезапускается')
   );
   const actions = el('div', 'row');
-  actions.append(save);
+  actions.append(save, openTiming);
   root.append(actions, messages);
 
   function show(error?: string, ok?: string): void {
@@ -67,6 +68,12 @@ export function mountAppSection(root: HTMLElement): SettingsSection {
   });
 
   void refresh();
+
+  openTiming.addEventListener('click', () => {
+    void window.tishka.openTimingLog().catch(() => {
+      show('Не удалось открыть журнал времени');
+    });
+  });
 
   return { refresh: () => void refresh() };
 }

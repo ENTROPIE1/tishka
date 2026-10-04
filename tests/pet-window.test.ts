@@ -138,6 +138,28 @@ describe('окно-питомец: уход по просьбе', () => {
     pet.dispose();
   });
 
+  it('возврат из ухода к видимому состоянию пересчитывает интерактивность', () => {
+    const bus = createEventBus();
+    const pet = createPetWindow({
+      bus,
+      getConfig: () => config(false),
+      savePetX: async () => undefined
+    });
+
+    pet.wake('click');
+    vi.advanceTimersByTime(1000);
+    pet.leave();
+    expect(fake.models.at(-1)).toBe('leave');
+
+    fake.sent.length = 0;
+    bus.emit({ type: 'speak.start', text: 'Хорошо, буду рядом' });
+    expect(fake.models.at(-1)).toBe('talking');
+
+    const pointer = fake.sent.filter((message) => message.channel === 'tishka:pet:pointer');
+    expect(pointer.length).toBeGreaterThan(0);
+    pet.dispose();
+  });
+
   it('окно создаётся один раз и при появлении только показывается', () => {
     const bus = createEventBus();
     const pet = createPetWindow({
