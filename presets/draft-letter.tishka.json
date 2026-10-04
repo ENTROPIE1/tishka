@@ -31,7 +31,7 @@
       "show": {
         "kind": "text",
         "title": "Черновик письма",
-        "markdown": "[Открыть черновик]({{steps.draft.data.url}})\n\n{{steps.letter.content}}"
+        "markdown": "[Открыть черновик]({{steps.draft.data.url}})\n\n{{steps.letter.content}}\n\n{{steps.draft.data.hint}}"
       }
     }
   ]

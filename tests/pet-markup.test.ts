@@ -9,6 +9,12 @@ import { stateLabel } from '../src/renderer/pet/state-label';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(resolve(root, 'src/renderer/pet/index.html'), 'utf8');
+const css = readFileSync(resolve(root, 'src/renderer/pet/pet.css'), 'utf8');
+
+function cssBlock(selector: string): string {
+  const match = css.match(new RegExp(`${selector}\\s*\\{([^}]*)\\}`));
+  return match?.[1] ?? '';
+}
 
 function bodyMarkup(): string {
   const match = html.match(/<body>([\s\S]*)<\/body>/);
@@ -95,6 +101,18 @@ describe('разметка окна-питомца', () => {
     expect(label).not.toBeNull();
     expect(element('character').nextElementSibling).toBe(label);
     expect(element('character').getAttribute('data-state')).not.toBeNull();
+  });
+
+  it('подпись состояния есть в разметке и видима', () => {
+    mount();
+    const state = element('state-label');
+    expect(state.classList.contains('state-label')).toBe(true);
+    expect(state.parentElement?.classList.contains('pet-side')).toBe(true);
+
+    const block = cssBlock('\\.state-label');
+    expect(block).not.toBe('');
+    expect(block).not.toContain('display: none');
+    expect(block).not.toContain('visibility: hidden');
   });
 
   it('в разметке строки нет атрибутов style', () => {

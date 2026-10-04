@@ -1,4 +1,4 @@
-import { app, globalShortcut, ipcMain, Menu, shell } from 'electron';
+import { app, globalShortcut, ipcMain, Menu, Notification, shell } from 'electron';
 import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
 import { saveConfig as persistConfig } from '../core/config';
@@ -7,8 +7,10 @@ import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { createSttService, type SttService } from '../voice/stt-service';
-import { openMainWindow } from './chat-window';
+import { loginItemSettings, startedHidden } from './autostart';
+import { openMainWindow, reloadMainWindow } from './chat-window';
 import { registerChatTalk, type ChatTalk } from './chat-talk';
+import { createMemoryWatch, type MemoryWatch } from './memory-watch';
 import { OPEN_CHAT_CHANNEL, PET_SPEAK_DONE_CHANNEL } from './ipc-channels';
 import { registerAutomationIpc } from './ipc-automations';
 import { registerIpc } from './ipc';
@@ -39,6 +41,8 @@ let speech: SpeechOutput | undefined;
 let speechDone: (() => void) | undefined;
 let chatTalk: ChatTalk | undefined;
 let webReader: WebReaderHandle | undefined;
+let memoryWatch: MemoryWatch | undefined;
+let processing = false;
 
 // Второй запуск не создаёт копию, а поднимает окно чата работающего приложения.
 const singleInstance = app.requestSingleInstanceLock();
@@ -112,6 +116,10 @@ app.whenReady().then(async () => {
         stt.stop();
         void stt.start().catch(() => undefined);
       }
+      if (previous.app.autostart !== next.app.autostart) {
+        app.setLoginItemSettings(loginItemSettings(next.app.autostart));
+      }
+      speech?.warm();
       petWake?.broadcast();
       chatTalk?.broadcast();
       tray?.refresh();
@@ -160,6 +168,7 @@ app.whenReady().then(async () => {
   });
   speech = speechOutput;
   registerSpeechIpc(speechOutput);
+  speechOutput.warm();
 
   const calibrationHint = createCalibrationHint({
     isCalibrated: () => tishka.config().voice.mic.calibratedAt !== null,
@@ -181,6 +190,7 @@ app.whenReady().then(async () => {
     core: tishka,
     bus,
     memoryName: () => tishka.memoryName(),
+    isReady: () => sttService.status() === 'ready',
     onMissedSpeech: () => calibrationHint.missed(),
     sendCommand: (command) => {
       if (command === 'listen') {
@@ -190,7 +200,7 @@ app.whenReady().then(async () => {
       chatTalk?.broadcast();
       tray?.refresh();
     },
-    hide: () => pet?.hide(),
+    hide: () => pet?.leave(),
     onSoonChange: () => {
       petWake?.broadcast();
       chatTalk?.broadcast();
@@ -201,6 +211,7 @@ app.whenReady().then(async () => {
     flow: wakeFlow,
     bus,
     getVoice: () => tishka.config().voice,
+    getWarmMinutes: () => tishka.config().app.warmMinutes,
     isReady: () => sttService.status() === 'ready'
   });
 
@@ -258,6 +269,35 @@ app.whenReady().then(async () => {
     }
   });
 
+  app.setLoginItemSettings(loginItemSettings(tishka.config().app.autostart));
+
+  bus.on((event) => {
+    if (event.type === 'think.start' || event.type === 'tool.start') {
+      processing = true;
+    } else if (event.type === 'idle' || event.type === 'speak.end') {
+      processing = false;
+    }
+  });
+
+  memoryWatch = createMemoryWatch({
+    getMetrics: () => ({ appMb: applicationMemoryMb(), sttMb: 0 }),
+    getLimitMb: () => tishka.config().app.memoryLimitMb,
+    isIdle: () => !wakeFlow.isConversation() && !processing,
+    reloadWindows: () => {
+      pet?.reload();
+      reloadMainWindow();
+    },
+    notify: (text) => {
+      new Notification({ title: 'Тишка', body: text }).show();
+    },
+    relaunch: () => {
+      app.relaunch();
+      app.quit();
+    },
+    log: (message) => console.warn(`[tishka] ${message}`)
+  });
+  memoryWatch.start();
+
   // Служба распознавания поднимается в фоне, чтобы не задерживать окна.
   void sttService.start()
     .then(() => {
@@ -266,12 +306,19 @@ app.whenReady().then(async () => {
     })
     .catch(() => undefined);
 
-  openStartupWindow();
+  if (!startedHidden(process.argv)) {
+    openStartupWindow();
+  }
 
   app.on('activate', () => {
     openStartupWindow();
   });
 });
+
+// Сумма памяти процессов приложения без службы распознавания (в мегабайтах).
+function applicationMemoryMb(): number {
+  return app.getAppMetrics().reduce((sum, metric) => sum + metric.memory.workingSetSize, 0) / 1024;
+}
 
 // Приложение живёт в области уведомлений, пока пользователь не выйдет из меню значка.
 app.on('window-all-closed', () => undefined);
@@ -291,6 +338,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   hotkeys?.dispose();
+  memoryWatch?.stop();
   stt?.stop();
   petWake?.dispose();
   speech?.dispose();

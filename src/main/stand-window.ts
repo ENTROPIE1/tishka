@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
+import { guardNavigation } from './navigation-guard';
 
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 640;
@@ -31,6 +32,7 @@ export function openStandWindow(): void {
   });
 
   window.setMenu(null);
+  guardNavigation(window);
   window.on('closed', () => {
     if (standWindow === window) {
       standWindow = undefined;

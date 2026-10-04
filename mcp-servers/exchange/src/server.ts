@@ -6,7 +6,7 @@ import {
   type Tool
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Meeting } from './client';
-import { mailDraftLink, meetingDraftLink } from './links';
+import { fitMailDraftLink, LONG_BODY_HINT, meetingDraftLink } from './links';
 
 export interface ExchangeCalendar {
   listMeetings(from: Date, to: Date): Promise<Meeting[]>;
@@ -129,12 +129,15 @@ function toolRuns(deps: ExchangeServerOptions): Record<string, ToolRun> {
     },
     mail_draft_link: async (args) => {
       const owaUrl = requireOwaUrl(deps);
+      const result = fitMailDraftLink(owaUrl, {
+        to: optionalString(args, 'to'),
+        subject: optionalString(args, 'subject'),
+        body: optionalString(args, 'body')
+      });
       return {
-        url: mailDraftLink(owaUrl, {
-          to: optionalString(args, 'to'),
-          subject: optionalString(args, 'subject'),
-          body: optionalString(args, 'body')
-        })
+        url: result.url,
+        body: result.body,
+        hint: result.truncated ? LONG_BODY_HINT : ''
       };
     },
     meeting_draft_link: async (args) => {

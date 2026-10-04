@@ -7,6 +7,7 @@ function voice(): Config['voice'] {
     hotkey: 'Control+Alt+Space',
     wakeWords: ['тишка'],
     wakeEnabled: false,
+    talkByDefault: true,
     talkTimeoutSec: 30,
     sensitivity: 'normal',
     mic: { threshold: null, noise: null, speech: null, calibratedAt: null },

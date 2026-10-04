@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import type { Config, EventBus } from '../core/types';
 import type { WakeFlow } from '../voice/wake-flow';
+import { DEFAULT_WARM_MINUTES, keepMicOpen } from '../voice/warm';
 import type { PetWindow } from './pet-window';
 import {
   PET_CONVERSATION_TOGGLE_CHANNEL,
@@ -10,12 +11,25 @@ import {
 } from './ipc-channels';
 
 const BUSY = new Set(['think.start', 'tool.start', 'reply', 'speak.start', 'listen.start']);
+// Обращения человека: продлевают тёплое состояние микрофона.
+const ACTIVITY = new Set([
+  'wake',
+  'listen.start',
+  'listen.end',
+  'think.start',
+  'tool.start',
+  'tool.end',
+  'reply',
+  'speak.start'
+]);
+const WARM_TICK_MS = 15000;
 
 export interface PetWakeDeps {
   pet: PetWindow;
   flow: WakeFlow;
   bus: EventBus;
   getVoice(): Config['voice'];
+  getWarmMinutes?: () => number;
   isReady(): boolean;
 }
 
@@ -31,13 +45,22 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
   let busy = false;
   let paused = false;
   let listening = false;
+  let lastInteractionAt = Date.now();
 
   function broadcast(): void {
     const voice = deps.getVoice();
     // Режимом владеет одно окно: пока разговор ведёт чат, питомец не слушает.
     const mine = deps.flow.conversationOwner() === 'pet';
     const idle = deps.flow.conversationOwner() === null;
-    listening = !paused && !busy && deps.isReady() && (idle ? voice.wakeEnabled : mine);
+    const warm = idle && keepMicOpen({
+      ready: deps.isReady(),
+      wakeEnabled: voice.wakeEnabled,
+      ownerActive: false,
+      lastInteractionAt,
+      now: Date.now(),
+      warmMinutes: deps.getWarmMinutes?.() ?? DEFAULT_WARM_MINUTES
+    });
+    listening = !paused && !busy && deps.isReady() && (mine || warm);
     deps.pet.wakeState({
       active: listening,
       conversation: mine,
@@ -48,6 +71,9 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
   }
 
   const unsubscribe = deps.bus.on((event) => {
+    if (ACTIVITY.has(event.type)) {
+      lastInteractionAt = Date.now();
+    }
     if (BUSY.has(event.type)) {
       busy = true;
     } else if (event.type === 'idle' || event.type === 'speak.end') {
@@ -57,6 +83,10 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
     }
     broadcast();
   });
+
+  // Долгий простой: когда тёплое время истекло, микрофон закрывается сам.
+  const warmTimer = setInterval(broadcast, WARM_TICK_MS);
+  warmTimer.unref?.();
 
   ipcMain.on(PET_WAKE_PHRASE_CHANNEL, (_event, value: unknown) => {
     if (value instanceof Uint8Array) {
@@ -89,6 +119,9 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
       broadcast();
     },
     isListening: () => listening,
-    dispose: unsubscribe
+    dispose(): void {
+      clearInterval(warmTimer);
+      unsubscribe();
+    }
   };
 }
