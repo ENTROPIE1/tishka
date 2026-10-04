@@ -17,6 +17,8 @@ export function defaultConfig(): Config {
     voice: {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],
+      wakeEnabled: false,
+      talkTimeoutSec: 30,
       sttUrl: 'http://127.0.0.1:8178',
       stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
       ttsEngine: 'none'
@@ -159,6 +161,8 @@ export function mergeConfig(value: unknown): Config {
     voice: {
       hotkey: pickString(voice.hotkey, defaults.voice.hotkey),
       wakeWords: pickStringArray(voice.wakeWords, defaults.voice.wakeWords),
+      wakeEnabled: pickBoolean(voice.wakeEnabled, defaults.voice.wakeEnabled),
+      talkTimeoutSec: pickNumber(voice.talkTimeoutSec, defaults.voice.talkTimeoutSec),
       sttUrl: pickString(voice.sttUrl, defaults.voice.sttUrl),
       stt: {
         exe: pickString(stt.exe, defaults.voice.stt.exe),

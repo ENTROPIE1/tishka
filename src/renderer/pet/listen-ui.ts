@@ -6,6 +6,7 @@ export interface ListenUi {
   isListening(): boolean;
   escape(): void;
   setError(message: string): void;
+  setConversation(on: boolean): void;
   say(modelSay: string | undefined, state: string): string;
 }
 
@@ -15,6 +16,7 @@ export function createListenUi(onStart: () => void): ListenUi {
   const levelFill = document.getElementById('level-fill') as HTMLElement;
   const mic = document.getElementById('mic') as HTMLElement;
   let listening = false;
+  let conversation = false;
   let error = '';
 
   function setListening(value: boolean): void {
@@ -36,7 +38,7 @@ export function createListenUi(onStart: () => void): ListenUi {
   });
 
   mic.addEventListener('click', () => {
-    window.tishka.pet.listenToggle();
+    window.tishka.pet.conversationToggle();
   });
 
   window.addEventListener('keydown', (event) => {
@@ -66,12 +68,18 @@ export function createListenUi(onStart: () => void): ListenUi {
     setError(message: string): void {
       error = message;
     },
+    setConversation(on): void {
+      conversation = on;
+    },
     say(modelSay, state): string {
       if (state !== 'confused') {
         error = '';
       }
       if (listening) {
         return LISTEN_SAY;
+      }
+      if (conversation) {
+        return modelSay ?? LISTEN_SAY;
       }
       return modelSay ?? (state === 'confused' ? error : '');
     }

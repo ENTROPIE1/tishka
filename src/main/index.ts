@@ -1,4 +1,4 @@
-import { app, globalShortcut, ipcMain, Menu, shell, type Tray } from 'electron';
+import { app, globalShortcut, ipcMain, Menu, shell } from 'electron';
 import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
 import { saveConfig as persistConfig } from '../core/config';
@@ -15,17 +15,20 @@ import { registerVoiceIpc } from './ipc-voice';
 import { createHotkeyRegistrar, type HotkeyRegistrar } from './pet-hotkey';
 import { registerPetIpc } from './pet-ipc';
 import { createPetListen } from './pet-listen';
-import { createPetTray } from './pet-tray';
+import { createPetTray, type PetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
+import { registerPetWake, type PetWake } from './pet-wake';
 import { closeSettingsWindow, openSettingsWindow } from './settings-window';
 import { openStandWindow } from './stand-window';
+import { createWakeFlow } from '../voice/wake-flow';
 
 const bus = createEventBus();
 let core: TishkaCore | undefined;
 let pet: PetWindow | undefined;
-let tray: Tray | undefined;
+let tray: PetTray | undefined;
 let stt: SttService | undefined;
 let hotkeys: HotkeyRegistrar | undefined;
+let petWake: PetWake | undefined;
 
 // Второй запуск не создаёт копию, а поднимает окно чата работающего приложения.
 const singleInstance = app.requestSingleInstanceLock();
@@ -40,20 +43,12 @@ if (!singleInstance) {
 function voiceRestartNeeded(previous: Config, next: Config): boolean {
   const before = previous.voice;
   const after = next.voice;
-  return (
-    before.sttUrl !== after.sttUrl ||
-    before.stt.exe !== after.stt.exe ||
-    before.stt.model !== after.stt.model
-  );
+  return before.sttUrl !== after.sttUrl || before.stt.exe !== after.stt.exe || before.stt.model !== after.stt.model;
 }
 
 // При запуске со стендом открывается он, иначе — обычное окно чата.
 function openStartupWindow(): void {
-  if (process.env['TISHKA_STAND'] === '1') {
-    openStandWindow();
-  } else {
-    openChatWindow();
-  }
+  (process.env['TISHKA_STAND'] === '1' ? openStandWindow : openChatWindow)();
 }
 
 app.whenReady().then(async () => {
@@ -86,6 +81,8 @@ app.whenReady().then(async () => {
         stt.stop();
         void stt.start().catch(() => undefined);
       }
+      petWake?.broadcast();
+      tray?.refresh();
     }
   });
   ipcMain.handle(OPEN_CHAT_CHANNEL, () => {
@@ -117,6 +114,29 @@ app.whenReady().then(async () => {
   });
   registerPetIpc(pet, listen);
 
+  const wakeFlow = createWakeFlow({
+    getVoice: () => tishka.config().voice,
+    stt: sttService,
+    core: tishka,
+    bus,
+    sendCommand: (command) => {
+      if (command === 'listen') {
+        pet?.listenCommand('start');
+      }
+      petWake?.broadcast();
+      tray?.refresh();
+    },
+    hide: () => pet?.hide(),
+    onSoonChange: () => petWake?.broadcast()
+  });
+  petWake = registerPetWake({
+    pet,
+    flow: wakeFlow,
+    bus,
+    getVoice: () => tishka.config().voice,
+    isReady: () => sttService.status() === 'ready'
+  });
+
   tray = createPetTray({
     wake: () => pet?.wake('name'),
     openChat: openChatWindow,
@@ -126,19 +146,37 @@ app.whenReady().then(async () => {
     setPetMode: (value) => {
       void tishka.saveConfig({ ...tishka.config(), petMode: value });
     },
+    getWakeEnabled: () => tishka.config().voice.wakeEnabled,
+    setWakeEnabled: (value) => {
+      void tishka.saveConfig({
+        ...tishka.config(),
+        voice: { ...tishka.config().voice, wakeEnabled: value }
+      });
+    },
+    isWakeListening: () => petWake?.isListening() ?? false,
     quit: () => app.quit()
   });
 
+  // Горячая клавиша включает режим разговора, повторное нажатие — выключает.
+  function toggleConversationByHotkey(): void {
+    if (!wakeFlow.isConversation()) {
+      bus.emit({ type: 'wake', source: 'hotkey' });
+    }
+    wakeFlow.toggleConversation();
+    petWake?.broadcast();
+    tray?.refresh();
+  }
+
   const hotkeyRegistrar = createHotkeyRegistrar(bus);
   hotkeys = hotkeyRegistrar;
-  hotkeyRegistrar.set(tishka.config().voice.hotkey, () => listen.toggle('hotkey'));
+  hotkeyRegistrar.set(tishka.config().voice.hotkey, toggleConversationByHotkey);
   registerVoiceIpc({
     stt: sttService,
-    reloadHotkey: (hotkey) => hotkeyRegistrar.set(hotkey, () => listen.toggle('hotkey'))
+    reloadHotkey: (hotkey) => hotkeyRegistrar.set(hotkey, toggleConversationByHotkey)
   });
 
   // Служба распознавания поднимается в фоне, чтобы не задерживать окна.
-  void sttService.start().catch(() => undefined);
+  void sttService.start().then(() => petWake?.broadcast()).catch(() => undefined);
 
   openStartupWindow();
 
@@ -150,25 +188,23 @@ app.whenReady().then(async () => {
 // Приложение живёт в области уведомлений, пока пользователь не выйдет из меню значка.
 app.on('window-all-closed', () => undefined);
 
-// Служба распознавания останавливается при любом способе выхода.
 function stopVoice(): void {
   stt?.stop();
 }
 
 app.on('before-quit', stopVoice);
-process.on('SIGINT', () => {
-  stopVoice();
-  app.quit();
-});
-process.on('SIGTERM', () => {
-  stopVoice();
-  app.quit();
-});
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    stopVoice();
+    app.quit();
+  });
+}
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   hotkeys?.dispose();
   stt?.stop();
+  petWake?.dispose();
   pet?.dispose();
   tray?.destroy();
   void core?.stop();

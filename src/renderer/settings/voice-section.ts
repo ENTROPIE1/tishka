@@ -20,6 +20,10 @@ export function mountVoiceSection(root: HTMLElement): void {
   const hotkey = textInput();
   const exe = textInput();
   const model = textInput();
+  const wakeEnabled = el('input', 'checkbox-input');
+  wakeEnabled.type = 'checkbox';
+  const wakeWords = textInput();
+  const talkTimeout = textInput('', 'number');
   const state = el('span', 'state state-off', STATE_LABELS.off);
   const save = button('Сохранить');
   const check = button('Проверить', 'button button-secondary');
@@ -27,6 +31,13 @@ export function mountVoiceSection(root: HTMLElement): void {
 
   root.append(
     field('Горячая клавиша', hotkey, 'Например, Control+Alt+Space'),
+    field(
+      'Откликаться на имя',
+      wakeEnabled,
+      'Микрофон слушается постоянно, речь распознаётся на этом компьютере и никуда не передаётся; фразы без имени сразу отбрасываются'
+    ),
+    field('Имена', wakeWords, 'Через запятую, например: тишка, ёжик'),
+    field('Уходить после тишины, секунд', talkTimeout),
     field('Программа распознавания', exe, 'Путь к whisper-server без кириллицы; пусто — служба не запускается'),
     field('Модель распознавания', model),
     field('Состояние службы', state)
@@ -83,9 +94,25 @@ export function mountVoiceSection(root: HTMLElement): void {
   async function refresh(): Promise<void> {
     const view = await window.tishka.config.get();
     hotkey.value = view.config.voice.hotkey;
+    wakeEnabled.checked = view.config.voice.wakeEnabled;
+    wakeWords.value = view.config.voice.wakeWords.join(', ');
+    talkTimeout.value = String(view.config.voice.talkTimeoutSec);
     exe.value = view.config.voice.stt.exe;
     model.value = view.config.voice.stt.model;
     await watchStatus();
+  }
+
+  function parseWords(value: string, fallback: string[]): string[] {
+    const words = value
+      .split(',')
+      .map((word) => word.trim())
+      .filter((word) => word !== '');
+    return words.length > 0 ? words : fallback;
+  }
+
+  function parseTimeout(value: string, fallback: number): number {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? Math.round(number) : fallback;
   }
 
   save.addEventListener('click', () => {
@@ -97,6 +124,9 @@ export function mountVoiceSection(root: HTMLElement): void {
           voice: {
             ...view.config.voice,
             hotkey: hotkey.value.trim(),
+            wakeEnabled: wakeEnabled.checked,
+            wakeWords: parseWords(wakeWords.value, view.config.voice.wakeWords),
+            talkTimeoutSec: parseTimeout(talkTimeout.value, view.config.voice.talkTimeoutSec),
             stt: {
               ...view.config.voice.stt,
               exe: exe.value.trim(),

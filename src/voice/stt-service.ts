@@ -25,7 +25,7 @@ export interface SttServiceOptions {
 export interface SttService {
   start(): Promise<{ ok: boolean; error?: string }>;
   stop(): void;
-  transcribe(wav: Uint8Array): Promise<TranscribeResult>;
+  transcribe(wav: Uint8Array, prompt?: string): Promise<TranscribeResult>;
   status(): SttStatus;
 }
 
@@ -193,7 +193,7 @@ export function createSttService(options: SttServiceOptions): SttService {
   return {
     start,
     stop,
-    transcribe: (wav) => transcribeHttp(fetchFn, options.getConfig().sttUrl, wav),
+    transcribe: (wav, prompt) => transcribeHttp(fetchFn, options.getConfig().sttUrl, wav, prompt),
     status: () => state
   };
 }

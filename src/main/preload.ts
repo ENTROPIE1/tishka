@@ -6,6 +6,7 @@ import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { Config, TishkaEvent } from '../core/types';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
+import type { WakeState } from '../voice/wake';
 import type { TranscribeResult } from '../voice/stt-service';
 import type {
   ConfigView,
@@ -47,6 +48,11 @@ import {
   PET_LISTEN_TOGGLE_CHANNEL,
   PET_MODEL_CHANNEL,
   PET_WAKE_CHANNEL,
+  PET_CONVERSATION_TOGGLE_CHANNEL,
+  PET_WAKE_ERROR_CHANNEL,
+  PET_WAKE_ESCAPE_CHANNEL,
+  PET_WAKE_PHRASE_CHANNEL,
+  PET_WAKE_STATE_CHANNEL,
   SECRETS_DELETE_CHANNEL,
   SECRETS_HAS_CHANNEL,
   SECRETS_NAMES_CHANNEL,
@@ -184,6 +190,27 @@ const api = {
     },
     listenResult(result: ListenResult): void {
       ipcRenderer.send(PET_LISTEN_RESULT_CHANNEL, result);
+    },
+    wakePhrase(wav: Uint8Array): void {
+      ipcRenderer.send(PET_WAKE_PHRASE_CHANNEL, wav);
+    },
+    conversationToggle(): void {
+      ipcRenderer.send(PET_CONVERSATION_TOGGLE_CHANNEL);
+    },
+    wakeEscape(): void {
+      ipcRenderer.send(PET_WAKE_ESCAPE_CHANNEL);
+    },
+    wakeError(message: string): void {
+      ipcRenderer.send(PET_WAKE_ERROR_CHANNEL, message);
+    },
+    onWakeState(listener: (state: WakeState) => void): () => void {
+      const handler = (_event: Electron.IpcRendererEvent, state: WakeState): void => {
+        listener(state);
+      };
+      ipcRenderer.on(PET_WAKE_STATE_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_WAKE_STATE_CHANNEL, handler);
+      };
     },
     onListenCommand(listener: (command: ListenCommand) => void): () => void {
       const handler = (_event: Electron.IpcRendererEvent, command: ListenCommand): void => {
