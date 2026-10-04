@@ -1,6 +1,10 @@
 export type TtsHealth = { ok: true; engine: string; voice: string } | { ok: false; error: string };
 
-export type TtsSynthesis = { ok: true; wav: Uint8Array } | { ok: false; error: string };
+export type TtsFailureKind = 'unreachable' | 'rejected';
+
+export type TtsSynthesis =
+  | { ok: true; wav: Uint8Array }
+  | { ok: false; error: string; kind: TtsFailureKind };
 
 export interface TtsClient {
   health(): Promise<TtsHealth>;
@@ -76,14 +80,16 @@ export function createTtsClient(options: TtsClientOptions): TtsClient {
           body: JSON.stringify({ text })
         });
         if (!response.ok) {
-          return { ok: false, error: `Служба синтеза ответила с ошибкой ${response.status}` };
+          const kind: TtsFailureKind = response.status === 503 ? 'unreachable' : 'rejected';
+          return { ok: false, error: `Служба синтеза ответила с ошибкой ${response.status}`, kind };
         }
         const buffer = await response.arrayBuffer();
         return { ok: true, wav: new Uint8Array(buffer) };
       } catch (error) {
         return {
           ok: false,
-          error: errorFor(error, 'Служба синтеза не ответила вовремя', 'Не удалось обратиться к службе синтеза')
+          error: errorFor(error, 'Служба синтеза не ответила вовремя', 'Не удалось обратиться к службе синтеза'),
+          kind: 'unreachable'
         };
       }
     }

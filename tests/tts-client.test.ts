@@ -42,13 +42,24 @@ describe('tts-client: synthesize', () => {
     expect(init?.body).toBe(JSON.stringify({ text: 'привет' }));
   });
 
-  it('сообщает об ошибке службы', async () => {
+  it('ошибка на конкретный текст — not unreachable', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({}, 500));
     const client = createTtsClient({ url: 'http://127.0.0.1:8179', fetch: fetchMock as unknown as typeof fetch });
     const result = await client.synthesize('привет');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain('500');
+      expect(result.kind).toBe('rejected');
+    }
+  });
+
+  it('503 — служба недоступна', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({}, 503));
+    const client = createTtsClient({ url: 'http://127.0.0.1:8179', fetch: fetchMock as unknown as typeof fetch });
+    const result = await client.synthesize('привет');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.kind).toBe('unreachable');
     }
   });
 
@@ -81,6 +92,10 @@ describe('tts-client: synthesize', () => {
     });
     const client = createTtsClient({ url: 'http://127.0.0.1:8179', fetch: fetchMock as unknown as typeof fetch });
     const result = await client.synthesize('привет');
-    expect(result).toEqual({ ok: false, error: 'Не удалось обратиться к службе синтеза' });
+    expect(result).toEqual({
+      ok: false,
+      error: 'Не удалось обратиться к службе синтеза',
+      kind: 'unreachable'
+    });
   });
 });
