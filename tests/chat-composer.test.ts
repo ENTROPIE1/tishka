@@ -44,7 +44,7 @@ describe('createComposer', () => {
     expect(input.value).toBe('');
   });
 
-  it('кнопка с глазом сразу даёт отклик: реплика в ленте, статус, вид «занята»', () => {
+  it('кнопка с глазом сразу даёт отклик: реплика в ленте, статус, активный вид', () => {
     const { composer, screenLook, send, input, deps } = setup();
     input.value = 'что тут?';
 
@@ -53,11 +53,12 @@ describe('createComposer', () => {
     expect(deps.send).toHaveBeenCalledWith('Посмотри на экран. что тут?');
     expect(deps.echo).toHaveBeenCalledWith('Посмотри на экран. что тут?');
     expect(deps.status).toHaveBeenCalledWith('Смотрю на экран…');
-    expect(screenLook.disabled).toBe(true);
-    expect(screenLook.classList.contains('busy')).toBe(true);
+    expect(screenLook.disabled).toBe(false);
+    expect(screenLook.classList.contains('active')).toBe(true);
     expect(send.textContent).toBe('Стоп');
     expect(input.value).toBe('');
     expect(composer.isBusy()).toBe(true);
+    expect(composer.isLooking()).toBe(true);
   });
 
   it('без вопроса кнопка с глазом отправляет дефолтную просьбу', () => {
@@ -68,14 +69,53 @@ describe('createComposer', () => {
     expect(deps.send).toHaveBeenCalledWith('Посмотри, что у меня на экране');
   });
 
-  it('при занятости кнопка с глазом ничего не отправляет', () => {
+  it('нажатие в активном виде вызывает остановку и не вызывает отправку', () => {
     const { composer, deps } = setup();
 
     composer.lookAtScreen();
     composer.lookAtScreen();
 
     expect(deps.send).toHaveBeenCalledTimes(1);
-    expect(deps.stop).not.toHaveBeenCalled();
+    expect(deps.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('вид кнопки возвращается от события ядра: конец просмотра гасит активность', () => {
+    const { composer, screenLook, send } = setup();
+
+    composer.lookAtScreen();
+    composer.setLooking(false);
+
+    expect(composer.isLooking()).toBe(false);
+    expect(screenLook.classList.contains('active')).toBe(false);
+    expect(screenLook.disabled).toBe(true);
+    expect(send.textContent).toBe('Стоп');
+  });
+
+  it('запуск просмотра не кнопкой тоже делает кнопку активной', () => {
+    const { composer, screenLook } = setup();
+
+    composer.setLooking(true);
+
+    expect(screenLook.classList.contains('active')).toBe(true);
+    expect(screenLook.disabled).toBe(false);
+    expect(composer.isLooking()).toBe(true);
+  });
+
+  it('выключенный просмотр экрана скрывает кнопку и запрещает запуск', () => {
+    const { composer, screenLook, deps } = setup();
+
+    composer.setAvailable(false);
+    composer.lookAtScreen();
+
+    expect(screenLook.hidden).toBe(true);
+    expect(deps.send).not.toHaveBeenCalled();
+    expect(composer.isLooking()).toBe(false);
+
+    composer.setAvailable(true);
+    composer.lookAtScreen();
+
+    expect(screenLook.hidden).toBe(false);
+    expect(deps.send).toHaveBeenCalledTimes(1);
   });
 
   it('кнопка «Отправить» при занятости останавливает, а не отправляет', () => {
@@ -102,15 +142,39 @@ describe('createComposer', () => {
     expect(deps.stop).toHaveBeenCalledTimes(1);
   });
 
+  it('повторная отправка при просмотре не ставит реплику в очередь', () => {
+    const { composer, input, deps } = setup();
+    composer.lookAtScreen();
+    input.value = 'второй вопрос';
+
+    composer.sendMessage();
+
+    expect(deps.send).toHaveBeenCalledTimes(1);
+    expect(deps.echo).toHaveBeenCalledTimes(1);
+    expect(input.value).toBe('второй вопрос');
+  });
+
+  it('Escape при занятости вызывает остановку, в простое — нет', () => {
+    const { composer, deps } = setup();
+
+    expect(composer.escape()).toBe(false);
+    expect(deps.stop).not.toHaveBeenCalled();
+
+    composer.lookAtScreen();
+    expect(composer.escape()).toBe(true);
+    expect(deps.stop).toHaveBeenCalledTimes(1);
+  });
+
   it('после простоя кнопки возвращаются в исходный вид', () => {
     const { composer, send, screenLook } = setup();
 
     composer.lookAtScreen();
+    composer.setLooking(false);
     composer.end();
 
     expect(send.textContent).toBe('Отправить');
     expect(send.classList.contains('stop')).toBe(false);
     expect(screenLook.disabled).toBe(false);
-    expect(screenLook.classList.contains('busy')).toBe(false);
+    expect(screenLook.classList.contains('active')).toBe(false);
   });
 });

@@ -1,6 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WAKE_PROMPT, isDismiss, matchWake, wakePrompt } from '../src/voice/wake';
-import { flush, makeHarness, voice, wav } from './wake-test-helpers';
+import { flush, makeHarness, voice, wav, type Harness } from './wake-test-helpers';
+
+// Источники обращений по имени, увиденные шиной.
+function wakeSources(h: Harness): string[] {
+  const sources: string[] = [];
+  h.bus.on((event) => {
+    if (event.type === 'wake') {
+      sources.push(event.source);
+    }
+  });
+  return sources;
+}
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -468,5 +479,61 @@ describe('wake-flow: щелчок по микрофону', () => {
     expect(h.flow.isConversation()).toBe(false);
     expect(h.errors).toContain('Распознавание речи не настроено');
     expect(h.commands).toContain('conversation-off');
+  });
+});
+
+describe('wake-flow: устаревшие фразы', () => {
+  it('сказанное при выключенном разговоре не становится репликой после включения', async () => {
+    const h = makeHarness(['какие встречи']);
+    h.flow.handlePhrase(wav);
+    h.flow.enableConversation();
+    await flush();
+    expect(h.transcribe).toHaveBeenCalledTimes(1);
+    expect(h.calls).toEqual([]);
+    expect(h.flow.isConversation()).toBe(true);
+  });
+
+  it('сказанное при выключенном разговоре проверяется только на имя', async () => {
+    const h = makeHarness(['Тишка, открой доску']);
+    const wakes = wakeSources(h);
+    h.flow.handlePhrase(wav);
+    h.flow.enableConversation();
+    await flush();
+    expect(h.calls).toEqual([]);
+    expect(wakes).toEqual(['name']);
+    expect(h.flow.isConversation()).toBe(true);
+  });
+
+  it('включение разговора отбрасывает ждущую фразу', async () => {
+    const h = makeHarness(['раз', 'два']);
+    h.flow.handlePhrase(wav);
+    h.flow.handlePhrase(wav);
+    h.flow.enableConversation();
+    await flush();
+    expect(h.transcribe).toHaveBeenCalledTimes(1);
+    expect(h.calls).toEqual([]);
+  });
+
+  it('сказанное в разговоре и распознанное после выключения в ядро не уходит', async () => {
+    const h = makeHarness(['раз']);
+    h.flow.enableConversation();
+    h.flow.handlePhrase(wav);
+    h.flow.disableConversation(false);
+    await flush();
+    expect(h.calls).toEqual([]);
+    expect(h.flow.isConversation()).toBe(false);
+  });
+
+  it('сказанное в разговоре после ухода работает как обращение по имени', async () => {
+    const h = makeHarness(['Тишка, открой доску']);
+    const wakes = wakeSources(h);
+    h.flow.enableConversation();
+    h.flow.handlePhrase(wav);
+    h.flow.disableConversation(false);
+    await flush();
+    expect(h.calls).toEqual([]);
+    expect(wakes).toEqual(['name']);
+    expect(h.commands).toContain('listen');
+    expect(h.flow.isConversation()).toBe(false);
   });
 });
