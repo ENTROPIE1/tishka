@@ -24,9 +24,22 @@ export interface PetModel {
   replies?: number;              // сколько раз приходил ответ; признак новой реплики
 }
 
+export type TalkSource = 'chat' | 'pet';
+
 export interface PetOpts {
   petMode: boolean;
   busy?: boolean;                // открыта карточка или пользователь вводит текст
+  source?: TalkSource;           // 'chat' — реплика из окна чата основного окна
+}
+
+// Из чата ёж показывает только состояние: ни облачка с текстом, ни карточки,
+// ни появления из скрытого состояния — ответ уже виден в чате.
+function isQuiet(opts: PetOpts): boolean {
+  return opts.source === 'chat';
+}
+
+function isAway(model: PetModel): boolean {
+  return model.state === 'hidden' || model.state === 'sleep';
 }
 
 const APPEAR_MS = 900;
@@ -73,7 +86,7 @@ function advance(model: PetModel, now: number): PetModel {
 const BUSY_STATES: PetState[] = ['appear', 'listening', 'thinking', 'working', 'talking', 'happy', 'confused'];
 
 export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: PetOpts): PetModel {
-  void opts;
+  const quiet = isQuiet(opts);
   switch (event.type) {
     case 'wake':
       if (model.state === 'hidden' || model.state === 'sleep') {
@@ -83,16 +96,24 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
     case 'listen.start':
       return enter(model, 'listening', now);
     case 'listen.end':
-      return enter(model, 'thinking', now);
+      return quiet && isAway(model) ? model : enter(model, 'thinking', now);
     case 'think.start':
-      return enter(model, 'thinking', now);
+      return quiet && isAway(model) ? model : enter(model, 'thinking', now);
     case 'tool.start':
-      return enter(model, 'working', now);
+      return quiet && isAway(model) ? model : enter(model, 'working', now);
     case 'tool.end':
-      return enter(model, 'thinking', now);
+      return quiet && isAway(model) ? model : enter(model, 'thinking', now);
     case 'status':
       return { ...model, say: event.text };
     case 'reply': {
+      if (quiet) {
+        const replies = (model.replies ?? 0) + 1;
+        if (isAway(model)) {
+          return { ...model, replies };
+        }
+        // Без облачка и карточки — только смена состояния.
+        return enter({ since: now, queue: [], state: model.state, replies }, 'talking', now);
+      }
       // Новый ответ заменяет прежнюю карточку: показывается либо результат, либо ввод.
       const base: PetModel = {
         since: now,
@@ -116,9 +137,9 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       return enter(base, 'talking', now);
     }
     case 'speak.start':
-      return enter(model, 'talking', now);
+      return isAway(model) ? model : enter(model, 'talking', now);
     case 'speak.end':
-      return enter(model, 'idle', now);
+      return isAway(model) ? model : enter(model, 'idle', now);
     case 'notify': {
       if (model.state === 'hidden' || model.state === 'sleep') {
         const base: PetModel = { ...model, say: event.title };
@@ -133,9 +154,9 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
     case 'skill.saved':
       return event.source === 'dialog' ? enter(model, 'happy', now, ['idle']) : model;
     case 'error':
-      return enter(model, 'confused', now);
+      return quiet && isAway(model) ? model : enter(model, 'confused', now);
     case 'idle':
-      return model.state === 'talking' ? model : enter(model, 'idle', now);
+      return quiet && isAway(model) ? model : model.state === 'talking' ? model : enter(model, 'idle', now);
     default:
       return model;
   }

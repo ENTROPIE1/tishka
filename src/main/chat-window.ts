@@ -10,6 +10,11 @@ export type MainScreen = 'chat' | 'connections' | 'memory' | 'voice' | 'persona'
 
 let mainWindow: BrowserWindow | undefined;
 
+// Отличает окно чата от окна-питомца: по отправителю реплики определяется источник.
+export function isMainWindow(window: BrowserWindow): boolean {
+  return window === mainWindow;
+}
+
 function raise(window: BrowserWindow): void {
   if (window.isMinimized()) {
     window.restore();

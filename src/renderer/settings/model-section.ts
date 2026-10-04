@@ -53,7 +53,7 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
   visionField.append(visionHint);
 
   const save = button('Сохранить');
-  const check = button('Проверить', 'button-secondary');
+  const check = button('Проверить', 'button button-secondary');
   const messages = el('div', 'messages');
 
   root.append(

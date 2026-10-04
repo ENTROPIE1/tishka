@@ -65,6 +65,20 @@ afterEach(() => {
 });
 
 describe('mountModelSection', () => {
+  it('кнопки «Сохранить» и «Проверить» имеют общий базовый класс', async () => {
+    install({ ok: true, models: [], ms: 1 });
+    const root = document.createElement('div');
+    mountModelSection(root);
+    await flush();
+
+    const save = buttonWith(root, 'Сохранить');
+    const check = buttonWith(root, 'Проверить');
+
+    expect(save.classList.contains('button')).toBe(true);
+    expect(check.classList.contains('button')).toBe(true);
+    expect(check.classList.contains('button-secondary')).toBe(true);
+  });
+
   it('кнопка «Проверить» показывает результат и список моделей', async () => {
     vi.useFakeTimers();
     install({ ok: true, models: ['DKS-Lynx', 'DKS-Vision'], ms: 42 });

@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import type { Config, EventBus } from '../core/types';
+import type { TalkSource } from '../pet/state';
 import type { ListenCommand } from '../voice/listen';
 import type { WakeState } from '../voice/wake';
 import type { SpeakMessage } from '../voice/speech-queue';
@@ -11,7 +12,7 @@ import { Mover } from './pet-motion';
 import { PetPlacement } from './pet-placement';
 
 export interface PetWindowDeps {
-  bus: EventBus;
+  bus: EventBus & { source?(): TalkSource };   // источник текущего обращения: чат или ёж
   getConfig: () => Config;
   savePetX: (x: number | null) => Promise<void>;
   onReload?: () => void;
