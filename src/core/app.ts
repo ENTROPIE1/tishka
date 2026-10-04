@@ -30,6 +30,7 @@ import { registerWebTools } from './tools/web';
 import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore, Skill } from './types';
 import type { WebReader } from './web/types';
 import { createVisionLook, type CaptureResult, type ScreenTarget } from './vision/look';
+import type { TimingMark } from '../main/timing-log';
 
 export interface CoreDeps {
   dataDir: string;                 // каталог данных пользователя
@@ -40,6 +41,7 @@ export interface CoreDeps {
   openExternal(url: string): Promise<void>;
   showPanel(panel: Panel): void;
   now: () => Date;
+  mark?: TimingMark;               // журнал времени, необязателен в тестах
   fetch?: typeof fetch;            // для тестов
   captureScreen?(target: ScreenTarget): Promise<CaptureResult>;   // снимок экрана из главного процесса
   readWeb?: WebReader;             // чтение страниц из скрытого окна Electron
@@ -373,7 +375,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       getModel: () => config.llm.model,
       getPersona: () => config.persona,
       memory: { search: (query, limit) => memoryStore.search(query, limit) },
-      now: deps.now
+      now: deps.now,
+      mark: deps.mark
     });
     router = createRouter({ agent, skills, runner, registry, events: deps.events });
     await router.refreshSkills();
@@ -387,7 +390,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     await reviewer.start();
 
     // Подключение серверов MCP не задерживает запуск: идёт в фоне.
-    mcp = createMcpManager({ registry, secrets: deps.secrets });
+    mcp = createMcpManager({ registry, secrets: deps.secrets, mark: deps.mark });
     mcpTask = applyMcpServers(config.mcpServers).catch(() => undefined);
 
     // Ядро считается проснувшимся, только когда все обязательные шаги прошли:

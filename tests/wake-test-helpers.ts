@@ -34,6 +34,8 @@ export interface Harness {
   soonChanges: boolean[];
   hidden: () => number;
   deferHandle: () => { resolve: () => void };
+  setReady: (value: boolean) => void;
+  setVisible: (value: boolean) => void;
 }
 
 export const wav = new Uint8Array([1, 2, 3, 4]);
@@ -42,12 +44,15 @@ export function makeHarness(
   scripts: PhraseScript[],
   initial: Config['voice'] = voice(),
   memoryName?: string,
-  ready = true
+  ready = true,
+  visible = true
 ): Harness {
   let voiceConfig = initial;
   let index = 0;
   let hiddenCount = 0;
   let blocked = false;
+  let readyState = ready;
+  let visibleState = visible;
   let releaseBlock: (() => void) | undefined;
   const calls: string[] = [];
   const history: string[] = [];
@@ -98,7 +103,8 @@ export function makeHarness(
       hiddenCount += 1;
     },
     onSoonChange: () => soonChanges.push(flow.isLeavingSoon()),
-    isReady: () => ready,
+    isReady: () => readyState,
+    isVisible: () => visibleState,
     memoryName: () => memoryName
   });
 
@@ -113,6 +119,12 @@ export function makeHarness(
     prompts,
     soonChanges,
     hidden: () => hiddenCount,
+    setReady: (value) => {
+      readyState = value;
+    },
+    setVisible: (value) => {
+      visibleState = value;
+    },
     deferHandle: () => {
       blocked = true;
       return {

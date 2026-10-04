@@ -1,6 +1,7 @@
 import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
 import { encodeWav, normalizePeak, resample } from '../../voice/wav';
 import { createMicCapture, type MicCapture } from './mic-capture';
+import { timingMark } from './timing';
 
 const TARGET_RATE = 16000;
 const DEFAULT_SILENCE_MS = 800;
@@ -94,7 +95,9 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
       return;
     }
     const normalized = normalizePeak(trimmed);
-    options.onPhrase(encodeWav(resample(normalized, sourceRate, TARGET_RATE), TARGET_RATE));
+    const wav = encodeWav(resample(normalized, sourceRate, TARGET_RATE), TARGET_RATE);
+    timingMark('phrase.end', { ms: Math.round((trimmed.length / sourceRate) * 1000), bytes: wav.length });
+    options.onPhrase(wav);
   }
 
   function handleFrame(frame: Float32Array, sampleRate: number): void {
@@ -118,6 +121,8 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
       }
       if (vad.heardSpeech()) {
         capturing = true;
+        timingMark('speech.detected');
+        timingMark('phrase.start');
         phraseFrames = preRoll.map((item) => item.data);
         phraseStartMs = preRoll.length > 0 ? preRoll[0].startMs : frameStartMs;
         preRoll = [];
@@ -154,6 +159,7 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     vad = makeVad();
     paused = false;
     active = true;
+    timingMark('listen.start');
     return true;
   }
 

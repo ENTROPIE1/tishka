@@ -1,5 +1,6 @@
 import { envelope } from '../../voice/envelope';
 import type { SpeakMessage } from '../../voice/speech-queue';
+import { timingMark } from '../shared/timing';
 
 const WINDOW_MS = 50;
 const TICK_MS = 33;
@@ -62,6 +63,7 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
     const id = pendingId;
     pendingId = undefined;
     clearPlayback();
+    timingMark('speak.play.end');
     deps.onDone(id);
   }
 
@@ -113,6 +115,7 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
           deps.setMouth(lastLevel);
         }, TICK_MS);
         node.start();
+        timingMark('speak.play.start');
       })
       .catch(() => {
         if (current === generation) {

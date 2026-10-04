@@ -1,4 +1,5 @@
 import { installLinkGuard } from '../shared/links';
+import { timingMark } from '../shared/timing';
 import { createChatFeed } from './feed';
 import { initAppShell } from './navigation';
 import { appendSkillSaveCard } from './skill-card';
@@ -55,6 +56,7 @@ function initEvents(): void {
         void reloadFeed();
         break;
       case 'reply':
+        timingMark('reply.shown');
         view.appendEntry({
           kind: 'message',
           id: crypto.randomUUID(),

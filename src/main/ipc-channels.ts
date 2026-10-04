@@ -80,3 +80,6 @@ export const VOICE_CALIBRATION_CHANNEL = 'tishka:voice:calibration';
 
 export const SPEECH_HEALTH_CHANNEL = 'tishka:speech:health';
 export const SPEECH_SAY_CHANNEL = 'tishka:speech:say';
+
+export const TIMING_MARK_CHANNEL = 'tishka:timing:mark';
+export const TIMING_OPEN_CHANNEL = 'tishka:timing:open';

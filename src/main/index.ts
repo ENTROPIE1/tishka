@@ -5,7 +5,7 @@ import { saveConfig as persistConfig } from '../core/config';
 import type { Config } from '../core/types';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
-import { createSttService, type SttService } from '../voice/stt-service';
+import { createSttService, START_CANCELLED, type SttService } from '../voice/stt-service';
 import { loginItemSettings, startedHidden } from './autostart';
 import { openMainWindow, reloadMainWindow } from './chat-window';
 import { registerChatTalk, type ChatTalk } from './chat-talk';
@@ -16,6 +16,7 @@ import { registerAutomationIpc } from './ipc-automations';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
 import { registerSpeechIpc } from './ipc-speech';
+import { registerTimingIpc } from './ipc-timing';
 import { registerVoiceIpc } from './ipc-voice';
 import { createHotkeyRegistrar, type HotkeyRegistrar } from './pet-hotkey';
 import { registerPetIpc } from './pet-ipc';
@@ -29,11 +30,23 @@ import { createScreenCapture } from './screen-capture';
 import { createSourceBus } from './source-bus';
 import { openStandWindow } from './stand-window';
 import { runStartup } from './startup';
+import { createTimingLog, mark, setTimingLog, TIMING_LOG_NAME } from './timing-log';
 import { createWebReader, type WebReaderHandle } from './web-reader';
 import { createWakeFlow } from '../voice/wake-flow';
 import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
 
 const bus = createSourceBus();
+// Журнал времени заводится до всего остального: строка-разделитель с версией
+// открывает каждый запуск, отметки старта процесса пишутся сразу.
+const timingLogPath = join(app.getPath('userData'), TIMING_LOG_NAME);
+setTimingLog(
+  createTimingLog({
+    filePath: timingLogPath,
+    version: app.getVersion(),
+    startedAt: Date.now() - Math.round(process.uptime() * 1000)
+  })
+);
+mark('process.start');
 let core: TishkaCore | undefined;
 let pet: PetWindow | undefined;
 let tray: PetTray | undefined;
@@ -68,6 +81,7 @@ app.whenReady().then(async () => {
     return;
   }
   Menu.setApplicationMenu(null);
+  mark('app.ready');
   const dataDir = app.getPath('userData');
   const appRoot = app.isPackaged ? app.getAppPath() : join(__dirname, '..', '..');
   const secrets = createSecretStore(join(dataDir, 'secrets.bin'), electronCrypto);
@@ -96,12 +110,14 @@ app.whenReady().then(async () => {
     // Панели приходят в составе ответа, отдельного показа пока не нужно.
     showPanel: () => undefined,
     now: () => new Date(),
+    mark,
     captureScreen: (target) => screenCapture.capture(target),
     readWeb: (url, options) => reader.read(url, options)
   });
   core = tishka;
 
   registerIpc(bus, tishka, secrets);
+  registerTimingIpc({ logPath: timingLogPath, openPath: (path) => shell.openPath(path) });
   registerAutomationIpc(tishka);
   registerSettingsIpc(tishka, secrets, {
     // Голос перезапускается сам, если изменились программа, модель или адрес.
@@ -129,7 +145,7 @@ app.whenReady().then(async () => {
     console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);
   }
 
-  const sttService = createSttService({ getConfig: () => tishka.config().voice });
+  const sttService = createSttService({ getConfig: () => tishka.config().voice, mark });
   stt = sttService;
 
   pet = createPetWindow({
@@ -140,6 +156,7 @@ app.whenReady().then(async () => {
     // Перезагрузка окна уничтожает звук: ожидающее обещание речи завершается.
     onReload: () => speakPlay?.abort()
   });
+  mark('pet.window.created');
 
   // Звук, отправленный в окно-питомец, считается проигранным после ответа speak-done.
   ipcMain.on(PET_SPEAK_DONE_CHANNEL, (_event, id: number | undefined) => {
@@ -154,7 +171,9 @@ app.whenReady().then(async () => {
   const speechOutput = createSpeechOutput({
     bus,
     getConfig: () => tishka.config(),
-    play: (message, signal) => speakPlay?.play(message, signal) ?? Promise.resolve()
+    isReady: () => sttService.status() === 'ready',
+    play: (message, signal) => speakPlay?.play(message, signal) ?? Promise.resolve(),
+    mark
   });
   speech = speechOutput;
   registerSpeechIpc(speechOutput);
@@ -185,6 +204,12 @@ app.whenReady().then(async () => {
     bus,
     memoryName: () => tishka.memoryName(),
     isReady: () => sttService.status() === 'ready',
+    // Ожидание готовности имеет смысл, пока окно-питомец ещё на экране.
+    isVisible: (surface) => (surface === 'pet' ? (pet?.isVisible() ?? false) : true),
+    onWaitingChange: () => {
+      petWake?.broadcast();
+      chatTalk?.broadcast();
+    },
     onMissedSpeech: () => calibrationHint.missed(),
     sendCommand: (command) => {
       if (command === 'listen') {
@@ -254,6 +279,7 @@ app.whenReady().then(async () => {
   const hotkeyRegistrar = createHotkeyRegistrar(bus);
   hotkeys = hotkeyRegistrar;
   hotkeyRegistrar.set(tishka.config().voice.hotkey, toggleConversationByHotkey);
+  mark('hotkey.registered');
   registerVoiceIpc({
     stt: sttService,
     reloadHotkey: (hotkey) => hotkeyRegistrar.set(hotkey, toggleConversationByHotkey),
@@ -298,12 +324,23 @@ app.whenReady().then(async () => {
   memoryWatch.start();
 
   // Служба распознавания поднимается в фоне, чтобы не задерживать окна.
-  void sttService.start()
-    .then(() => {
+  // Отложенное включение записи ждёт её готовности; отмена не считается сбоем.
+  void sttService
+    .start()
+    .then((result) => {
+      if (result.ok) {
+        wakeFlow.noteReady();
+      } else if (result.error !== START_CANCELLED) {
+        wakeFlow.noteFailed(result.error);
+      }
       petWake?.broadcast();
       chatTalk?.broadcast();
     })
-    .catch(() => undefined);
+    .catch(() => {
+      wakeFlow.noteFailed();
+      petWake?.broadcast();
+      chatTalk?.broadcast();
+    });
 
   void runStartup({
     hidden: startedHidden(process.argv),

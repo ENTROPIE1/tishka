@@ -1,3 +1,5 @@
+import type { TimingMark } from '../main/timing-log';
+
 export type TranscribeResult =
   | { ok: true; text: string }
   | { ok: false; error: string; empty?: boolean };
@@ -84,7 +86,8 @@ export async function transcribeHttp(
   fetchFn: typeof fetch,
   url: string,
   wav: Uint8Array,
-  prompt?: string
+  prompt?: string,
+  mark?: TimingMark
 ): Promise<TranscribeResult> {
   const bytes = new Uint8Array(wav.length);
   bytes.set(wav);
@@ -95,6 +98,10 @@ export async function transcribeHttp(
     form.append('prompt', prompt);
   }
 
+  const startedAt = Date.now();
+  const size = wav.length;
+  mark?.('stt.request.start', { bytes: size });
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -104,17 +111,22 @@ export async function transcribeHttp(
       signal: controller.signal
     });
     if (!response.ok) {
+      mark?.('stt.request.end', { ok: false, code: response.status, bytes: size, ms: Date.now() - startedAt });
       return { ok: false, error: `Служба распознавания ответила с ошибкой ${response.status}` };
     }
     const data: unknown = await response.json();
     const raw = isRecord(data) && typeof data.text === 'string' ? data.text : '';
     const text = cleanTranscript(raw);
     if (text === '' || isNoiseTranscript(text)) {
+      mark?.('stt.request.end', { ok: false, bytes: size, chars: 0, ms: Date.now() - startedAt });
       return { ok: false, error: 'Не расслышал', empty: true };
     }
+    mark?.('stt.request.end', { ok: true, bytes: size, chars: text.length, ms: Date.now() - startedAt });
     return { ok: true, text };
   } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
+    const reason = error instanceof Error && error.name === 'AbortError' ? 'timeout' : 'network';
+    mark?.('stt.request.end', { ok: false, reason, bytes: size, ms: Date.now() - startedAt });
+    if (reason === 'timeout') {
       return { ok: false, error: 'Служба распознавания не ответила вовремя' };
     }
     return { ok: false, error: 'Не удалось обратиться к службе распознавания' };

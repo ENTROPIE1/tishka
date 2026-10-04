@@ -12,6 +12,7 @@ import { createSpeaker } from './speaker';
 import { stateLabel } from './state-label';
 import { createWakeListener } from './wake-listener';
 import { installLinkGuard } from '../shared/links';
+import { timingMark } from '../shared/timing';
 
 const pet = document.getElementById('pet') as HTMLElement;
 const bubble = document.getElementById('bubble') as HTMLElement;
@@ -24,6 +25,7 @@ const characterModel: Character = createCharacter('svg');
 
 let mirrored = false;
 let currentState: PetState = 'hidden';
+let waiting = false;
 let dragging = false;
 let dragMoved = false;
 let dragLastX = 0;
@@ -63,6 +65,11 @@ const wake = createWakeListener({
   onConversation: (on) => {
     listen.setConversation(on);
     composer.setListening(on);
+  },
+  onWaiting: (value) => {
+    waiting = value;
+    composer.setWaiting(value);
+    updateStateLabel();
   }
 });
 composer.input.addEventListener('keydown', () => {
@@ -82,6 +89,10 @@ function refreshBusy(): void {
 function updateBubble(): void {
   const text = say.textContent ?? '';
   bubble.hidden = text === '' && !listen.isListening();
+}
+
+function updateStateLabel(): void {
+  stateLabelEl.textContent = stateLabel(currentState, waiting);
 }
 
 function applyComposer(state: PetState, visible: boolean): void {
@@ -105,7 +116,7 @@ function applyFlip(): void {
 function renderModel(model: PetModel): void {
   currentState = model.state;
   character.dataset.state = model.state;
-  stateLabelEl.textContent = stateLabel(model.state);
+  updateStateLabel();
   say.textContent = listen.say(model.say, model.state);
   petCard.render(model);
 
@@ -176,6 +187,8 @@ window.tishka.onPetModel(renderModel);
 window.tishka.onEvent((event) => {
   if (event.type === 'speak.level') {
     characterModel.setMouth(event.level);
+  } else if (event.type === 'reply') {
+    timingMark('reply.shown');
   } else if (event.type === 'error') {
     listen.setError(event.message);
   }

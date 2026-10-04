@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Panel, TishkaEvent } from '../src/core/types';
-import { initialPet, onEvent, onTick, type PetModel, type PetOpts } from '../src/pet/state';
+import { initialPet, onEvent, onTick, requestLeave, type PetModel, type PetOpts } from '../src/pet/state';
 
 const MODE_OFF: PetOpts = { petMode: false };
 const MODE_ON: PetOpts = { petMode: true };
@@ -179,6 +179,61 @@ describe('pet state: уход по тишине', () => {
 
     model = fire(model, { type: 'wake', source: 'click' }, 900 + 300000, MODE_ON);
     expect(model.state).toBe('appear');
+  });
+
+  it('уход по просьбе во время ответа: сначала ответ, затем leave → hidden', () => {
+    let model = fire(ready(0), { type: 'reply', reply: { say: 'Хорошо, буду рядом' } }, 1000);
+    expect(model.state).toBe('talking');
+
+    model = requestLeave(model, 1001);
+    expect(model.state).toBe('talking');
+    expect(model.leaving).toBe(true);
+
+    model = fire(model, { type: 'speak.start', text: 'Хорошо, буду рядом' }, 1002);
+    expect(model.state).toBe('talking');
+    expect(model.leaving).toBe(true);
+
+    model = fire(model, { type: 'speak.end' }, 5000);
+    expect(model.state).toBe('leave');
+    expect(model.leaving).toBeUndefined();
+
+    model = onTick(model, 5900, MODE_OFF);
+    expect(model.state).toBe('hidden');
+  });
+
+  it('события ответа той же реплики не отменяют отложенный уход', () => {
+    let model = fire(ready(0), { type: 'reply', reply: { say: 'ответ' } }, 1000);
+    model = requestLeave(model, 1001);
+    model = requestLeave(model, 1002);
+    expect(model.leaving).toBe(true);
+
+    model = onTick(model, 1000 + 1500 + 5 * 60, MODE_OFF);
+    expect(model.state).toBe('leave');
+
+    model = onTick(model, 1000 + 2400 + 6 * 60 + 900, MODE_OFF);
+    expect(model.state).toBe('hidden');
+  });
+
+  it('уход без ответа сразу даёт leave, затем hidden, затем вызов даёт appear', () => {
+    let model = requestLeave(ready(0), 1000);
+    expect(model.state).toBe('leave');
+
+    model = onTick(model, 1900, MODE_OFF);
+    expect(model.state).toBe('hidden');
+
+    model = fire(model, { type: 'wake', source: 'name' }, 2000);
+    expect(model.state).toBe('appear');
+  });
+
+  it('новый вызов во время отложенного ухода отменяет уход', () => {
+    let model = fire(ready(0), { type: 'reply', reply: { say: 'ответ' } }, 1000);
+    model = requestLeave(model, 1001);
+
+    model = fire(model, { type: 'wake', source: 'click' }, 1100);
+    model = onTick(model, 5000, MODE_OFF);
+
+    expect(model.state).not.toBe('leave');
+    expect(model.leaving).toBeUndefined();
   });
 
   it('при opts.busy отсчёт простоя не идёт', () => {
