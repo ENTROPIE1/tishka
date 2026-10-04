@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron';
 import type { Config, EventBus } from '../core/types';
-import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
+import { initialPet, onEvent, onTick, type PetModel, type TalkSource } from '../pet/state';
 import { PET_LAYOUT_CHANNEL, PET_MODEL_CHANNEL } from './ipc-channels';
 import type { PetActivation } from './pet-activation';
 import type { Mover } from './pet-motion';
@@ -13,7 +13,7 @@ export interface PetLifecycleDeps {
   mover: Mover;
   placement: PetPlacement;
   activation: PetActivation;
-  bus: EventBus;
+  bus: EventBus & { source?(): TalkSource };   // источник текущего обращения: чат или ёж
   getConfig: () => Config;
 }
 
@@ -86,7 +86,7 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
   }
 
   function handleEvent(event: Parameters<typeof onEvent>[1]): void {
-    applyModel(onEvent(model, event, Date.now(), { petMode: petMode(), busy }));
+    applyModel(onEvent(model, event, Date.now(), { petMode: petMode(), busy, source: bus.source?.() }));
   }
 
   const unsubscribe = bus.on(handleEvent);

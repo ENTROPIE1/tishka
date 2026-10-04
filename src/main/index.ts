@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
 import { saveConfig as persistConfig } from '../core/config';
 import type { Config } from '../core/types';
-import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { createSttService, type SttService } from '../voice/stt-service';
@@ -27,12 +26,14 @@ import { createPetTray, type PetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
 import { registerPetWake, type PetWake } from './pet-wake';
 import { createScreenCapture } from './screen-capture';
+import { createSourceBus } from './source-bus';
 import { openStandWindow } from './stand-window';
+import { runStartup } from './startup';
 import { createWebReader, type WebReaderHandle } from './web-reader';
 import { createWakeFlow } from '../voice/wake-flow';
 import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
 
-const bus = createEventBus();
+const bus = createSourceBus();
 let core: TishkaCore | undefined;
 let pet: PetWindow | undefined;
 let tray: PetTray | undefined;
@@ -60,15 +61,6 @@ function voiceRestartNeeded(previous: Config, next: Config): boolean {
   const before = previous.voice;
   const after = next.voice;
   return before.sttUrl !== after.sttUrl || before.stt.exe !== after.stt.exe || before.stt.model !== after.stt.model;
-}
-
-// При запуске со стендом открывается он, иначе — обычное окно чата.
-function openStartupWindow(): void {
-  if (process.env['TISHKA_STAND'] === '1') {
-    openStandWindow();
-  } else {
-    openMainWindow('chat');
-  }
 }
 
 app.whenReady().then(async () => {
@@ -175,7 +167,7 @@ app.whenReady().then(async () => {
 
   const listen = createPetListen({
     bus,
-    core: tishka,
+    core: { handleUserText: (text) => bus.run('pet', () => tishka.handleUserText(text)) },
     stt: sttService,
     sendCommand: (command) => pet?.listenCommand(command),
     onMissedSpeech: () => calibrationHint.missed()
@@ -185,7 +177,11 @@ app.whenReady().then(async () => {
   const wakeFlow = createWakeFlow({
     getVoice: () => tishka.config().voice,
     stt: sttService,
-    core: tishka,
+    // Реплика голосом относится к тому окну, что ведёт разговор: чат или ёж.
+    core: {
+      handleUserText: (text) =>
+        bus.run(wakeFlow.conversationOwner() === 'chat' ? 'chat' : 'pet', () => tishka.handleUserText(text))
+    },
     bus,
     memoryName: () => tishka.memoryName(),
     isReady: () => sttService.status() === 'ready',
@@ -309,12 +305,18 @@ app.whenReady().then(async () => {
     })
     .catch(() => undefined);
 
-  if (!startedHidden(process.argv)) {
-    openStartupWindow();
-  }
+  void runStartup({
+    hidden: startedHidden(process.argv),
+    stand: process.env['TISHKA_STAND'] === '1',
+    hasGatewayKey: () => tishka.hasGatewayKey(),
+    openStand: openStandWindow,
+    openChat: openMainWindow,
+    // Запуск будит ежа как обычный вызов: строка ввода, микрофон по тем же правилам.
+    openPet: () => pet?.wake('click')
+  });
 
   app.on('activate', () => {
-    openStartupWindow();
+    openMainWindow();
   });
 });
 

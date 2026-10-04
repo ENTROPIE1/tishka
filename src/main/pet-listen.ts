@@ -1,11 +1,10 @@
-import type { TishkaCore } from '../core/app';
 import type { EventBus } from '../core/types';
 import type { ListenCommand, ListenResult } from '../voice/listen';
 import type { SttService } from '../voice/stt-service';
 
 export interface PetListenDeps {
   bus: EventBus;
-  core: TishkaCore;
+  core: { handleUserText(text: string): Promise<unknown> };
   stt: SttService;
   sendCommand(command: ListenCommand): void;
   onMissedSpeech?(): void;

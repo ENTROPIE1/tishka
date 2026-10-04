@@ -4,6 +4,7 @@ import { initialPet, onEvent, onTick, type PetModel, type PetOpts } from '../src
 
 const MODE_OFF: PetOpts = { petMode: false };
 const MODE_ON: PetOpts = { petMode: true };
+const FROM_CHAT: PetOpts = { petMode: false, source: 'chat' };
 const PANEL: Panel = { kind: 'text', title: 'Ответ', markdown: 'подробности' };
 
 function fire(model: PetModel, event: TishkaEvent, now: number, opts: PetOpts = MODE_OFF): PetModel {
@@ -179,5 +180,65 @@ describe('pet state', () => {
     model = onTick(model, 10_000, MODE_OFF);
     expect(model.state).toBe('idle');
     expect(model.replies).toBe(2);
+  });
+});
+
+describe('реплика из чата основного окна', () => {
+  it('скрытый ёж не появляется и не показывает ответ', () => {
+    let model = fire(initialPet(0), { type: 'listen.end', text: 'привет' }, 0, FROM_CHAT);
+    expect(model.state).toBe('hidden');
+
+    model = fire(model, { type: 'think.start' }, 1, FROM_CHAT);
+    expect(model.state).toBe('hidden');
+
+    model = fire(model, { type: 'reply', reply: { say: 'ответ', show: PANEL, ask: { title: 'ещё' } } }, 2, FROM_CHAT);
+    expect(model.state).toBe('hidden');
+    expect(model.say).toBeUndefined();
+    expect(model.panel).toBeUndefined();
+    expect(model.ask).toBeUndefined();
+  });
+
+  it('видимый ёж показывает только состояние, без облачка и карточки', () => {
+    let model = fire(initialPet(0), { type: 'wake', source: 'click' }, 0);
+    model = onTick(model, 900, MODE_OFF);
+    expect(model.state).toBe('listening');
+
+    model = fire(model, { type: 'listen.end', text: 'привет' }, 1000, FROM_CHAT);
+    expect(model.state).toBe('thinking');
+
+    model = fire(model, { type: 'reply', reply: { say: 'ответ', show: PANEL } }, 1001, FROM_CHAT);
+    expect(model.state).toBe('talking');
+    expect(model.say).toBeUndefined();
+    expect(model.panel).toBeUndefined();
+  });
+
+  it('полоска с прежним текстом очищается при тихом ответе из чата', () => {
+    let model = fire(initialPet(0), { type: 'wake', source: 'click' }, 0);
+    model = onTick(model, 900, MODE_OFF);
+    model = fire(model, { type: 'reply', reply: { say: 'первый ответ', show: PANEL } }, 1000);
+    expect(model.say).toBe('первый ответ');
+
+    model = fire(model, { type: 'reply', reply: { say: 'второй' } }, 1001, FROM_CHAT);
+    expect(model.say).toBeUndefined();
+    expect(model.panel).toBeUndefined();
+  });
+
+  it('реплика из строки ежа по-прежнему показывает облачко и карточку', () => {
+    let model = fire(initialPet(0), { type: 'reply', reply: { say: 'ответ', show: PANEL } }, 0, { petMode: false, source: 'pet' });
+    expect(model.state).toBe('talking');
+    expect(model.say).toBe('ответ');
+    expect(model.panel).toEqual(PANEL);
+  });
+
+  it('уведомление по расписанию показывается у ежа, даже если до этого был тихий ответ', () => {
+    let model = fire(initialPet(0), { type: 'reply', reply: { say: 'ответ' } }, 0, FROM_CHAT);
+    expect(model.state).toBe('hidden');
+
+    model = fire(model, { type: 'notify', title: 'Купить хлеб' }, 1);
+    expect(model.state).toBe('appear');
+
+    model = onTick(model, 901, MODE_OFF);
+    expect(model.state).toBe('notify');
+    expect(model.say).toBe('Купить хлеб');
   });
 });
