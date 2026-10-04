@@ -1,76 +1,11 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createTishkaCore, type TishkaCore } from '../src/core/app';
 import { defaultConfig } from '../src/core/config';
-import { createEventBus } from '../src/core/events';
-import type { SecretStore, TishkaEvent } from '../src/core/types';
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const presetsDir = join(root, 'presets');
-const FIXED_NOW = new Date('2026-10-02T10:00:00');
+import { choice, cleanupCores, replyChoice, setupCore, toolChoice } from './core-helpers';
 
 const delay = (ms: number): Promise<void> =>
   new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
-
-function fakeSecrets(values: Record<string, string>): SecretStore {
-  const map = new Map(Object.entries(values));
-  return {
-    async set(name, value) {
-      map.set(name, value);
-    },
-    async get(name) {
-      return map.get(name);
-    },
-    async has(name) {
-      return map.has(name);
-    },
-    async delete(name) {
-      map.delete(name);
-    },
-    async names() {
-      return [...map.keys()];
-    }
-  };
-}
-
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' }
-  });
-}
-
-function choice(message: Record<string, unknown>): Response {
-  return jsonResponse({ choices: [{ message }] });
-}
-
-function replyChoice(id: string, say: string): Response {
-  return choice({
-    content: null,
-    tool_calls: [{ id, type: 'function', function: { name: 'reply', arguments: JSON.stringify({ say }) } }]
-  });
-}
-
-function toolChoice(id: string, name: string, args: Record<string, unknown>): Response {
-  return choice({
-    content: null,
-    tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }]
-  });
-}
-
-async function removeDir(dir: string): Promise<void> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    try {
-      await rm(dir, { recursive: true, force: true });
-      return;
-    } catch {
-      await delay(100);
-    }
-  }
-}
 
 async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -82,52 +17,15 @@ async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<vo
   }
 }
 
-const pendingCleanup: Array<() => Promise<void>> = [];
-
-async function setup(
-  options: { fetch?: typeof fetch; secrets?: Record<string, string>; config?: unknown; now?: () => Date } = {}
-) {
-  const dataDir = await mkdtemp(join(tmpdir(), 'tishka-app-'));
-  if (options.config !== undefined) {
-    await writeFile(join(dataDir, 'config.json'), JSON.stringify(options.config), 'utf8');
-  }
-  const bus = createEventBus();
-  const events: TishkaEvent[] = [];
-  bus.on((event) => events.push(event));
-  const openExternal = vi.fn(async () => undefined);
-  const core: TishkaCore = createTishkaCore({
-    dataDir,
-    presetsDir,
-    appRoot: root,
-    secrets: fakeSecrets(options.secrets ?? { DKS_API_KEY: 'test-key' }),
-    events: bus,
-    openExternal,
-    showPanel: () => undefined,
-    now: options.now ?? (() => FIXED_NOW),
-    fetch: options.fetch
-  });
-  await core.start();
-  pendingCleanup.push(async () => {
-    await core.stop();
-    await removeDir(dataDir);
-  });
-  return { core, bus, events, openExternal, dataDir };
-}
-
 afterEach(async () => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
-  while (pendingCleanup.length > 0) {
-    const task = pendingCleanup.pop();
-    if (task !== undefined) {
-      await task();
-    }
-  }
+  await cleanupCores();
 });
 
 describe('createTishkaCore', () => {
   it('после start() в пустом каталоге данных появились пресеты, config() даёт значения по умолчанию', async () => {
-    const { core, dataDir } = await setup();
+    const { core, dataDir } = await setupCore();
 
     const files = await readdir(join(dataDir, 'skills'));
 
@@ -138,7 +36,7 @@ describe('createTishkaCore', () => {
 
   it('фраза «утро пятницы» запускает пресет: ссылки открыты, модель не вызывалась', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => choice({ content: 'ок' }));
-    const { core, openExternal, events } = await setup({ fetch: fetchMock });
+    const { core, openExternal, events } = await setupCore({ fetch: fetchMock });
 
     const reply = await core.handleUserText('утро пятницы');
 
@@ -152,7 +50,7 @@ describe('createTishkaCore', () => {
 
   it('фраза без подходящего навыка уходит модели, ответ через reply возвращается', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'Привет! Я Тишка.'));
-    const { core, events } = await setup({ fetch: fetchMock });
+    const { core, events } = await setupCore({ fetch: fetchMock });
 
     const reply = await core.handleUserText('расскажи о себе');
 
@@ -169,7 +67,7 @@ describe('createTishkaCore', () => {
     fetchMock
       .mockResolvedValueOnce(toolChoice('c1', 'create_reminder', { time: '12:00', text: 'выпить воды' }))
       .mockResolvedValueOnce(replyChoice('r1', 'Записал, напомню в срок.'));
-    const { core, dataDir, events } = await setup({ fetch: fetchMock });
+    const { core, dataDir, events } = await setupCore({ fetch: fetchMock });
 
     const reply = await core.handleUserText('напомни выпить воды');
 
@@ -185,7 +83,7 @@ describe('createTishkaCore', () => {
   it('нет ключа DKS_API_KEY — ответ с mood confused и без исключения', async () => {
     vi.stubEnv('DKS_API_KEY', '');
     const fetchMock = vi.fn<typeof fetch>(async () => choice({ content: 'ок' }));
-    const { core } = await setup({ fetch: fetchMock, secrets: {} });
+    const { core } = await setupCore({ fetch: fetchMock, secrets: {} });
 
     const reply = await core.handleUserText('привет');
 
@@ -196,7 +94,7 @@ describe('createTishkaCore', () => {
   it('без секрета и переменной окружения Тишка просит добавить ключ в подключениях', async () => {
     vi.stubEnv('DKS_API_KEY', '');
     const fetchMock = vi.fn<typeof fetch>(async () => choice({ content: 'ок' }));
-    const { core } = await setup({ fetch: fetchMock, secrets: {} });
+    const { core } = await setupCore({ fetch: fetchMock, secrets: {} });
 
     const reply = await core.handleUserText('привет');
 
@@ -212,7 +110,7 @@ describe('createTishkaCore', () => {
       authorization = (init?.headers as Record<string, string>).Authorization;
       return replyChoice('r1', 'Привет! Я Тишка.');
     });
-    const { core } = await setup({ fetch: fetchMock, secrets: {} });
+    const { core } = await setupCore({ fetch: fetchMock, secrets: {} });
 
     const reply = await core.handleUserText('привет');
 
@@ -221,27 +119,27 @@ describe('createTishkaCore', () => {
   });
 
   it('hasGatewayKey: секрет DKS_API_KEY даёт true', async () => {
-    const { core } = await setup({ secrets: { DKS_API_KEY: 'test-key' } });
+    const { core } = await setupCore({ secrets: { DKS_API_KEY: 'test-key' } });
 
     await expect(core.hasGatewayKey()).resolves.toBe(true);
   });
 
   it('hasGatewayKey: без секрета ключ берётся из переменной окружения', async () => {
     vi.stubEnv('DKS_API_KEY', 'env-key-123');
-    const { core } = await setup({ secrets: {} });
+    const { core } = await setupCore({ secrets: {} });
 
     await expect(core.hasGatewayKey()).resolves.toBe(true);
   });
 
   it('hasGatewayKey: без секрета и переменной окружения false', async () => {
     vi.stubEnv('DKS_API_KEY', '');
-    const { core } = await setup({ secrets: {} });
+    const { core } = await setupCore({ secrets: {} });
 
     await expect(core.hasGatewayKey()).resolves.toBe(false);
   });
 
   it('сервер MCP с несуществующей командой даёт статус error, остальное работает', async () => {
-    const { core } = await setup({
+    const { core } = await setupCore({
       config: {
         mcpServers: [{ name: 'broken', transport: 'stdio', command: 'tishka-no-such-command', args: [] }]
       }
@@ -270,7 +168,7 @@ describe('createTishkaCore', () => {
       active -= 1;
       return replyChoice(`r${calls}`, 'отвечаю');
     });
-    const { core, events } = await setup({ fetch: fetchMock });
+    const { core, events } = await setupCore({ fetch: fetchMock });
 
     const [first, second] = await Promise.all([
       core.handleUserText('привет'),
@@ -291,7 +189,7 @@ describe('createTishkaCore', () => {
 
   it('после handleUserText в history() есть запись пользователя и запись Тишки', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'Привет! Я Тишка.'));
-    const { core } = await setup({ fetch: fetchMock });
+    const { core } = await setupCore({ fetch: fetchMock });
 
     await core.handleUserText('расскажи о себе');
 
@@ -324,7 +222,7 @@ describe('createTishkaCore', () => {
       realClearInterval(timer);
     });
 
-    const { core } = await setup();
+    const { core } = await setupCore();
     await core.stop();
 
     expect(created.size).toBeGreaterThan(0);
@@ -339,7 +237,7 @@ describe('createTishkaCore', () => {
       bodies.push(String(init?.body));
       return replyChoice(`r${bodies.length}`, 'ок');
     });
-    const { core } = await setup({ fetch: fetchMock });
+    const { core } = await setupCore({ fetch: fetchMock });
     const dividers = (): number => core.history().filter((entry) => entry.kind === 'divider').length;
 
     await core.handleUserText('первый вопрос');
@@ -356,7 +254,7 @@ describe('createTishkaCore', () => {
   it('после 31 минуты тишины начинается новый разговор, после 10 минут — нет', async () => {
     let current = new Date('2026-10-02T10:00:00');
     const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'ок'));
-    const { core } = await setup({ fetch: fetchMock, now: () => current });
+    const { core } = await setupCore({ fetch: fetchMock, now: () => current });
     const dividers = (): number => core.history().filter((entry) => entry.kind === 'divider').length;
     const baseline = dividers();
 
@@ -373,7 +271,7 @@ describe('createTishkaCore', () => {
   it('напоминание Тишки разговор не начинает и не продлевает', async () => {
     let current = new Date('2026-10-02T10:00:00');
     const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'ок'));
-    const { core, bus } = await setup({ fetch: fetchMock, now: () => current });
+    const { core, bus } = await setupCore({ fetch: fetchMock, now: () => current });
     const dividers = (): number => core.history().filter((entry) => entry.kind === 'divider').length;
     const baseline = dividers();
 
@@ -388,7 +286,7 @@ describe('createTishkaCore', () => {
   });
 
   it('skills.overview отдаёт навыки с описанием и состоянием', async () => {
-    const { core } = await setup();
+    const { core } = await setupCore();
 
     const entries = await core.skills.overview();
     const watch = entries.find((entry) => entry.skill.id === 'watch-page');
@@ -400,7 +298,7 @@ describe('createTishkaCore', () => {
   });
 
   it('skills.setEnabled выключает навык, экспорт не содержит состояния запусков', async () => {
-    const { core, dataDir } = await setup();
+    const { core, dataDir } = await setupCore();
 
     await expect(core.skills.setEnabled('watch-page', false)).resolves.toBe(true);
     const off = (await core.skills.overview()).find((entry) => entry.skill.id === 'watch-page');
@@ -417,7 +315,7 @@ describe('createTishkaCore', () => {
   });
 
   it('skills.save отвергает неверный навык со списком ошибок', async () => {
-    const { core } = await setup();
+    const { core } = await setupCore();
 
     const result = await core.skills.save({ format: 'tishka-skill/1', id: 'bad id!', name: '' } as never);
 
@@ -433,7 +331,7 @@ describe('createTishkaCore', () => {
       bodies.push(String(init?.body));
       return replyChoice(`r${bodies.length}`, 'ок');
     });
-    const { core } = await setup({ fetch: fetchMock });
+    const { core } = await setupCore({ fetch: fetchMock });
     const long = 'я'.repeat(5000);
 
     await core.handleUserText(long);
