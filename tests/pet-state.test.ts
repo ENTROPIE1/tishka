@@ -45,6 +45,19 @@ describe('pet state', () => {
     expect(model.state).toBe('idle');
   });
 
+  it('reply с ask держит карточку ввода, следующий ответ её заменяет', () => {
+    const ask = { title: 'Пришли текст', placeholder: 'заметки' };
+    let model = fire(initialPet(0), { type: 'reply', reply: { say: 'Пришли заметки', ask } }, 0);
+
+    expect(model.state).toBe('talking');
+    expect(model.ask).toEqual(ask);
+    expect(model.panel).toBeUndefined();
+
+    model = fire(model, { type: 'reply', reply: { say: 'Готово', show: PANEL } }, 10);
+    expect(model.ask).toBeUndefined();
+    expect(model.panel).toEqual(PANEL);
+  });
+
   it('reply с mood happy: сначала happy, затем talking', () => {
     let model = fire(initialPet(0), { type: 'reply', reply: { say: 'ура', mood: 'happy' } }, 0);
     expect(model.state).toBe('happy');

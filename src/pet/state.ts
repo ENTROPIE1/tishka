@@ -18,7 +18,8 @@ export interface PetModel {
   state: PetState;
   since: number;                 // мс, когда вошли в состояние
   say?: string;                  // текст в облачке
-  panel?: Panel;                 // карточка
+  panel?: Panel;                 // карточка результата
+  ask?: { title: string; placeholder?: string };   // карточка ввода
   queue: PetState[];             // состояния, которые нужно показать после текущего
 }
 
@@ -48,6 +49,9 @@ function enter(model: PetModel, state: PetState, now: number, queue: PetState[] 
     }
     if (model.panel !== undefined) {
       next.panel = model.panel;
+    }
+    if (model.ask !== undefined) {
+      next.ask = model.ask;
     }
   }
   return next;
@@ -83,10 +87,13 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
     case 'tool.end':
       return enter(model, 'thinking', now);
     case 'reply': {
-      const base: PetModel = { ...model, since: now, queue: [] };
-      base.say = event.reply.say;
+      // Новый ответ заменяет прежнюю карточку: показывается либо результат, либо ввод.
+      const base: PetModel = { since: now, queue: [], say: event.reply.say, state: model.state };
       if (event.reply.show !== undefined) {
         base.panel = event.reply.show;
+      }
+      if (event.reply.ask !== undefined) {
+        base.ask = event.reply.ask;
       }
       if (event.reply.mood === 'happy') {
         return enter(base, 'happy', now, ['talking']);

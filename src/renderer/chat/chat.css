@@ -316,6 +316,71 @@ body {
   color: var(--text);
 }
 
+.card-copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ask-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ask-input {
+  width: 100%;
+  min-height: calc(8 * 1.45em);
+  max-height: 40vh;
+  overflow-y: auto;
+  resize: vertical;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.ask-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ask-hint {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.ask-sent {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.msg-user-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.msg-user .msg-text.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.msg-expand {
+  align-self: flex-start;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 .status {
   flex: none;
   padding: 4px 16px;

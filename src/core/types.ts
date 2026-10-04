@@ -32,6 +32,7 @@ export type Panel =
 export interface Reply {
   say: string;      // вслух: до двух коротких предложений, без цифр и латиницы
   show?: Panel;     // подробности в панели и в чате
+  ask?: { title: string; placeholder?: string };   // просьба прислать текст: окно показывает карточку ввода
   mood?: Mood;
 }
 

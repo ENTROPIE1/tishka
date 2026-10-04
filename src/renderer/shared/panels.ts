@@ -1,10 +1,11 @@
 import type { Panel } from '../../core/types';
-import { renderMarkdown } from './markdown';
+import { markdownToPlain, renderMarkdown } from './markdown';
 
 const COPY_FEEDBACK_MS = 1000;
 
 export interface PanelActions {
   onCopy?: (text: string) => void;
+  onCopyRich?: (html: string, text: string) => void;   // текстовая карточка: html и чистый текст сразу
   onOpenChat?: () => void;
   onClose?: () => void;
 }
@@ -104,21 +105,27 @@ export function panelElement(panel: Panel, actions: PanelActions = {}): HTMLElem
   card.append(head);
   card.append(panelBody(panel));
 
-  if (actions.onCopy === undefined && actions.onOpenChat === undefined) {
+  if (actions.onCopy === undefined && actions.onCopyRich === undefined && actions.onOpenChat === undefined) {
     return card;
   }
 
   const row = document.createElement('div');
   row.className = 'card-actions';
 
-  if (actions.onCopy !== undefined) {
+  if (actions.onCopy !== undefined || actions.onCopyRich !== undefined) {
     const copy = actions.onCopy;
+    const copyRich = actions.onCopyRich;
     const copyButton = document.createElement('button');
     copyButton.type = 'button';
     copyButton.className = 'card-copy';
     copyButton.textContent = 'Копировать';
     copyButton.addEventListener('click', () => {
-      copy(copyTextForPanel(panel));
+      if (panel.kind === 'text' && copyRich !== undefined) {
+        // Заголовок карточки в буфер не попадает: копируется только markdown.
+        copyRich(renderMarkdown(panel.markdown), markdownToPlain(panel.markdown));
+      } else {
+        copy?.(copyTextForPanel(panel));
+      }
       copyButton.textContent = 'Скопировано';
       window.setTimeout(() => {
         copyButton.textContent = 'Копировать';

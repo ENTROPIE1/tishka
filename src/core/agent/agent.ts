@@ -1,9 +1,10 @@
 import type { ChatMessage, ChatRequest, ChatResponse } from '../llm/client';
 import { LlmError } from '../llm/client';
 import { stepTools } from '../skills/tools';
-import type { EventBus, Mood, Panel, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
+import type { EventBus, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
 import type { FyrLevel } from './persona';
 import { buildSystemPrompt } from './prompt';
+import { REPLY_TOOL_NAME, replyFromText, replyFromToolArgs, replyTool } from './reply';
 import { skillGuide } from './skill-guide';
 
 export interface AgentDeps {
@@ -25,76 +26,6 @@ const MAX_ROUNDS = 8;
 const MAX_HISTORY = 40;
 const MAX_TOOL_CONTENT = 6000;
 const TRUNCATED_MARK = '\n[обрезано]';
-const REPLY_TOOL_NAME = 'reply';
-
-const panelSchema = {
-  description: 'Панель с подробностями, ровно один из трёх видов',
-  oneOf: [
-    {
-      type: 'object',
-      description: 'Список',
-      properties: {
-        kind: { type: 'string', enum: ['list'] },
-        title: { type: 'string', description: 'Заголовок списка' },
-        items: {
-          type: 'array',
-          description: 'Элементы списка',
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string' },
-              subtitle: { type: 'string' },
-              url: { type: 'string' }
-            },
-            required: ['title'],
-            additionalProperties: false
-          }
-        }
-      },
-      required: ['kind', 'title', 'items'],
-      additionalProperties: false
-    },
-    {
-      type: 'object',
-      description: 'Текст в markdown',
-      properties: {
-        kind: { type: 'string', enum: ['text'] },
-        title: { type: 'string', description: 'Заголовок' },
-        markdown: { type: 'string', description: 'Содержание в markdown' }
-      },
-      required: ['kind', 'title', 'markdown'],
-      additionalProperties: false
-    },
-    {
-      type: 'object',
-      description: 'Картинка',
-      properties: {
-        kind: { type: 'string', enum: ['image'] },
-        title: { type: 'string', description: 'Заголовок' },
-        path: { type: 'string', description: 'Путь к файлу картинки' }
-      },
-      required: ['kind', 'title', 'path'],
-      additionalProperties: false
-    }
-  ]
-};
-
-const replyTool: ToolDef = {
-  name: REPLY_TOOL_NAME,
-  description: 'Завершает работу и передаёт пользователю итоговый ответ.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      say: { type: 'string', description: 'Короткая фраза вслух' },
-      show: panelSchema,
-      mood: { type: 'string', enum: ['neutral', 'happy', 'confused'] }
-    },
-    required: ['say'],
-    additionalProperties: false
-  },
-  source: 'builtin',
-  readOnly: true
-};
 
 const ERROR_PHRASES: Record<LlmError['kind'], string> = {
   auth: 'Ключ шлюза моделей не подошёл, проверь настройки',
@@ -121,49 +52,6 @@ function toolResultToText(result: ToolResult): string {
   }
   const error = result.error ?? result.content;
   return truncate(error.length > 0 ? `Ошибка: ${error}` : 'Ошибка');
-}
-
-function splitSentences(text: string): string[] {
-  const parts = text.match(/[^.!?…]*[.!?…]+["»')\]]*\s*|[^.!?…]+$/g) ?? [];
-  return parts.map((part) => part.trim()).filter((part) => part.length > 0);
-}
-
-function replyFromText(text: string): Reply {
-  const trimmed = text.trim();
-  const sentences = splitSentences(trimmed);
-  if (sentences.length <= 2) {
-    return { say: trimmed, mood: 'neutral' };
-  }
-  const say = sentences.slice(0, 2).join(' ');
-  return { say, show: { kind: 'text', title: 'Ответ', markdown: trimmed }, mood: 'neutral' };
-}
-
-function parseMood(value: unknown): Mood {
-  return value === 'happy' || value === 'confused' || value === 'neutral' ? value : 'neutral';
-}
-
-function parsePanel(value: unknown): Panel | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return undefined;
-  }
-  const panel = value as Record<string, unknown>;
-  if (panel.kind === 'text' && typeof panel.markdown === 'string') {
-    return value as Panel;
-  }
-  if (panel.kind === 'image' && typeof panel.path === 'string') {
-    return value as Panel;
-  }
-  if (panel.kind === 'list' && Array.isArray(panel.items)) {
-    return value as Panel;
-  }
-  return undefined;
-}
-
-function replyFromToolArgs(args: Record<string, unknown>, fallbackText: string | null): Reply {
-  const say = typeof args.say === 'string' && args.say.length > 0 ? args.say : (fallbackText ?? '').trim();
-  const show = parsePanel(args.show);
-  const mood = parseMood(args.mood);
-  return show === undefined ? { say, mood } : { say, show, mood };
 }
 
 export function createAgent(deps: AgentDeps): Agent {

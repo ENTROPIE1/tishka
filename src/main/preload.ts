@@ -20,6 +20,7 @@ import {
   CONNECTIONS_REMOVE_CHANNEL,
   CONNECTIONS_SAVE_CHANNEL,
   CONNECTIONS_STATUS_CHANNEL,
+  COPY_RICH_CHANNEL,
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
@@ -30,6 +31,7 @@ import {
   PET_BUSY_CHANNEL,
   PET_DRAG_CHANNEL,
   PET_DRAG_END_CHANNEL,
+  PET_FOCUS_CHANNEL,
   PET_INTERACTIVE_CHANNEL,
   PET_MODEL_CHANNEL,
   PET_WAKE_CHANNEL,
@@ -64,6 +66,9 @@ const api = {
   },
   copyText(text: string): Promise<void> {
     return ipcRenderer.invoke(COPY_TEXT_CHANNEL, text);
+  },
+  copyRich(html: string, text: string): Promise<void> {
+    return ipcRenderer.invoke(COPY_RICH_CHANNEL, html, text);
   },
   secrets: {
     set(name: string, value: string): Promise<void> {
@@ -146,6 +151,9 @@ const api = {
     },
     wake(source: 'name' | 'hotkey' | 'click' | 'trigger'): void {
       ipcRenderer.send(PET_WAKE_CHANNEL, source);
+    },
+    focus(): void {
+      ipcRenderer.send(PET_FOCUS_CHANNEL);
     }
   }
 };

@@ -21,6 +21,7 @@ export interface PetWindow {
   wake(source: 'name' | 'hotkey' | 'click' | 'trigger'): void;
   setInteractive(interactive: boolean): void;
   setBusy(busy: boolean): void;
+  focusWindow(): void;
   dragBy(deltaX: number): void;
   dragEnd(): void;
   dispose(): void;
@@ -147,6 +148,15 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     },
     setBusy(value): void {
       busy = value;
+    },
+    focusWindow(): void {
+      if (window.isDestroyed()) {
+        return;
+      }
+      if (!window.isVisible()) {
+        showAtRest();
+      }
+      window.focus();
     },
     dragBy(deltaX): void {
       if (window.isDestroyed()) {

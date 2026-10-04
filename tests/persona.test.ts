@@ -112,6 +112,15 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain('Без цифр, без латиницы');
   });
 
+  it('содержит правило про ask и однократную просьбу текста', () => {
+    const prompt = buildSystemPrompt(NOW, 'sometimes');
+    expect(prompt).toContain('ask');
+    expect(prompt).toContain('Проси текст один раз');
+    expect(prompt).toContain('не переспрашивай');
+    expect(prompt).toContain('«Сделано», «В работе», «Планы»');
+    expect(prompt).toContain('шаблон или формат не требуй');
+  });
+
   it('зависит от уровня фыр', () => {
     expect(buildSystemPrompt(NOW, 'off')).toContain('запрещён');
     expect(buildSystemPrompt(NOW, 'often')).toContain('большинств');

@@ -4,6 +4,7 @@ export const HISTORY_CHANNEL = 'tishka:history';
 export const HISTORY_CLEAR_CHANNEL = 'tishka:history:clear';
 export const OPEN_EXTERNAL_CHANNEL = 'tishka:open-external';
 export const COPY_TEXT_CHANNEL = 'tishka:copy-text';
+export const COPY_RICH_CHANNEL = 'tishka:copy-rich';
 
 export const SECRETS_SET_CHANNEL = 'tishka:secrets:set';
 export const SECRETS_HAS_CHANNEL = 'tishka:secrets:has';
@@ -28,3 +29,4 @@ export const PET_BUSY_CHANNEL = 'tishka:pet:busy';
 export const PET_DRAG_CHANNEL = 'tishka:pet:drag';
 export const PET_DRAG_END_CHANNEL = 'tishka:pet:drag-end';
 export const PET_WAKE_CHANNEL = 'tishka:pet:wake';
+export const PET_FOCUS_CHANNEL = 'tishka:pet:focus';

@@ -120,3 +120,58 @@ export function renderMarkdown(source: string): string {
   flushList();
   return blocks.join('\n');
 }
+
+function plainInline(text: string): string {
+  const withoutCode = text.replace(/`([^`\n]+)`/g, '$1');
+  const withLinks = withoutCode.replace(
+    /\[([^\]\n]+)\]\(([^()\s]+)\)/g,
+    (_match, label: string, url: string) => `${label} (${url})`
+  );
+  return withLinks.replace(/\*\*([^*\n]+)\*\*/g, '$1');
+}
+
+// Разметка без знаков форматирования: обратные кавычки и ** убираются,
+// заголовки теряют решётки, пункты списка начинаются с «• » или номера.
+export function markdownToPlain(source: string): string {
+  const lines = source.split('\n');
+  const out: string[] = [];
+  let inFence = false;
+  let fence: string[] = [];
+
+  for (const line of lines) {
+    if (inFence) {
+      if (/^\s*```/.test(line)) {
+        out.push(...fence);
+        fence = [];
+        inFence = false;
+      } else {
+        fence.push(line);
+      }
+      continue;
+    }
+    if (/^\s*```/.test(line)) {
+      inFence = true;
+      continue;
+    }
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    if (heading !== null) {
+      out.push(plainInline(heading[1] ?? ''));
+      continue;
+    }
+    const unordered = /^(\s*)-\s+(.*)$/.exec(line);
+    if (unordered !== null) {
+      out.push(`${unordered[1] ?? ''}• ${plainInline(unordered[2] ?? '')}`);
+      continue;
+    }
+    const ordered = /^(\s*)(\d+)\.\s+(.*)$/.exec(line);
+    if (ordered !== null) {
+      out.push(`${ordered[1] ?? ''}${ordered[2]}. ${plainInline(ordered[3] ?? '')}`);
+      continue;
+    }
+    out.push(plainInline(line));
+  }
+  if (inFence) {
+    out.push(...fence);
+  }
+  return out.join('\n');
+}

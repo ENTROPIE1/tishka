@@ -1,7 +1,6 @@
-import type { Panel } from '../../core/types';
 import type { PetModel, PetState } from '../../pet/state';
-import { panelElement } from '../shared/panels';
 import { clipForState, type Character } from './character';
+import { createPetCard } from './pet-card';
 import { SvgHedgehog } from './svg-hedgehog';
 
 const bubble = document.getElementById('bubble') as HTMLElement;
@@ -12,6 +11,7 @@ const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
 const stateLabel = document.getElementById('state') as HTMLElement;
 const characterModel: Character = new SvgHedgehog();
+const petCard = createPetCard({ element: cardHost, refreshBusy });
 
 const STATE_LABELS: Record<PetState, string> = {
   hidden: 'спит за краем',
@@ -28,9 +28,7 @@ const STATE_LABELS: Record<PetState, string> = {
   sleep: 'спит'
 };
 
-let lastPanelKey = '';
 let lastSay = '';
-let cardClosed = false;
 let interactive = false;
 let dragging = false;
 let dragMoved = false;
@@ -51,37 +49,10 @@ function updateBubble(): void {
   bubble.hidden = text === '' && composer.hidden;
 }
 
-function renderCard(panel: Panel | undefined): void {
-  const key = panel === undefined ? '' : JSON.stringify(panel);
-  if (key !== lastPanelKey) {
-    lastPanelKey = key;
-    cardClosed = false;
-    cardHost.replaceChildren();
-    if (panel !== undefined) {
-      cardHost.append(
-        panelElement(panel, {
-          onCopy: (text) => {
-            void window.tishka.copyText(text);
-          },
-          onOpenChat: () => {
-            void window.tishka.openChat();
-          },
-          onClose: () => {
-            cardClosed = true;
-            cardHost.hidden = true;
-            refreshBusy();
-          }
-        })
-      );
-    }
-  }
-  cardHost.hidden = panel === undefined || cardClosed;
-}
-
 function renderModel(model: PetModel): void {
   stateLabel.textContent = STATE_LABELS[model.state];
   say.textContent = model.say ?? '';
-  renderCard(model.panel);
+  petCard.render(model);
 
   const { clip, flip } = clipForState(model.state);
   characterModel.setClip(clip);

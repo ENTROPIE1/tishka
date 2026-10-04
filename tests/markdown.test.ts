@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMarkdown } from '../src/renderer/shared/markdown';
+import { markdownToPlain, renderMarkdown } from '../src/renderer/shared/markdown';
 
 describe('renderMarkdown', () => {
   it('абзацы разделяются пустой строкой', () => {
@@ -68,5 +68,28 @@ describe('renderMarkdown', () => {
     expect(html).toContain('&amp;');
     expect(html).toContain('&quot;');
     expect(html).not.toContain('"');
+  });
+});
+
+describe('markdownToPlain', () => {
+  it('заголовок, жирный текст, список и ссылка теряют разметку', () => {
+    const plain = markdownToPlain('## Итог\n- **Сделано**: отчёт\n- [ссылка](https://a.b)');
+    expect(plain).toBe('Итог\n• Сделано: отчёт\n• ссылка (https://a.b)');
+  });
+
+  it('нумерованный список сохраняет номер', () => {
+    expect(markdownToPlain('1. раз\n2. два')).toBe('1. раз\n2. два');
+  });
+
+  it('обратные кавычки убираются', () => {
+    expect(markdownToPlain('запусти `npm test`')).toBe('запусти npm test');
+  });
+
+  it('заголовки разных уровней теряют решётки', () => {
+    expect(markdownToPlain('### Мелкий')).toBe('Мелкий');
+  });
+
+  it('текст в блоке кода выводится без кавычек-ограждений', () => {
+    expect(markdownToPlain('до\n```\nкод <b>\n```\nпосле')).toBe('до\nкод <b>\nпосле');
   });
 });

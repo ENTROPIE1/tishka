@@ -1,8 +1,9 @@
-import { BrowserWindow, clipboard, ipcMain, shell } from 'electron';
+import { BrowserWindow, clipboard, ClipboardItem, ipcMain, shell } from 'electron';
 import type { TishkaCore } from '../core/app';
 import type { EventBus, SecretStore, TishkaEvent } from '../core/types';
 import {
   CONFIG_CHANGED_CHANNEL,
+  COPY_RICH_CHANNEL,
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
   HISTORY_CHANNEL,
@@ -71,6 +72,14 @@ export function registerIpc(bus: EventBus, core: TishkaCore, secrets: SecretStor
       return;
     }
     clipboard.writeText(text);
+  });
+
+  // Копирование с форматированием: сразу html (для Word, Outlook, Confluence) и текст.
+  ipcMain.handle(COPY_RICH_CHANNEL, (_event, html: unknown, text: unknown) => {
+    if (typeof html !== 'string' || typeof text !== 'string') {
+      return;
+    }
+    return clipboard.write([new ClipboardItem({ 'text/html': html, 'text/plain': text })]);
   });
 
   ipcMain.handle(SECRETS_SET_CHANNEL, async (_event, name: unknown, value: unknown) => {

@@ -3,6 +3,7 @@ import {
   PET_BUSY_CHANNEL,
   PET_DRAG_CHANNEL,
   PET_DRAG_END_CHANNEL,
+  PET_FOCUS_CHANNEL,
   PET_INTERACTIVE_CHANNEL,
   PET_WAKE_CHANNEL
 } from './ipc-channels';
@@ -36,5 +37,9 @@ export function registerPetIpc(pet: PetWindow): void {
 
   ipcMain.on(PET_DRAG_END_CHANNEL, () => {
     pet.dragEnd();
+  });
+
+  ipcMain.on(PET_FOCUS_CHANNEL, () => {
+    pet.focusWindow();
   });
 }

@@ -1,6 +1,4 @@
-import type { HistoryEntry } from '../../core/history';
-import { panelElement } from '../shared/panels';
-import { renderMarkdown } from '../shared/markdown';
+import { createChatFeed } from './feed';
 
 const feed = document.getElementById('feed') as HTMLElement;
 const statusLine = document.getElementById('status') as HTMLElement;
@@ -11,74 +9,10 @@ const settingsButton = document.getElementById('open-settings') as HTMLButtonEle
 const bannerButton = document.getElementById('open-settings-banner') as HTMLButtonElement;
 const noKeyBanner = document.getElementById('no-key') as HTMLElement;
 
-const STICK_BOTTOM_GAP = 48;
+const view = createChatFeed(feed);
 
 function nowIso(): string {
   return new Date().toISOString();
-}
-
-function isPinnedToBottom(): boolean {
-  return feed.scrollHeight - feed.scrollTop - feed.clientHeight < STICK_BOTTOM_GAP;
-}
-
-function scrollToBottom(): void {
-  feed.scrollTop = feed.scrollHeight;
-}
-
-function timeLabel(at: string): string {
-  const date = new Date(at);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function messageElement(entry: HistoryEntry): HTMLElement {
-  const message = document.createElement('div');
-  message.className = `msg msg-${entry.from}`;
-  if (entry.from === 'tishka' && entry.mood !== undefined) {
-    message.classList.add(`mood-${entry.mood}`);
-  }
-
-  const content = document.createElement('div');
-  content.className = 'msg-content';
-
-  if (entry.from === 'tishka') {
-    const text = document.createElement('div');
-    text.className = 'msg-text';
-    text.innerHTML = renderMarkdown(entry.text);
-    content.append(text);
-  } else {
-    const text = document.createElement('div');
-    text.className = 'msg-text';
-    text.textContent = entry.text;
-    content.append(text);
-  }
-
-  if (entry.from === 'tishka' && entry.panel !== undefined) {
-    content.append(
-      panelElement(entry.panel, {
-        onCopy: (text) => {
-          void window.tishka.copyText(text);
-        }
-      })
-    );
-  }
-
-  const time = document.createElement('div');
-  time.className = 'msg-time';
-  time.textContent = timeLabel(entry.at);
-
-  message.append(content, time);
-  return message;
-}
-
-function appendEntry(entry: HistoryEntry): void {
-  const pinned = isPinnedToBottom();
-  feed.append(messageElement(entry));
-  if (pinned) {
-    scrollToBottom();
-  }
 }
 
 function setStatus(text: string): void {
@@ -105,10 +39,10 @@ function initEvents(): void {
   window.tishka.onEvent((event) => {
     switch (event.type) {
       case 'listen.end':
-        appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'user', text: event.text });
+        view.appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'user', text: event.text });
         break;
       case 'reply':
-        appendEntry({
+        view.appendEntry({
           id: crypto.randomUUID(),
           at: nowIso(),
           from: 'tishka',
@@ -116,13 +50,16 @@ function initEvents(): void {
           panel: event.reply.show,
           mood: event.reply.mood
         });
+        if (event.reply.ask !== undefined) {
+          view.appendAskCard(event.reply.ask);
+        }
         clearStatus();
         break;
       case 'notify':
-        appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
+        view.appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;
       case 'error':
-        appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.message });
+        view.appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.message });
         clearStatus();
         break;
       case 'think.start':
@@ -171,18 +108,14 @@ function initClearButton(): void {
       return;
     }
     void window.tishka.clearHistory().then(() => {
-      feed.replaceChildren();
+      view.clear();
       clearStatus();
     });
   });
 }
 
 async function loadHistory(): Promise<void> {
-  const entries = await window.tishka.history(200);
-  for (const entry of entries) {
-    feed.append(messageElement(entry));
-  }
-  scrollToBottom();
+  view.fill(await window.tishka.history(200));
 }
 
 function initSettingsButtons(): void {
