@@ -72,30 +72,45 @@ function advance(model: PetModel, now: number): PetModel {
 // Состояния, во время которых уведомление ждёт своей очереди, а не перебивает текущее.
 const BUSY_STATES: PetState[] = ['appear', 'listening', 'thinking', 'working', 'talking', 'happy', 'confused'];
 
+function isGone(model: PetModel): boolean {
+  return model.state === 'hidden' || model.state === 'sleep';
+}
+
+// Любое событие, которое показывает ёжика, проходит через появление. Из скрытого
+// состояния и сна — состояние appear с нужным следом; во время появления событие
+// заменяет очередь, не срывая начатую анимацию. Так повод не важен: путь один.
+function show(model: PetModel, target: PetState, now: number, rest: PetState[] = []): PetModel {
+  if (model.state === 'appear') {
+    return { ...model, queue: [target, ...rest] };
+  }
+  if (isGone(model)) {
+    return enter(model, 'appear', now, [target, ...rest]);
+  }
+  return enter(model, target, now, rest);
+}
+
 export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: PetOpts): PetModel {
   void opts;
   switch (event.type) {
     case 'wake':
-      if (model.state === 'hidden' || model.state === 'sleep') {
-        return enter(model, 'appear', now, ['listening']);
-      }
-      return enter(model, 'listening', now);
+      return show(model, 'listening', now);
     case 'listen.start':
-      return enter(model, 'listening', now);
+      return show(model, 'listening', now);
     case 'listen.end':
-      return enter(model, 'thinking', now);
+      return show(model, 'thinking', now);
     case 'think.start':
-      return enter(model, 'thinking', now);
+      return show(model, 'thinking', now);
     case 'tool.start':
-      return enter(model, 'working', now);
+      return show(model, 'working', now);
     case 'tool.end':
-      return enter(model, 'thinking', now);
+      return show(model, 'thinking', now);
     case 'status':
       return { ...model, say: event.text };
     case 'reply': {
       // Новый ответ заменяет прежнюю карточку: показывается либо результат, либо ввод.
       const base: PetModel = {
-        since: now,
+        // Во время появления не сбиваем его отсчёт — ответ встанет в очередь.
+        since: model.state === 'appear' ? model.since : now,
         queue: [],
         say: event.reply.say,
         state: model.state,
@@ -108,34 +123,31 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
         base.ask = event.reply.ask;
       }
       if (event.reply.mood === 'happy') {
-        return enter(base, 'happy', now, ['talking']);
+        return show(base, 'happy', now, ['talking']);
       }
       if (event.reply.mood === 'confused') {
-        return enter(base, 'confused', now, ['talking']);
+        return show(base, 'confused', now, ['talking']);
       }
-      return enter(base, 'talking', now);
+      return show(base, 'talking', now);
     }
     case 'speak.start':
-      return enter(model, 'talking', now);
+      return show(model, 'talking', now);
     case 'speak.end':
-      return enter(model, 'idle', now);
+      return isGone(model) ? model : enter(model, 'idle', now);
     case 'notify': {
-      if (model.state === 'hidden' || model.state === 'sleep') {
-        const base: PetModel = { ...model, say: event.title };
-        return enter(base, 'appear', now, ['notify']);
-      }
       if (BUSY_STATES.includes(model.state)) {
         return { ...model, queue: [...model.queue, 'notify'] };
       }
       const base: PetModel = { ...model, say: event.title };
-      return enter(base, 'notify', now);
+      return show(base, 'notify', now);
     }
     case 'skill.saved':
-      return event.source === 'dialog' ? enter(model, 'happy', now, ['idle']) : model;
+      return event.source === 'dialog' ? show(model, 'happy', now, ['idle']) : model;
     case 'error':
-      return enter(model, 'confused', now);
+      return show(model, 'confused', now);
     case 'idle':
-      return model.state === 'talking' ? model : enter(model, 'idle', now);
+      // Простой вне разговора не поднимает окно: скрытый ёж остаётся скрытым.
+      return isGone(model) || model.state === 'talking' ? model : enter(model, 'idle', now);
     default:
       return model;
   }

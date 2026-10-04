@@ -1,6 +1,6 @@
 import { screen } from 'electron';
 import {
-  PET_LAYOUT_DEFAULTS,
+  defaultPetX,
   petLayout,
   rectWithinAny,
   workAreaForPoint,
@@ -19,10 +19,6 @@ function displayAreas(): WorkArea[] {
   return screen.getAllDisplays().map((display) => display.workArea);
 }
 
-function defaultPetX(area: WorkArea): number {
-  return area.x + area.width - PET_LAYOUT_DEFAULTS.margin - PET_LAYOUT_DEFAULTS.petWidth;
-}
-
 // Держит раскладку окна-питомца и экран, на котором он сейчас находится.
 // Перемещение меняет только положение: размер берётся из чистой раскладки.
 export class PetPlacement {
@@ -31,7 +27,7 @@ export class PetPlacement {
 
   constructor(initialPetX: number | null, private readonly content: PetLayoutContent) {
     const area = screen.getPrimaryDisplay().workArea;
-    this.layout = petLayout(area, initialPetX ?? defaultPetX(area), content);
+    this.layout = petLayout(area, initialPetX ?? defaultPetX(area, content), content);
     this.geometry = { y: this.layout.window.y, hiddenX: area.x + area.width };
     this.ensureOnScreen();
   }

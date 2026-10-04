@@ -104,6 +104,14 @@ export function rectWithinAny(workAreas: WorkArea[], rect: PetWindowRect): boole
   );
 }
 
+// Место по умолчанию: правый нижний угол рабочей области с отступом, так чтобы
+// слева от ёжика помещались облачко с репликой и карточка.
+export function defaultPetX(workArea: WorkArea, content: PetLayoutContent = {}): number {
+  const petWidth = content.petWidth ?? PET_LAYOUT_DEFAULTS.petWidth;
+  const margin = content.margin ?? PET_LAYOUT_DEFAULTS.margin;
+  return workArea.x + workArea.width - margin - petWidth;
+}
+
 // Положение ёжика, при котором он остаётся в пределах рабочей области.
 export function clampPetX(workArea: WorkArea, petX: number, content: PetLayoutContent = {}): number {
   const petWidth = content.petWidth ?? PET_LAYOUT_DEFAULTS.petWidth;

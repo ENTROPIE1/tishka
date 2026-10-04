@@ -49,13 +49,17 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
     }
     switch (next.state) {
       case 'appear':
+        // Появление — всегда на сохранённом месте, без пробега через экран:
+        // окно встаёт туда, где стоит, и анимацию играет сам персонаж.
         mover.stop();
-        window.setBounds(placement.hiddenBounds());
+        placement.ensureOnScreen();
+        window.setBounds(placement.bounds());
         window.showInactive();
-        mover.to(placement.layout.window.x);
         break;
       case 'leave':
-        mover.to(placement.geometry.hiddenX, () => window.hide());
+        // Уход — тоже на месте: окно не двигается, персонаж уходит сам,
+        // а окно скрывается при переходе в hidden.
+        mover.stop();
         break;
       case 'hidden':
         mover.stop();

@@ -184,3 +184,30 @@ body {
   pointer-events: none;
   user-select: none;
 }
+
+/* Появление и уход — на месте: ёжик поднимается из-за края и опускается за него,
+   окно при этом не двигается по экрану. */
+.character[data-state="appear"] {
+  animation: pet-appear 0.9s ease-out;
+}
+
+.character[data-state="leave"] {
+  animation: pet-leave 0.9s ease-in forwards;
+}
+
+@keyframes pet-appear {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pet-leave {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(48px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .character[data-state="appear"],
+  .character[data-state="leave"] {
+    animation: none;
+  }
+}

@@ -76,7 +76,11 @@ vi.mock('electron', () => {
 });
 
 import { createEventBus } from '../src/core/events';
+import { defaultPetX, petLayout, type WorkArea } from '../src/pet/layout';
 import { createPetWindow } from '../src/main/pet-window';
+
+const AREA: WorkArea = { x: 0, y: 0, width: 1920, height: 1080 };
+const REST_X = petLayout(AREA, defaultPetX(AREA)).window.x;
 
 function config(petMode: boolean): Config {
   return { petMode, pet: { x: null } } as unknown as Config;
@@ -132,6 +136,55 @@ describe('окно-питомец: уход по просьбе', () => {
 
     expect(visibleAfterFirst).toBe(true);
     expect(fake.visible).toBe(true);
+    pet.dispose();
+  });
+});
+
+describe('окно-питомец: место появления и ухода', () => {
+  function create(): ReturnType<typeof createPetWindow> {
+    return createPetWindow({
+      bus: createEventBus(),
+      getConfig: () => config(false),
+      savePetX: async () => undefined
+    });
+  }
+
+  it('по умолчанию — справа; появление, уход и новое появление не сдвигают окно', () => {
+    const pet = create();
+    pet.wake('name');
+
+    expect(fake.visible).toBe(true);
+    expect(fake.bounds.x).toBe(REST_X);
+    expect(REST_X).toBeGreaterThan(AREA.x + AREA.width / 2);
+
+    vi.advanceTimersByTime(1000);
+    expect(fake.bounds.x).toBe(REST_X);
+
+    fake.models.length = 0;
+    pet.leave();
+    expect(fake.bounds.x).toBe(REST_X);
+    vi.advanceTimersByTime(1000);
+    expect(fake.visible).toBe(false);
+
+    pet.wake('click');
+    expect(fake.visible).toBe(true);
+    expect(fake.bounds.x).toBe(REST_X);
+    pet.dispose();
+  });
+
+  it('прогулка (перетаскивание) заканчивается на сохранённом месте', () => {
+    const pet = create();
+    pet.wake('name');
+    pet.dragBy(-160);
+    const dragged = fake.bounds.x;
+    expect(dragged).toBeLessThan(REST_X);
+
+    pet.leave();
+    vi.advanceTimersByTime(1000);
+    expect(fake.visible).toBe(false);
+
+    pet.wake('click');
+    expect(fake.bounds.x).toBe(dragged);
     pet.dispose();
   });
 });

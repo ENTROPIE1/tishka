@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { PET_LAYOUT_DEFAULTS, petLayout, type WorkArea } from '../src/pet/layout';
+import { defaultPetX, PET_LAYOUT_DEFAULTS, petLayout, type WorkArea } from '../src/pet/layout';
 
 const { margin, petWidth, columnWidth: desiredColumn, columnMinWidth, composerHeight } = PET_LAYOUT_DEFAULTS;
-
-function defaultPetX(workArea: WorkArea): number {
-  return workArea.x + workArea.width - margin - petWidth;
-}
 
 describe('petLayout', () => {
   const screen: WorkArea = { x: 0, y: 0, width: 1920, height: 1020 };
@@ -40,6 +36,18 @@ describe('petLayout', () => {
   it('на сверхузкой рабочей области колонка остаётся 260 px', () => {
     const tiny: WorkArea = { x: 0, y: 0, width: 400, height: 800 };
     expect(petLayout(tiny, defaultPetX(tiny)).columnWidth).toBe(columnMinWidth);
+  });
+
+  it('место по умолчанию — справа, с местом слева под облачко и карточку', () => {
+    const petX = defaultPetX(screen);
+    expect(petX).toBe(screen.x + screen.width - margin - petWidth);
+
+    const layout = petLayout(screen, petX);
+    expect(layout.mirrored).toBe(false);
+    expect(layout.columnX).toBeLessThan(layout.petX);
+    expect(layout.window.x).toBeGreaterThanOrEqual(screen.x);
+    expect(layout.window.x + layout.window.width).toBeLessThanOrEqual(screen.x + screen.width);
+    expect(layout.petX + layout.petWidth).toBe(screen.x + screen.width - margin);
   });
 
   it('правый край окна не выходит за рабочую область при любом месте ёжика', () => {
