@@ -1,5 +1,6 @@
 import type { Config, EventBus } from '../core/types';
-import type { TranscribeResult } from './stt-service';
+import type { SttStatus, TranscribeResult } from './stt-service';
+import { NOT_READY_MESSAGE, planToggle } from './talk-toggle';
 import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
 
 export type WakeCommand = 'listen' | 'conversation-on' | 'conversation-off';
@@ -16,6 +17,7 @@ export interface WakeFlowDeps {
   hide(): void;
   onSoonChange?(): void;
   isReady?(): boolean;                 // служба распознавания готова
+  getStatus?(): SttStatus;             // 'starting' — служба поднимается, не ошибка
   isVisible?(surface: TalkSurface): boolean;   // окно ещё на экране: ждать готовности есть смысл
   onWaitingChange?(): void;            // изменилось ожидание готовности службы
   memoryName?(): string | undefined;   // имя человека из памяти для подсказки
@@ -133,10 +135,21 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     deps.onWaitingChange?.();
   }
 
+  // Служба ещё поднимается: щелчок откладывает включение, а не сообщает об ошибке.
+  // Если состояние неизвестно, ждём только обещанный по умолчанию разговор.
+  function isStarting(): boolean {
+    const status = deps.getStatus?.();
+    return status !== undefined ? status === 'starting' : deps.getVoice().talkByDefault;
+  }
+
   // Появление человека: сбрасывает выключенный значок и, если разговор включён
   // по умолчанию, сразу переводит в режим разговора. Уведомление не в счёт.
   function appear(source: 'name' | 'hotkey' | 'click' | 'trigger'): void {
     if (source === 'trigger') {
+      return;
+    }
+    if (source === 'name' && suppressed) {
+      // Реплика в том же появлении: разговор сам не включается до конца появления.
       return;
     }
     suppressed = false;
@@ -159,6 +172,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     // выключает разговор, но не прячет питомца.
     if (hide && surface === 'pet') {
       deps.hide();
+      // Появление закончилось: запрет на автоматическое включение больше не нужен.
+      suppressed = false;
     }
   }
 
@@ -203,7 +218,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     }
     deps.bus.emit({ type: 'listen.start' });
     answering = true;
-    if (!conversation) {
+    if (!conversation && !suppressed) {
       enableConversation();
     }
     void deps.core
@@ -319,20 +334,37 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       reportError(message ?? 'Распознавание речи не настроено');
     },
     toggleConversation(by: TalkSurface = 'pet'): void {
-      if (conversation && owner === by) {
+      const plan = planToggle(
+        {
+          conversation,
+          owner,
+          suppressed,
+          ready: deps.isReady?.() ?? true,
+          starting: isStarting()
+        },
+        by
+      );
+      suppressed = plan.suppressed;
+      if (plan.action === 'disable') {
         disableConversation(false);
-        if (by === 'pet') {
-          suppressed = true;
-        }
-      } else if (waiting === by) {
+        return;
+      }
+      if (waiting === by) {
         // Значок нажали, пока ждали службу: до конца появления не слушаем.
         clearWaiting();
         if (by === 'pet') {
           suppressed = true;
         }
-      } else if (!(by === 'pet' && suppressed)) {
-        requestListen(by);
+        return;
       }
+      if (plan.action === 'not-ready') {
+        // Щелчок не молчит: окно узнаёт причину и остаётся выключенным.
+        reportError(NOT_READY_MESSAGE);
+        deps.sendCommand('conversation-off');
+        return;
+      }
+      // Готово — включить сразу; служба поднимается — дождаться готовности.
+      requestListen(by);
     },
     enableConversation,
     disableConversation,

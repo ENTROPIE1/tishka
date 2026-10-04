@@ -346,3 +346,61 @@ describe('wake-flow: ошибки', () => {
     expect(h.errors).toEqual(['Не слышу микрофон']);
   });
 });
+
+describe('wake-flow: щелчок по микрофону', () => {
+  it('выключение щелчком и повторный щелчок снова включает разговор', () => {
+    const h = makeHarness([]);
+    h.flow.toggleConversation('pet');
+    expect(h.flow.isConversation()).toBe(true);
+    expect(h.flow.conversationOwner()).toBe('pet');
+
+    h.flow.toggleConversation('pet');
+    expect(h.flow.isConversation()).toBe(false);
+
+    h.flow.toggleConversation('pet');
+    expect(h.flow.isConversation()).toBe(true);
+    expect(h.flow.conversationOwner()).toBe('pet');
+  });
+
+  it('после выключения щелчком реплика в том же появлении разговор не включает', async () => {
+    const h = makeHarness(['Тишка, привет'], voice({ talkByDefault: true }));
+    h.bus.emit({ type: 'wake', source: 'click' });
+    expect(h.flow.isConversation()).toBe(true);
+
+    h.flow.toggleConversation('pet');
+    expect(h.flow.isConversation()).toBe(false);
+
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual(['привет']);
+    expect(h.flow.isConversation()).toBe(false);
+  });
+
+  it('после нового появления автоматическое включение снова работает', () => {
+    const h = makeHarness([], voice({ talkByDefault: true }));
+    h.bus.emit({ type: 'wake', source: 'click' });
+    h.flow.toggleConversation('pet');
+    expect(h.flow.isConversation()).toBe(false);
+
+    h.bus.emit({ type: 'wake', source: 'click' });
+    expect(h.flow.isConversation()).toBe(true);
+  });
+
+  it('щелчок ежа при владельце «чат» забирает разговор ежу', () => {
+    const h = makeHarness([]);
+    h.flow.enableConversation('chat');
+    expect(h.flow.conversationOwner()).toBe('chat');
+
+    h.flow.toggleConversation('pet');
+    expect(h.flow.isConversation()).toBe(true);
+    expect(h.flow.conversationOwner()).toBe('pet');
+  });
+
+  it('при неготовой службе щелчок даёт сообщение и остаётся выключенным', () => {
+    const h = makeHarness([], voice(), undefined, false);
+    h.flow.toggleConversation('pet');
+    expect(h.flow.isConversation()).toBe(false);
+    expect(h.errors).toContain('Распознавание речи не настроено');
+    expect(h.commands).toContain('conversation-off');
+  });
+});

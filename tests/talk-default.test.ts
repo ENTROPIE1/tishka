@@ -54,7 +54,7 @@ describe('talkByDefault', () => {
     expect(h.errors).toEqual([]);
   });
 
-  it('выключенный значок молчит до конца появления, затем слушает снова', () => {
+  it('щелчок выключает разговор и снова включает его', () => {
     const h = makeHarness([], TALK);
     h.bus.emit({ type: 'wake', source: 'click' });
     expect(h.flow.isConversation()).toBe(true);
@@ -63,9 +63,6 @@ describe('talkByDefault', () => {
     expect(h.flow.isConversation()).toBe(false);
 
     h.flow.toggleConversation('pet');
-    expect(h.flow.isConversation()).toBe(false);
-
-    h.bus.emit({ type: 'wake', source: 'click' });
     expect(h.flow.isConversation()).toBe(true);
   });
 });

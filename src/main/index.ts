@@ -204,6 +204,7 @@ app.whenReady().then(async () => {
     bus,
     memoryName: () => tishka.memoryName(),
     isReady: () => sttService.status() === 'ready',
+    getStatus: () => sttService.status(),
     // Ожидание готовности имеет смысл, пока окно-питомец ещё на экране.
     isVisible: (surface) => (surface === 'pet' ? (pet?.isVisible() ?? false) : true),
     onWaitingChange: () => {
