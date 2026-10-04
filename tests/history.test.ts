@@ -164,33 +164,133 @@ describe('createHistory', () => {
     history.stop();
   });
 
-  it('addDivider пишет разделитель в список и файл', async () => {
+  it('addDivider пишет разделитель в список и файл после реплики', async () => {
     const file = await tempHistoryPath();
-    const history = createHistory(file, createEventBus(), () => FIXED_NOW);
+    const bus = createEventBus();
+    const history = createHistory(file, bus, () => FIXED_NOW);
     await history.start();
 
+    bus.emit({ type: 'listen.end', text: 'привет' });
     history.addDivider();
 
     const entries = history.list();
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ kind: 'divider', at: FIXED_NOW.toISOString() });
+    expect(entries).toHaveLength(2);
+    expect(entries[1]).toMatchObject({ kind: 'divider', at: FIXED_NOW.toISOString() });
 
     const raw = await readFile(file, 'utf8');
-    expect(JSON.parse(raw.trim())).toMatchObject({ kind: 'divider', at: FIXED_NOW.toISOString() });
+    const lines = raw.trim().split('\n');
+    expect(JSON.parse(lines[lines.length - 1] as string)).toMatchObject({
+      kind: 'divider',
+      at: FIXED_NOW.toISOString()
+    });
+    history.stop();
+  });
+
+  it('addDivider не пишет разделитель, если история пуста или уже кончается разделителем', async () => {
+    const bus = createEventBus();
+    const history = createHistory(await tempHistoryPath(), bus, () => FIXED_NOW);
+    await history.start();
+
+    history.addDivider();
+    history.addDivider();
+    expect(history.list()).toEqual([]);
+
+    bus.emit({ type: 'listen.end', text: 'первый' });
+    history.addDivider();
+    history.addDivider();
+    history.addDivider();
+
+    const dividers = history.list().filter((entry) => entry.kind === 'divider');
+    expect(dividers).toHaveLength(1);
+    history.stop();
+  });
+
+  it('три запуска подряд без реплик оставляют не больше одного разделителя в конце', async () => {
+    const file = await tempHistoryPath();
+    const bus = createEventBus();
+    const history = createHistory(file, bus, () => FIXED_NOW);
+    await history.start();
+
+    bus.emit({ type: 'listen.end', text: 'привет' });
+    bus.emit({ type: 'reply', reply: { say: 'и тебе привет' } });
+
+    history.addDivider();
+    history.addDivider();
+    history.addDivider();
+
+    const entries = history.list();
+    expect(entries.filter((entry) => entry.kind === 'divider')).toHaveLength(1);
+    expect(entries[entries.length - 1]).toMatchObject({ kind: 'divider' });
+    history.stop();
+  });
+
+  it('разделитель, реплика, новый разговор — второй разделитель записан', async () => {
+    const bus = createEventBus();
+    const history = createHistory(await tempHistoryPath(), bus, () => FIXED_NOW);
+    await history.start();
+
+    bus.emit({ type: 'listen.end', text: 'первый' });
+    history.addDivider();
+    bus.emit({ type: 'listen.end', text: 'второй' });
+    history.addDivider();
+
+    const dividers = history.list().filter((entry) => entry.kind === 'divider');
+    expect(dividers).toHaveLength(2);
+    history.stop();
+  });
+
+  it('пять разделителей подряд при чтении схлопываются в один', async () => {
+    const file = await tempHistoryPath();
+    const lines: string[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      lines.push(JSON.stringify({ kind: 'divider', id: `d-${index}`, at: FIXED_NOW.toISOString() }));
+    }
+    await writeFile(file, `${lines.join('\n')}\n`, 'utf8');
+
+    const history = createHistory(file, createEventBus(), () => FIXED_NOW);
+    await history.start();
+
+    const entries = history.list();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: 'divider', id: 'd-4' });
+    history.stop();
+  });
+
+  it('системная запись между разделителями не мешает схлопыванию', async () => {
+    const file = await tempHistoryPath();
+    const dividers = [0, 1, 2].map((index) =>
+      JSON.stringify({ kind: 'divider', id: `d-${index}`, at: FIXED_NOW.toISOString() })
+    );
+    const notice = JSON.stringify({
+      id: 's-1',
+      at: FIXED_NOW.toISOString(),
+      from: 'system',
+      text: 'Напоминание'
+    });
+    await writeFile(file, `${dividers[0]}\n${notice}\n${dividers[1]}\n${dividers[2]}\n`, 'utf8');
+
+    const history = createHistory(file, createEventBus(), () => FIXED_NOW);
+    await history.start();
+
+    const entries = history.list();
+    expect(entries.filter((entry) => entry.kind === 'divider')).toHaveLength(1);
+    expect(entries.find((entry) => entry.kind === 'divider')).toMatchObject({ id: 'd-2' });
     history.stop();
   });
 
   it('разделитель переживает перезапуск', async () => {
     const file = await tempHistoryPath();
-    const first = createHistory(file, createEventBus(), () => FIXED_NOW);
+    const firstBus = createEventBus();
+    const first = createHistory(file, firstBus, () => FIXED_NOW);
     await first.start();
+    firstBus.emit({ type: 'listen.end', text: 'привет' });
     first.addDivider();
     first.stop();
 
     const second = createHistory(file, createEventBus(), () => FIXED_NOW);
     await second.start();
 
-    expect(second.list()[0]).toMatchObject({ kind: 'divider' });
+    expect(second.list().at(-1)).toMatchObject({ kind: 'divider' });
     second.stop();
   });
 

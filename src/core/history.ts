@@ -79,6 +79,41 @@ function parseEntry(line: string): HistoryEntry | undefined {
   return entry;
 }
 
+function isSystemMessage(entry: HistoryEntry | undefined): boolean {
+  return entry !== undefined && entry.kind === 'message' && entry.from === 'system';
+}
+
+// Служебные записи не открывают разговор: при поиске последней «содержательной»
+// записи они пропускаются.
+function lastMeaningful(entries: HistoryEntry[]): HistoryEntry | undefined {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (!isSystemMessage(entry)) {
+      return entry;
+    }
+  }
+  return undefined;
+}
+
+// Подряд идущие разделители (в том числе разделённые служебными записями)
+// при чтении схлопываются в один — последний.
+function collapseDividers(entries: HistoryEntry[]): HistoryEntry[] {
+  const result: HistoryEntry[] = [];
+  for (const entry of entries) {
+    if (entry.kind === 'divider') {
+      let index = result.length - 1;
+      while (index >= 0 && isSystemMessage(result[index])) {
+        index -= 1;
+      }
+      if (index >= 0 && result[index]?.kind === 'divider') {
+        result.splice(index, 1);
+      }
+    }
+    result.push(entry);
+  }
+  return result;
+}
+
 // Записи в файл идут синхронно, чтобы история пережила падение приложения
 // и новый экземпляр всегда видел уже записанные события.
 export function createHistory(filePath: string, events: EventBus, now: () => Date): History {
@@ -148,7 +183,7 @@ export function createHistory(filePath: string, events: EventBus, now: () => Dat
     if (limit <= 0) {
       return [];
     }
-    return entries.slice(-limit);
+    return collapseDividers(entries).slice(-limit);
   }
 
   function search(query: string, limit?: number): HistoryEntry[] {
@@ -156,6 +191,10 @@ export function createHistory(filePath: string, events: EventBus, now: () => Dat
   }
 
   function addDivider(): void {
+    const last = lastMeaningful(entries);
+    if (last === undefined || last.kind === 'divider') {
+      return;
+    }
     append({ kind: 'divider', id: randomUUID(), at: now().toISOString() });
   }
 
