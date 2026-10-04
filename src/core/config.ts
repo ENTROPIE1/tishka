@@ -5,6 +5,7 @@ import type { Config, McpServerConfig } from './types';
 export const CONFIG_FILE = 'config.json';
 
 type FyrLevel = Config['persona']['fyr'];
+type Sensitivity = Config['voice']['sensitivity'];
 
 export function defaultConfig(): Config {
   return {
@@ -18,6 +19,7 @@ export function defaultConfig(): Config {
       wakeWords: ['тишка'],
       wakeEnabled: false,
       talkTimeoutSec: 30,
+      sensitivity: 'normal',
       sttUrl: 'http://127.0.0.1:8178',
       stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
       tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
@@ -61,6 +63,10 @@ function pickVolume(value: unknown, fallback: number): number {
 
 function pickFyr(value: unknown, fallback: FyrLevel): FyrLevel {
   return value === 'off' || value === 'sometimes' || value === 'often' ? value : fallback;
+}
+
+function pickSensitivity(value: unknown, fallback: Sensitivity): Sensitivity {
+  return value === 'low' || value === 'normal' || value === 'high' ? value : fallback;
 }
 
 function pickPetX(value: unknown, fallback: number | null): number | null {
@@ -166,6 +172,7 @@ export function mergeConfig(value: unknown): Config {
       wakeWords: pickStringArray(voice.wakeWords, defaults.voice.wakeWords),
       wakeEnabled: pickBoolean(voice.wakeEnabled, defaults.voice.wakeEnabled),
       talkTimeoutSec: pickNumber(voice.talkTimeoutSec, defaults.voice.talkTimeoutSec),
+      sensitivity: pickSensitivity(voice.sensitivity, defaults.voice.sensitivity),
       sttUrl: pickString(voice.sttUrl, defaults.voice.sttUrl),
       stt: {
         exe: pickString(stt.exe, defaults.voice.stt.exe),

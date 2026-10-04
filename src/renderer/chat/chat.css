@@ -440,7 +440,8 @@ body {
   cursor: default;
 }
 
-.mic-button.recording {
+.mic-button.recording,
+.mic-button.active {
   color: #ffffff;
   background: var(--accent);
   border-color: var(--accent);
@@ -467,6 +468,7 @@ body {
 }
 
 .dictation .level {
+  position: relative;
   flex: 1;
   height: 5px;
   background: var(--surface-soft);
@@ -480,6 +482,16 @@ body {
   height: 100%;
   background: var(--accent);
   transition: width 80ms linear;
+}
+
+.dictation .level-mark {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--muted);
+  opacity: 0.6;
 }
 
 .composer-input {

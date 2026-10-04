@@ -6,7 +6,7 @@ import { createEventBus } from '../src/core/events';
 import { createMemoryStore, type MemoryStore } from '../src/core/memory/store';
 import { registerMemoryTools } from '../src/core/memory/tools';
 import { createToolRegistry } from '../src/core/tools/registry';
-import type { ToolRegistry } from '../src/core/types';
+import type { TishkaEvent, ToolRegistry } from '../src/core/types';
 
 let dir: string;
 let store: MemoryStore;
@@ -63,6 +63,18 @@ describe('registerMemoryTools', () => {
 
     expect(result.ok).toBe(true);
     expect(result.content).toContain('anna@example.ru');
+  });
+
+  it('memory_save порождает событие memory.changed', async () => {
+    const bus = createEventBus();
+    const events: TishkaEvent[] = [];
+    bus.on((event) => events.push(event));
+    const withEvents = createToolRegistry(bus);
+    registerMemoryTools(withEvents, store, bus);
+
+    await withEvents.call('memory_save', { items: [{ text: 'Имя: Эвелина', tags: ['имя'] }] });
+
+    expect(events.some((event) => event.type === 'memory.changed')).toBe(true);
   });
 
   it('memory_update, memory_forget и memory_confirm работают по идентификатору', async () => {

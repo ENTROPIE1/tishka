@@ -8,6 +8,7 @@ function voice(): Config['voice'] {
     wakeWords: ['тишка'],
     wakeEnabled: false,
     talkTimeoutSec: 30,
+    sensitivity: 'normal',
     sttUrl: 'http://127.0.0.1:8178',
     stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
     tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }

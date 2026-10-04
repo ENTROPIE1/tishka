@@ -32,11 +32,15 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
 
   function broadcast(): void {
     const voice = deps.getVoice();
-    listening = !busy && deps.isReady() && (voice.wakeEnabled || deps.flow.isConversation());
+    // Режимом владеет одно окно: пока разговор ведёт чат, питомец не слушает.
+    const mine = deps.flow.conversationOwner() === 'pet';
+    const idle = deps.flow.conversationOwner() === null;
+    listening = !busy && deps.isReady() && (idle ? voice.wakeEnabled : mine);
     deps.pet.wakeState({
       active: listening,
-      conversation: deps.flow.isConversation(),
-      soon: deps.flow.isLeavingSoon()
+      conversation: mine,
+      soon: mine && deps.flow.isLeavingSoon(),
+      sensitivity: voice.sensitivity
     });
   }
 

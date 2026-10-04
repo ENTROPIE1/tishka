@@ -6,7 +6,7 @@ import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { Config, TishkaEvent } from '../core/types';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
-import type { WakeState } from '../voice/wake';
+import type { ChatTalkState, WakeState } from '../voice/wake';
 import type { SpeakMessage } from '../voice/speech-queue';
 import type { TtsHealth } from '../voice/tts-client';
 import type { TranscribeResult } from '../voice/stt-service';
@@ -18,6 +18,11 @@ import type {
   VoiceStateView
 } from './ipc-settings';
 import {
+  CHAT_TALK_ESCAPE_CHANNEL,
+  CHAT_TALK_KEYBOARD_CHANNEL,
+  CHAT_TALK_PHRASE_CHANNEL,
+  CHAT_TALK_STATE_CHANNEL,
+  CHAT_TALK_TOGGLE_CHANNEL,
   CONFIG_CHANGED_CHANNEL,
   CONFIG_GET_CHANNEL,
   CONFIG_SAVE_CHANNEL,
@@ -177,6 +182,29 @@ const api = {
   },
   openChat(): Promise<void> {
     return ipcRenderer.invoke(OPEN_CHAT_CHANNEL);
+  },
+  chatTalk: {
+    toggle(): void {
+      ipcRenderer.send(CHAT_TALK_TOGGLE_CHANNEL);
+    },
+    phrase(wav: Uint8Array): void {
+      ipcRenderer.send(CHAT_TALK_PHRASE_CHANNEL, wav);
+    },
+    escape(): void {
+      ipcRenderer.send(CHAT_TALK_ESCAPE_CHANNEL);
+    },
+    keyboard(): void {
+      ipcRenderer.send(CHAT_TALK_KEYBOARD_CHANNEL);
+    },
+    onState(listener: (state: ChatTalkState) => void): () => void {
+      const handler = (_event: Electron.IpcRendererEvent, state: ChatTalkState): void => {
+        listener(state);
+      };
+      ipcRenderer.on(CHAT_TALK_STATE_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(CHAT_TALK_STATE_CHANNEL, handler);
+      };
+    }
   },
   onPetModel(listener: (model: PetModel) => void): () => void {
     const handler = (_event: Electron.IpcRendererEvent, model: PetModel): void => {

@@ -50,6 +50,7 @@ export interface TishkaCore {
   clearHistory(): Promise<void>;
   memory(): MemoryRecord[];
   memorySearch(query: string): MemoryRecord[];
+  memoryName(): string | undefined;   // текст записи с меткой «имя»
   memoryUpdate(id: string, patch: UpdateMemoryPatch): Promise<MemoryRecord | undefined>;
   memoryRemove(id: string): Promise<boolean>;
   memoryClear(): Promise<void>;
@@ -214,7 +215,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     });
     await memoryStore.load();
     memory = memoryStore;
-    registerMemoryTools(registry, memoryStore);
+    registerMemoryTools(registry, memoryStore, deps.events);
 
     const llm = createLlmClient({
       baseUrl: config.llm.baseUrl,
@@ -320,10 +321,27 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     clearHistory: () => historyStore.clear(),
     memory: () => memory?.list() ?? [],
     memorySearch: (query: string) => memory?.search(query) ?? [],
-    memoryUpdate: (id: string, patch: UpdateMemoryPatch) =>
-      memory === undefined ? Promise.resolve(undefined) : memory.update(id, patch),
-    memoryRemove: (id: string) =>
-      memory === undefined ? Promise.resolve(false) : memory.remove(id),
-    memoryClear: () => (memory === undefined ? Promise.resolve() : memory.clear())
+    memoryName: () =>
+      memory?.list().find((record) => record.tags.some((tag) => tag.trim().toLowerCase() === 'имя'))?.text,
+    memoryUpdate: async (id: string, patch: UpdateMemoryPatch) => {
+      const record = memory === undefined ? undefined : await memory.update(id, patch);
+      if (record !== undefined) {
+        deps.events.emit({ type: 'memory.changed' });
+      }
+      return record;
+    },
+    memoryRemove: async (id: string) => {
+      const removed = memory === undefined ? false : await memory.remove(id);
+      if (removed) {
+        deps.events.emit({ type: 'memory.changed' });
+      }
+      return removed;
+    },
+    memoryClear: async () => {
+      if (memory !== undefined) {
+        await memory.clear();
+        deps.events.emit({ type: 'memory.changed' });
+      }
+    }
   };
 }

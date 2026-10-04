@@ -9,10 +9,10 @@ function screen(id: string): HTMLElement {
   return node;
 }
 
-// Собирает навигацию окна: экраны чата и настроек, полосу слева и переходы
-// из главного процесса.
+// Собирает навигацию окна: экраны чата и настроек, полосу слева, переходы
+// из главного процесса и перечитывание данных при показе экрана.
 export function initAppShell(): Shell {
-  mountSettingsScreens();
+  const sections = mountSettingsScreens();
   const screens: Record<ScreenName, HTMLElement> = {
     chat: screen('screen-chat'),
     connections: screen('screen-connections'),
@@ -23,6 +23,7 @@ export function initAppShell(): Shell {
   return createShell({
     screens,
     nav: screen('nav'),
-    subscribe: (listener) => window.tishka.onNavigate(listener)
+    subscribe: (listener) => window.tishka.onNavigate(listener),
+    onShow: (name) => sections[name]?.refresh()
   });
 }

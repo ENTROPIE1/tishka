@@ -17,6 +17,21 @@ export function clear(node: HTMLElement): void {
   node.replaceChildren();
 }
 
+export interface SettingsSection {
+  refresh(): void;
+}
+
+// Несколько разделов на одном экране обновляются вместе.
+export function combineSections(sections: SettingsSection[]): SettingsSection {
+  return {
+    refresh(): void {
+      for (const section of sections) {
+        section.refresh();
+      }
+    }
+  };
+}
+
 export function sectionTitle(text: string): HTMLElement {
   return el('h2', 'section-title', text);
 }

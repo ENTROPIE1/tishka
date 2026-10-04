@@ -1,7 +1,6 @@
-import { createMicButton } from '../shared/mic-button';
-import { insertAtCursor } from '../shared/text-insert';
 import { createChatFeed } from './feed';
 import { initAppShell } from './navigation';
+import { createTalkMode, type TalkMode } from './talk-mode';
 import { mountChatToolbar } from './toolbar';
 
 const feed = document.getElementById('feed') as HTMLElement;
@@ -15,9 +14,11 @@ const noKeyBanner = document.getElementById('no-key') as HTMLElement;
 const micSlot = document.getElementById('mic-slot') as HTMLElement;
 const dictation = document.getElementById('dictation') as HTMLElement;
 const dictationLevel = document.getElementById('dictation-level') as HTMLElement;
+const dictationLabel = dictation.querySelector('.dictation-label') as HTMLElement;
 const keyDot = document.getElementById('key-dot') as HTMLElement;
 
 const view = createChatFeed(feed);
+let talkMode: TalkMode | undefined;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -41,6 +42,7 @@ function send(): void {
   window.tishka.sendUserText(text);
   input.value = '';
   input.focus();
+  talkMode?.keyboard();
 }
 
 function initEvents(): void {
@@ -112,26 +114,13 @@ function initComposer(): void {
   });
 }
 
-// Диктовка в поле ввода: текст вставляется в место курсора и не отправляется сам.
-function initDictation(): void {
-  const mic = createMicButton({
-    onText: (text) => {
-      insertAtCursor(input, text);
-    },
-    onLevel: (level) => {
-      dictationLevel.style.width = `${Math.round(level * 100)}%`;
-    },
-    onListeningChange: (listening) => {
-      dictation.hidden = !listening;
-      if (!listening) {
-        dictationLevel.style.width = '0%';
-      }
-    },
-    onError: (message) => {
-      setStatus(message);
-    }
-  });
-  micSlot.append(mic.element);
+// Кнопка микрофона — переключатель режима разговора, как в окне-питомце.
+function initTalkMode(): void {
+  talkMode = createTalkMode(
+    { level: dictation, levelFill: dictationLevel, label: dictationLabel },
+    (message) => setStatus(message)
+  );
+  micSlot.append(talkMode.button);
 }
 
 function initClearButton(): void {
@@ -185,7 +174,7 @@ initAppShell();
 initEvents();
 initFeed();
 initComposer();
-initDictation();
+initTalkMode();
 initClearButton();
 mountChatToolbar({ feed: view, reload: reloadFeed, loadAll: () => window.tishka.history(2000) });
 initSettingsButtons();

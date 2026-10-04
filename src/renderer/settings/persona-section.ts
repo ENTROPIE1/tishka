@@ -1,5 +1,5 @@
 import type { Config } from '../../core/types';
-import { button, clear, el, field, runWithFeedback, sectionTitle, selectInput } from './dom';
+import { button, clear, el, field, runWithFeedback, sectionTitle, selectInput, type SettingsSection } from './dom';
 
 type FyrLevel = Config['persona']['fyr'];
 
@@ -11,7 +11,7 @@ const FYR_OPTIONS: Array<{ value: FyrLevel; label: string }> = [
   { value: 'often', label: 'Часто' }
 ];
 
-export function mountPersonaSection(root: HTMLElement): void {
+export function mountPersonaSection(root: HTMLElement): SettingsSection {
   clear(root);
   root.append(sectionTitle('Характер'));
 
@@ -57,4 +57,6 @@ export function mountPersonaSection(root: HTMLElement): void {
   });
 
   void refresh();
+
+  return { refresh: () => void refresh() };
 }

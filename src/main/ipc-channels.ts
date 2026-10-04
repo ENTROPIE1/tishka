@@ -50,6 +50,12 @@ export const PET_SPEAK_CHANNEL = 'tishka:pet:speak';
 export const PET_SPEAK_STOP_CHANNEL = 'tishka:pet:speak-stop';
 export const PET_SPEAK_DONE_CHANNEL = 'tishka:pet:speak-done';
 
+export const CHAT_TALK_TOGGLE_CHANNEL = 'tishka:chat:talk-toggle';
+export const CHAT_TALK_PHRASE_CHANNEL = 'tishka:chat:talk-phrase';
+export const CHAT_TALK_ESCAPE_CHANNEL = 'tishka:chat:talk-escape';
+export const CHAT_TALK_KEYBOARD_CHANNEL = 'tishka:chat:talk-keyboard';
+export const CHAT_TALK_STATE_CHANNEL = 'tishka:chat:talk-state';
+
 export const VOICE_STATUS_CHANNEL = 'tishka:voice:status';
 export const VOICE_CHECK_CHANNEL = 'tishka:voice:check';
 export const VOICE_APPLY_CHANNEL = 'tishka:voice:apply';

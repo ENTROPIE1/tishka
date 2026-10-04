@@ -33,6 +33,27 @@ export function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array
   return new Uint8Array(buffer);
 }
 
+// Выравнивание громкости: пик приводится к цели одним общим коэффициентом.
+// Тишина (пик ниже 0,001) не усиливается — иначе шум станет речью.
+export function normalizePeak(samples: Float32Array, target = 0.9, maxGain = 20): Float32Array {
+  let peak = 0;
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = Math.abs(samples[i]);
+    if (value > peak) {
+      peak = value;
+    }
+  }
+  if (peak < 0.001) {
+    return samples.slice();
+  }
+  const gain = Math.min(target / peak, maxGain);
+  const result = new Float32Array(samples.length);
+  for (let i = 0; i < samples.length; i += 1) {
+    result[i] = samples[i] * gain;
+  }
+  return result;
+}
+
 // Приведение частоты линейной интерполяцией, по умолчанию к 16 000 Гц.
 export function resample(samples: Float32Array, from: number, to: number): Float32Array {
   if (samples.length === 0 || from === to) {

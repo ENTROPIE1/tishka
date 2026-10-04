@@ -8,6 +8,7 @@ import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
 import { createSttService, type SttService } from '../voice/stt-service';
 import { openMainWindow } from './chat-window';
+import { registerChatTalk, type ChatTalk } from './chat-talk';
 import { OPEN_CHAT_CHANNEL, PET_SPEAK_DONE_CHANNEL } from './ipc-channels';
 import { registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
@@ -32,6 +33,7 @@ let hotkeys: HotkeyRegistrar | undefined;
 let petWake: PetWake | undefined;
 let speech: SpeechOutput | undefined;
 let speechDone: (() => void) | undefined;
+let chatTalk: ChatTalk | undefined;
 
 // Второй запуск не создаёт копию, а поднимает окно чата работающего приложения.
 const singleInstance = app.requestSingleInstanceLock();
@@ -89,6 +91,7 @@ app.whenReady().then(async () => {
         void stt.start().catch(() => undefined);
       }
       petWake?.broadcast();
+      chatTalk?.broadcast();
       tray?.refresh();
     }
   });
@@ -149,15 +152,20 @@ app.whenReady().then(async () => {
     stt: sttService,
     core: tishka,
     bus,
+    memoryName: () => tishka.memoryName(),
     sendCommand: (command) => {
       if (command === 'listen') {
         pet?.listenCommand('start');
       }
       petWake?.broadcast();
+      chatTalk?.broadcast();
       tray?.refresh();
     },
     hide: () => pet?.hide(),
-    onSoonChange: () => petWake?.broadcast()
+    onSoonChange: () => {
+      petWake?.broadcast();
+      chatTalk?.broadcast();
+    }
   });
   petWake = registerPetWake({
     pet,
@@ -187,6 +195,17 @@ app.whenReady().then(async () => {
     quit: () => app.quit()
   });
 
+  chatTalk = registerChatTalk({
+    flow: wakeFlow,
+    bus,
+    getVoice: () => tishka.config().voice,
+    isReady: () => sttService.status() === 'ready',
+    onChange: () => {
+      petWake?.broadcast();
+      tray?.refresh();
+    }
+  });
+
   // Горячая клавиша включает режим разговора, повторное нажатие — выключает.
   function toggleConversationByHotkey(): void {
     if (!wakeFlow.isConversation()) {
@@ -194,6 +213,7 @@ app.whenReady().then(async () => {
     }
     wakeFlow.toggleConversation();
     petWake?.broadcast();
+    chatTalk?.broadcast();
     tray?.refresh();
   }
 
@@ -206,7 +226,12 @@ app.whenReady().then(async () => {
   });
 
   // Служба распознавания поднимается в фоне, чтобы не задерживать окна.
-  void sttService.start().then(() => petWake?.broadcast()).catch(() => undefined);
+  void sttService.start()
+    .then(() => {
+      petWake?.broadcast();
+      chatTalk?.broadcast();
+    })
+    .catch(() => undefined);
 
   openStartupWindow();
 
@@ -236,6 +261,7 @@ app.on('will-quit', () => {
   stt?.stop();
   petWake?.dispose();
   speech?.dispose();
+  chatTalk?.dispose();
   pet?.dispose();
   tray?.destroy();
   void core?.stop();

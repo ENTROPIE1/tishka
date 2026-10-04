@@ -62,6 +62,21 @@ describe('wakePrompt', () => {
     expect(h.prompts).toEqual(['Разговор с помощником по имени ёжик.']);
     expect(h.calls).toEqual(['открой доску']);
   });
+
+  it('имя человека из памяти добавляется после основной фразы', () => {
+    const base = wakePrompt(['тишка']);
+    const withName = wakePrompt(['тишка'], 'Эвелина');
+    expect(withName.startsWith(base)).toBe(true);
+    expect(withName).toContain('Эвелина');
+    expect(withName.length - base.length).toBeLessThanOrEqual(101);
+  });
+
+  it('имя из памяти длиннее предела обрезается до 100 символов', () => {
+    const base = wakePrompt(['тишка']);
+    const prompt = wakePrompt(['тишка'], 'я'.repeat(300));
+    expect(prompt.endsWith('я'.repeat(100))).toBe(true);
+    expect(prompt.length).toBeLessThanOrEqual(base.length + 1 + 100);
+  });
 });
 
 describe('isDismiss', () => {
@@ -243,6 +258,55 @@ describe('wake-flow: режим разговора', () => {
     h.flow.handlePhrase(wav);
     await flush();
     expect(h.flow.isLeavingSoon()).toBe(false);
+  });
+});
+
+describe('wake-flow: окно чата', () => {
+  it('две фразы подряд в чате уходят без нажатий', async () => {
+    const h = makeHarness(['раз', 'два']);
+    h.flow.enableConversation('chat');
+    expect(h.flow.conversationOwner()).toBe('chat');
+    h.flow.handlePhrase(wav);
+    await flush();
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual(['раз', 'два']);
+  });
+
+  it('тишина дольше срока выключает режим чата', async () => {
+    const h = makeHarness(['раз']);
+    h.flow.enableConversation('chat');
+    h.flow.handlePhrase(wav);
+    await flush();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(h.flow.isConversation()).toBe(false);
+    expect(h.flow.conversationOwner()).toBeNull();
+  });
+
+  it('«уходи» выключает чат и не уходит в модель', async () => {
+    const h = makeHarness(['уходи']);
+    h.flow.enableConversation('chat');
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual([]);
+    expect(h.flow.isConversation()).toBe(false);
+  });
+
+  it('включение в чате выключает режим в окне-питомце', () => {
+    const h = makeHarness([]);
+    h.flow.enableConversation('pet');
+    expect(h.flow.conversationOwner()).toBe('pet');
+    h.flow.toggleConversation('chat');
+    expect(h.flow.conversationOwner()).toBe('chat');
+    expect(h.flow.isConversation()).toBe(true);
+  });
+
+  it('повторное нажатие в чате выключает разговор', () => {
+    const h = makeHarness([]);
+    h.flow.toggleConversation('chat');
+    expect(h.flow.isConversation()).toBe(true);
+    h.flow.toggleConversation('chat');
+    expect(h.flow.isConversation()).toBe(false);
   });
 });
 

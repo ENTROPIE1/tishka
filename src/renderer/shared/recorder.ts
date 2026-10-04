@@ -1,13 +1,23 @@
 import type { ListenResult } from '../../voice/listen';
-import { createVad, type Vad } from '../../voice/vad';
-import { encodeWav, resample } from '../../voice/wav';
+import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
+import { encodeWav, normalizePeak, resample } from '../../voice/wav';
 
-const PROCESSOR_BUFFER = 4096;
+const PROCESSOR_BUFFER = 1024;
 const TARGET_RATE = 16000;
+
+const MIC_CONSTRAINTS: MediaStreamConstraints = {
+  audio: {
+    autoGainControl: true,
+    noiseSuppression: true,
+    echoCancellation: true,
+    channelCount: 1
+  }
+};
 
 export interface RecorderOptions {
   onLevel(level: number): void;
   onResult(result: ListenResult): void;
+  sensitivity?: VadSensitivity;
   getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   makeVad?: () => Vad;
   targetRate?: number;
@@ -32,7 +42,7 @@ function stopTracks(stream: MediaStream | undefined): void {
 export function createRecorder(options: RecorderOptions): Recorder {
   const getUserMedia =
     options.getUserMedia ?? ((constraints: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(constraints));
-  const makeVad = options.makeVad ?? (() => createVad());
+  const makeVad = options.makeVad ?? (() => createVad({ sensitivity: options.sensitivity }));
   const targetRate = options.targetRate ?? TARGET_RATE;
 
   let stream: MediaStream | undefined;
@@ -70,6 +80,7 @@ export function createRecorder(options: RecorderOptions): Recorder {
   function finalize(): void {
     const collected = chunks;
     const rate = sourceRate;
+    const activeVad = vad;
     teardown();
     reset();
     if (collected.length === 0) {
@@ -86,7 +97,9 @@ export function createRecorder(options: RecorderOptions): Recorder {
       merged.set(part, offset);
       offset += part.length;
     }
-    const resampled = resample(merged, rate, targetRate);
+    const trimmed = activeVad === undefined ? merged : activeVad.result(merged, rate);
+    const normalized = normalizePeak(trimmed);
+    const resampled = resample(normalized, rate, targetRate);
     options.onResult({ kind: 'wav', data: encodeWav(resampled, targetRate) });
   }
 
@@ -122,7 +135,7 @@ export function createRecorder(options: RecorderOptions): Recorder {
     starting = true;
     let media: MediaStream;
     try {
-      media = await getUserMedia({ audio: true });
+      media = await getUserMedia(MIC_CONSTRAINTS);
     } catch {
       starting = false;
       options.onResult({ kind: 'error', message: 'Нет доступа к микрофону' });
