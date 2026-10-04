@@ -17,6 +17,7 @@ export interface PetWindowDeps {
   bus: EventBus;
   getConfig: () => Config;
   savePetX: (x: number | null) => Promise<void>;
+  onReload?: () => void;
 }
 
 export interface PetWindow {
@@ -197,6 +198,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
       applyModel({ state: 'leave', since: Date.now(), queue: [] });
     },
     reload(): void {
+      deps.onReload?.();
       if (!window.isDestroyed()) {
         window.webContents.reload();
       }

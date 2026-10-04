@@ -314,8 +314,8 @@ const api = {
     wakeError(message: string): void {
       ipcRenderer.send(PET_WAKE_ERROR_CHANNEL, message);
     },
-    speakDone(): void {
-      ipcRenderer.send(PET_SPEAK_DONE_CHANNEL);
+    speakDone(id?: number): void {
+      ipcRenderer.send(PET_SPEAK_DONE_CHANNEL, id);
     },
     onSpeak(listener: (message: SpeakMessage) => void): () => void {
       const handler = (_event: Electron.IpcRendererEvent, message: SpeakMessage): void => {

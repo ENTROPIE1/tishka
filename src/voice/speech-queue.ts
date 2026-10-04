@@ -6,6 +6,7 @@ export interface SpeechItem {
 export interface SpeakMessage {
   wav: Uint8Array;
   volume: number;
+  id?: number;
 }
 
 export interface SpeechQueueDeps {
