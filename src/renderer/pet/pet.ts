@@ -2,34 +2,22 @@ import type { PetModel, PetState } from '../../pet/state';
 import { clipForState, type Character } from './character';
 import { createCharacter } from './character-factory';
 import { createComposer } from './composer';
+import { applyPetLayout } from './layout-view';
 import { createListenUi } from './listen-ui';
 import { createPetCard } from './pet-card';
 import { createSpeaker } from './speaker';
 import { createWakeListener } from './wake-listener';
 
+const pet = document.getElementById('pet') as HTMLElement;
 const bubble = document.getElementById('bubble') as HTMLElement;
 const say = document.getElementById('say') as HTMLElement;
 const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
-const stateLabel = document.getElementById('state') as HTMLElement;
 const composerHost = document.getElementById('composer-host') as HTMLElement;
 const characterModel: Character = createCharacter('svg');
 
-const STATE_LABELS: Record<PetState, string> = {
-  hidden: 'спит за краем',
-  appear: 'выходит',
-  idle: 'ждёт',
-  listening: 'слушает',
-  thinking: 'думает',
-  working: 'работает',
-  talking: 'говорит',
-  notify: 'замечает',
-  happy: 'радуется',
-  confused: 'не понял',
-  leave: 'уходит',
-  sleep: 'спит'
-};
-
+let mirrored = false;
+let currentState: PetState = 'hidden';
 let interactive = false;
 let dragging = false;
 let dragMoved = false;
@@ -90,14 +78,23 @@ function applyComposer(state: PetState, visible: boolean): void {
   }
 }
 
+// Ёжик смотрит на колонку ответов: в обычной раскладке — влево, в зеркальной —
+// вправо. Во время появления и ухода направление движения прежнее.
+function applyFlip(): void {
+  const { flip } = clipForState(currentState);
+  const moving = currentState === 'appear' || currentState === 'leave';
+  characterModel.setFlip(moving ? flip : !mirrored);
+}
+
 function renderModel(model: PetModel): void {
-  stateLabel.textContent = STATE_LABELS[model.state];
+  currentState = model.state;
+  character.dataset.state = model.state;
   say.textContent = listen.say(model.say, model.state);
   petCard.render(model);
 
-  const { clip, flip } = clipForState(model.state);
+  const { clip } = clipForState(model.state);
   characterModel.setClip(clip);
-  characterModel.setFlip(flip);
+  applyFlip();
 
   const visible = isOnScreen(model.state);
   applyComposer(model.state, visible);
@@ -188,6 +185,11 @@ window.tishka.onEvent((event) => {
   }
 });
 window.tishka.pet.setInteractive(false);
+window.tishka.pet.onLayout((layout) => {
+  mirrored = layout.mirrored;
+  applyPetLayout(pet, layout);
+  applyFlip();
+});
 window.tishka.pet.onSpeak((message) => speaker.play(message));
 window.tishka.pet.onSpeakStop(() => speaker.stop());
 void characterModel.mount(character).catch(() => undefined);

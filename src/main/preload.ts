@@ -7,6 +7,7 @@ import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { PresetInfo } from '../core/skills/presets';
 import type { SkillOverview } from '../core/skills/overview';
 import type { Config, Reply, Skill, TishkaEvent } from '../core/types';
+import type { PetLayoutView } from '../pet/layout';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
 import type { ChatTalkState, WakeState } from '../voice/wake';
@@ -58,6 +59,7 @@ import {
   PET_DRAG_END_CHANNEL,
   PET_FOCUS_CHANNEL,
   PET_INTERACTIVE_CHANNEL,
+  PET_LAYOUT_CHANNEL,
   PET_LISTEN_COMMAND_CHANNEL,
   PET_LISTEN_RESULT_CHANNEL,
   PET_LISTEN_TOGGLE_CHANNEL,
@@ -271,6 +273,15 @@ const api = {
     },
     setBusy(busy: boolean): void {
       ipcRenderer.send(PET_BUSY_CHANNEL, busy);
+    },
+    onLayout(listener: (layout: PetLayoutView) => void): () => void {
+      const handler = (_event: Electron.IpcRendererEvent, layout: PetLayoutView): void => {
+        listener(layout);
+      };
+      ipcRenderer.on(PET_LAYOUT_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_LAYOUT_CHANNEL, handler);
+      };
     },
     dragBy(deltaX: number): void {
       ipcRenderer.send(PET_DRAG_CHANNEL, deltaX);

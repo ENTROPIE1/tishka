@@ -1,19 +1,16 @@
 import { BrowserWindow, screen } from 'electron';
 import { join } from 'node:path';
 import type { Config, EventBus } from '../core/types';
+import { PET_LAYOUT_DEFAULTS, petLayout, type PetLayoutContent } from '../pet/layout';
 import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
 import type { ListenCommand } from '../voice/listen';
 import type { WakeState } from '../voice/wake';
 import type { SpeakMessage } from '../voice/speech-queue';
-import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
-import { Mover, clamp, type Geometry } from './pet-motion';
+import { PET_LAYOUT_CHANNEL, PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
+import { Mover, type Geometry } from './pet-motion';
 
-const WIDTH = 440;
-const CONTENT_HEIGHT = 820;
-const COMPOSER_HEIGHT = 64;
-const HEIGHT = CONTENT_HEIGHT + COMPOSER_HEIGHT;
+const CONTENT: PetLayoutContent = {};
 const TICK_MS = 250;
-const MIN_VISIBLE = 80;
 
 export interface PetWindowDeps {
   bus: EventBus;
@@ -39,17 +36,13 @@ export interface PetWindow {
 
 export function createPetWindow(deps: PetWindowDeps): PetWindow {
   const workArea = screen.getPrimaryDisplay().workArea;
-  const geometry: Geometry = {
-    y: workArea.y + workArea.height - HEIGHT,
-    hiddenX: workArea.x + workArea.width
-  };
-  const minX = workArea.x - WIDTH + MIN_VISIBLE;
-  const maxX = workArea.x + workArea.width - MIN_VISIBLE;
+  const defaultPetX = workArea.x + workArea.width - PET_LAYOUT_DEFAULTS.margin - PET_LAYOUT_DEFAULTS.petWidth;
   const configuredX = deps.getConfig().pet.x;
-  let restX = clamp(configuredX ?? workArea.x + workArea.width - WIDTH, minX, maxX);
+  let layout = petLayout(workArea, configuredX ?? defaultPetX, CONTENT);
+  const geometry: Geometry = { y: layout.window.y, hiddenX: workArea.x + workArea.width };
 
   const window = new BrowserWindow({
-    width: WIDTH, height: HEIGHT, x: geometry.hiddenX, y: geometry.y,
+    width: layout.window.width, height: layout.window.height, x: geometry.hiddenX, y: geometry.y,
     show: false, frame: false, transparent: true, resizable: false,
     alwaysOnTop: true, skipTaskbar: true, hasShadow: false, backgroundColor: '#00000000',
     webPreferences: {
@@ -60,13 +53,11 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   window.setMenu(null);
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setIgnoreMouseEvents(true, { forward: true });
-
   // Запись с микрофона: разрешаем только доступ к медиа, остальное запрещено.
   window.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {
     callback(permission === 'media');
   });
   window.webContents.session.setPermissionCheckHandler((_contents, permission) => permission === 'media');
-
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   if (rendererUrl !== undefined) {
     void window.loadURL(`${rendererUrl}/pet/index.html`);
@@ -84,8 +75,12 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     if (!window.isDestroyed()) window.webContents.send(PET_MODEL_CHANNEL, model);
   }
 
+  function sendLayout(): void {
+    if (!window.isDestroyed()) window.webContents.send(PET_LAYOUT_CHANNEL, { mirrored: layout.mirrored });
+  }
+
   function showAtRest(): void {
-    window.setPosition(restX, geometry.y);
+    window.setPosition(layout.window.x, layout.window.y);
     window.showInactive();
   }
 
@@ -98,7 +93,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
         mover.stop();
         window.setPosition(geometry.hiddenX, geometry.y);
         window.showInactive();
-        mover.to(restX);
+        mover.to(layout.window.x);
         break;
       case 'leave':
         mover.to(geometry.hiddenX, () => window.hide());
@@ -135,7 +130,10 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   tickTimer = setInterval(() => {
     applyModel(onTick(model, Date.now(), { petMode: petMode(), busy }));
   }, TICK_MS);
-  window.webContents.on('did-finish-load', sendModel);
+  window.webContents.on('did-finish-load', () => {
+    sendModel();
+    sendLayout();
+  });
 
   return {
     wake(source): void {
@@ -159,13 +157,14 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
       window.focus();
     },
     dragBy(deltaX): void {
-      if (!window.isDestroyed()) {
-        restX = clamp(window.getBounds().x + deltaX, minX, maxX);
-        window.setPosition(restX, geometry.y);
-      }
+      if (window.isDestroyed()) return;
+      // Двигаем ёжика по экрану; окно и сторона раскладки следуют за ним.
+      layout = petLayout(workArea, layout.petX + deltaX, CONTENT);
+      window.setPosition(layout.window.x, layout.window.y);
+      sendLayout();
     },
     dragEnd(): void {
-      void deps.savePetX(restX);
+      void deps.savePetX(layout.petX);
     },
     listenCommand(command): void {
       if (!window.isDestroyed()) window.webContents.send(PET_LISTEN_COMMAND_CHANNEL, command);

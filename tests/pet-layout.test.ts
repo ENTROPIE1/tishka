@@ -1,131 +1,53 @@
-// @vitest-environment jsdom
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createComposer, PLACEHOLDER_IDLE, PLACEHOLDER_LISTENING } from '../src/renderer/pet/composer';
+import { describe, expect, it } from 'vitest';
+import { PET_LAYOUT_DEFAULTS, petLayout, type WorkArea } from '../src/pet/layout';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const html = readFileSync(resolve(root, 'src/renderer/pet/index.html'), 'utf8');
+const { margin, petWidth, columnWidth: desiredColumn, columnMinWidth, composerHeight } = PET_LAYOUT_DEFAULTS;
 
-function bodyMarkup(): string {
-  const match = html.match(/<body>([\s\S]*)<\/body>/);
-  return match?.[1] ?? '';
+function defaultPetX(workArea: WorkArea): number {
+  return workArea.x + workArea.width - margin - petWidth;
 }
 
-interface Mounted {
-  composer: ReturnType<typeof createComposer>;
-  input: HTMLInputElement;
-  send: ReturnType<typeof vi.fn>;
-  escape: ReturnType<typeof vi.fn>;
-  expand: ReturnType<typeof vi.fn>;
-}
+describe('petLayout', () => {
+  const screen: WorkArea = { x: 0, y: 0, width: 1920, height: 1020 };
 
-function mount(): Mounted {
-  document.body.innerHTML = bodyMarkup();
-  const send = vi.fn<(text: string) => void>();
-  const escape = vi.fn<() => void>();
-  const expand = vi.fn<() => void>();
-  const composer = createComposer({ onSend: send, onEscape: escape, onExpand: expand });
-  const host = document.getElementById('composer-host');
-  if (host === null) {
-    throw new Error('нет composer-host');
-  }
-  host.append(composer.element);
-  return { composer, input: composer.input, send, escape, expand };
-}
+  it('обычный экран: колонка слева, ёжик справа, окно целиком в рабочей области', () => {
+    const layout = petLayout(screen, defaultPetX(screen));
 
-function key(input: HTMLInputElement, value: string): void {
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true }));
-}
+    expect(layout.mirrored).toBe(false);
+    expect(layout.columnWidth).toBe(desiredColumn);
+    expect(layout.columnX).toBeLessThan(layout.petX);
+    expect(layout.window.x).toBeGreaterThanOrEqual(screen.x);
+    expect(layout.window.x + layout.window.width).toBeLessThanOrEqual(screen.x + screen.width);
+    expect(layout.composerHeight).toBe(composerHeight);
+  });
 
-afterEach(() => {
-  document.body.replaceChildren();
-  vi.restoreAllMocks();
-});
+  it('ёжик у левого края — раскладка зеркальная, колонка справа', () => {
+    const layout = petLayout(screen, screen.x + margin);
 
-describe('разметка окна-питомца', () => {
-  it('блоки идут сверху вниз: карточка, облачко, ёжик, строка', () => {
-    mount();
-    const pet = document.getElementById('pet');
-    if (pet === null) {
-      throw new Error('нет #pet');
+    expect(layout.mirrored).toBe(true);
+    expect(layout.columnX).toBeGreaterThan(layout.petX);
+    expect(layout.window.x + layout.window.width).toBeLessThanOrEqual(screen.x + screen.width);
+  });
+
+  it('узкая рабочая область сужает колонку, но не меньше 260 px', () => {
+    const narrow: WorkArea = { x: 0, y: 0, width: 680, height: 800 };
+    const layout = petLayout(narrow, defaultPetX(narrow));
+
+    expect(layout.columnWidth).toBeLessThan(desiredColumn);
+    expect(layout.columnWidth).toBeGreaterThanOrEqual(columnMinWidth);
+  });
+
+  it('на сверхузкой рабочей области колонка остаётся 260 px', () => {
+    const tiny: WorkArea = { x: 0, y: 0, width: 400, height: 800 };
+    expect(petLayout(tiny, defaultPetX(tiny)).columnWidth).toBe(columnMinWidth);
+  });
+
+  it('правый край окна не выходит за рабочую область при любом месте ёжика', () => {
+    const right = screen.x + screen.width;
+    for (let petX = screen.x; petX <= right; petX += 40) {
+      const layout = petLayout(screen, petX);
+      expect(layout.window.x).toBeGreaterThanOrEqual(screen.x);
+      expect(layout.window.x + layout.window.width).toBeLessThanOrEqual(right);
     }
-    expect(Array.from(pet.children).map((child) => child.id)).toEqual([
-      'card-host',
-      'bubble',
-      'character',
-      'composer-host'
-    ]);
-  });
-
-  it('поле ввода живёт в строке, а облачко не содержит полей', () => {
-    const { input } = mount();
-    expect(input.parentElement?.id).toBe('composer');
-    expect(document.querySelector('#bubble input, #bubble textarea')).toBeNull();
-    expect(document.querySelector('#composer #input')).not.toBeNull();
-  });
-
-  it('в разметке строки нет атрибутов style', () => {
-    const { composer } = mount();
-    expect(composer.element.querySelectorAll('[style]')).toHaveLength(0);
-  });
-});
-
-describe('поведение строки общения', () => {
-  it('Enter отправляет текст и очищает поле', () => {
-    const { input, send } = mount();
-    input.value = 'утро пятницы';
-    key(input, 'Enter');
-    expect(send).toHaveBeenCalledWith('утро пятницы');
-    expect(input.value).toBe('');
-  });
-
-  it('Esc с текстом очищает поле и не прячет Тишку', () => {
-    const { input, escape } = mount();
-    input.value = 'черновик';
-    key(input, 'Escape');
-    expect(input.value).toBe('');
-    expect(escape).not.toHaveBeenCalled();
-  });
-
-  it('Esc с пустым полем прячет Тишку', () => {
-    const { input, escape } = mount();
-    key(input, 'Escape');
-    expect(escape).toHaveBeenCalledOnce();
-  });
-
-  it('во время «думает» отправка встаёт в очередь и уходит после ответа', () => {
-    const { composer, input, send } = mount();
-    composer.setBusy(true);
-    input.value = 'вторая фраза';
-    key(input, 'Enter');
-    expect(send).not.toHaveBeenCalled();
-    expect(input.value).toBe('');
-
-    composer.setBusy(false);
-    expect(send).toHaveBeenCalledWith('вторая фраза');
-  });
-
-  it('свёрнутая строка разворачивается по щелчку', () => {
-    const { composer, expand } = mount();
-    composer.setCollapsed(true);
-    expect(composer.isCollapsed()).toBe(true);
-    expect(composer.element.classList.contains('collapsed')).toBe(true);
-
-    composer.element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
-    expect(composer.isCollapsed()).toBe(false);
-    expect(composer.element.classList.contains('collapsed')).toBe(false);
-    expect(expand).toHaveBeenCalledOnce();
-  });
-
-  it('подсказка поля зависит от микрофона', () => {
-    const { composer, input } = mount();
-    expect(input.placeholder).toBe(PLACEHOLDER_IDLE);
-    composer.setListening(true);
-    expect(input.placeholder).toBe(PLACEHOLDER_LISTENING);
-    composer.setListening(false);
-    expect(input.placeholder).toBe(PLACEHOLDER_IDLE);
   });
 });

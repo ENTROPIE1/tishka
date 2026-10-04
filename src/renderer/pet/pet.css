@@ -8,6 +8,8 @@
   --border: #e2e0d9;
   --code-bg: #f0efe9;
   --shadow: 0 2px 10px rgb(0 0 0 / 18%);
+  --pet-gap: 24px;
+  --pet-width: 280px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -46,24 +48,46 @@ body {
   user-select: none;
 }
 
+/* Ёжик справа, ответы и строка ввода слева; строка — во всю ширину снизу. */
 .pet {
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  padding: 0 16px 8px;
+}
+
+.pet-row {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: var(--pet-gap);
+}
+
+.pet.mirrored .pet-row {
+  flex-direction: row-reverse;
+}
+
+.answers {
+  flex: 1 1 auto;
+  min-width: 260px;
+  max-width: 380px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   justify-content: flex-end;
-  gap: 4px;
-  padding: 12px 12px 0;
+  gap: 6px;
 }
 
 .card-host {
+  flex: 0 1 auto;
   width: 100%;
-  max-width: 100%;
-  max-height: 300px;
+  min-height: 0;
+  max-height: 60vh;
   display: flex;
   flex-direction: column;
-  min-height: 0;
   overflow: hidden;
 }
 
@@ -73,10 +97,10 @@ body {
 
 .bubble {
   position: relative;
+  flex: none;
+  align-self: flex-end;
   width: fit-content;
   max-width: 100%;
-  max-height: 55vh;
-  align-self: center;
   display: flex;
   flex-direction: column;
   padding: 10px 12px;
@@ -87,22 +111,33 @@ body {
   overflow-wrap: anywhere;
 }
 
+.pet.mirrored .bubble {
+  align-self: flex-start;
+}
+
+/* Хвостик облачка направлен к ёжику на уровне его мордочки. */
 .bubble::after {
   content: "";
   position: absolute;
-  left: 50%;
-  bottom: -8px;
+  right: -8px;
+  bottom: 42px;
   width: 0;
   height: 0;
-  margin-left: -8px;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-top: 8px solid var(--surface);
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid var(--surface);
+}
+
+.pet.mirrored .bubble::after {
+  right: auto;
+  left: -8px;
+  border-left: 0;
+  border-right: 8px solid var(--surface);
 }
 
 .say {
   width: fit-content;
-  max-width: 300px;
+  max-width: 100%;
   max-height: calc(8 * 1.45em);
   overflow-y: auto;
   white-space: pre-wrap;
@@ -116,25 +151,12 @@ body {
 .character {
   position: relative;
   z-index: 2;
-  width: 200px;
-  height: 200px;
   flex: none;
+  width: var(--pet-width);
+  height: 200px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   background: transparent;
   cursor: grab;
-}
-
-.state-label {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 1px 8px;
-  font-size: 11px;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
-  border-radius: 8px;
-  pointer-events: none;
 }
