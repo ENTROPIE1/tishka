@@ -66,6 +66,8 @@ import {
   PET_LISTEN_RESULT_CHANNEL,
   PET_LISTEN_TOGGLE_CHANNEL,
   PET_MODEL_CHANNEL,
+  PET_POINTER_CHANNEL,
+  PET_FOCUS_INPUT_CHANNEL,
   PET_WAKE_CHANNEL,
   PET_CONVERSATION_TOGGLE_CHANNEL,
   PET_WAKE_ERROR_CHANNEL,
@@ -356,6 +358,24 @@ const api = {
       ipcRenderer.on(PET_LISTEN_COMMAND_CHANNEL, handler);
       return () => {
         ipcRenderer.removeListener(PET_LISTEN_COMMAND_CHANNEL, handler);
+      };
+    },
+    onPointer(listener: (point: { x: number; y: number }) => void): () => void {
+      const handler = (_event: Electron.IpcRendererEvent, point: { x: number; y: number }): void => {
+        listener(point);
+      };
+      ipcRenderer.on(PET_POINTER_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_POINTER_CHANNEL, handler);
+      };
+    },
+    onFocusInput(listener: () => void): () => void {
+      const handler = (): void => {
+        listener();
+      };
+      ipcRenderer.on(PET_FOCUS_INPUT_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_FOCUS_INPUT_CHANNEL, handler);
       };
     }
   },

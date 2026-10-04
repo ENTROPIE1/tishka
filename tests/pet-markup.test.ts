@@ -35,6 +35,7 @@ interface Mounted {
   send: ReturnType<typeof vi.fn>;
   escape: ReturnType<typeof vi.fn>;
   expand: ReturnType<typeof vi.fn>;
+  focus: ReturnType<typeof vi.fn>;
 }
 
 function mount(): Mounted {
@@ -42,9 +43,10 @@ function mount(): Mounted {
   const send = vi.fn<(text: string) => void>();
   const escape = vi.fn<() => void>();
   const expand = vi.fn<() => void>();
-  const composer = createComposer({ onSend: send, onEscape: escape, onExpand: expand });
+  const focus = vi.fn<() => void>();
+  const composer = createComposer({ onSend: send, onEscape: escape, onExpand: expand, onFocus: focus });
   element('composer-host').append(composer.element);
-  return { composer, input: composer.input, send, escape, expand };
+  return { composer, input: composer.input, send, escape, expand, focus };
 }
 
 function key(input: HTMLInputElement, value: string): void {

@@ -14,6 +14,7 @@ export interface ComposerActions {
   onSend(text: string): void;
   onEscape(): void;
   onExpand(): void;
+  onFocus(): void;
 }
 
 export interface Composer {
@@ -143,6 +144,12 @@ export function createComposer(actions: ComposerActions): Composer {
       setCollapsed(false);
       actions.onExpand();
     }
+  });
+
+  // Окно может быть без фокуса даже когда строка видна: любой щелчок по строке
+  // возвращает фокус окну, чтобы набранный текст не терялся.
+  element.addEventListener('pointerdown', () => {
+    actions.onFocus();
   });
 
   return {

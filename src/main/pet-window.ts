@@ -1,42 +1,17 @@
 import { BrowserWindow, screen } from 'electron';
 import { join } from 'node:path';
-import type { Config, EventBus } from '../core/types';
 import { PET_LAYOUT_DEFAULTS, petLayout, type PetLayoutContent } from '../pet/layout';
 import { initialPet, onEvent, onTick, type PetModel } from '../pet/state';
-import type { ListenCommand } from '../voice/listen';
-import type { WakeState } from '../voice/wake';
-import type { SpeakMessage } from '../voice/speech-queue';
 import { PET_LAYOUT_CHANNEL, PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
 import { guardNavigation } from './navigation-guard';
+import { createPetActivation } from './pet-activation';
 import { Mover, type Geometry } from './pet-motion';
+import type { PetWindow, PetWindowDeps } from './pet-window-types';
+
+export type { PetWindow, PetWindowDeps } from './pet-window-types';
 
 const CONTENT: PetLayoutContent = {};
 const TICK_MS = 250;
-
-export interface PetWindowDeps {
-  bus: EventBus;
-  getConfig: () => Config;
-  savePetX: (x: number | null) => Promise<void>;
-  onReload?: () => void;
-}
-
-export interface PetWindow {
-  wake(source: 'name' | 'hotkey' | 'click' | 'trigger'): void;
-  setInteractive(interactive: boolean): void;
-  setBusy(busy: boolean): void;
-  focusWindow(): void;
-  dragBy(deltaX: number): void;
-  dragEnd(): void;
-  listenCommand(command: ListenCommand): void;
-  wakeState(state: WakeState): void;
-  speak(message: SpeakMessage): void;
-  stopSpeaking(): void;
-  hide(): void;
-  show(): void;
-  leave(): void;
-  reload(): void;
-  dispose(): void;
-}
 
 export function createPetWindow(deps: PetWindowDeps): PetWindow {
   const workArea = screen.getPrimaryDisplay().workArea;
@@ -72,9 +47,9 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   }
 
   const mover = new Mover(window, geometry);
+  const activation = createPetActivation(window);
   let model: PetModel = initialPet(Date.now());
   let busy = false;
-  let focusOnAppear = false;
   let tickTimer: NodeJS.Timeout | undefined;
 
   function sendModel(): void {
@@ -88,6 +63,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   function showAtRest(): void {
     window.setPosition(layout.window.x, layout.window.y);
     window.showInactive();
+    activation.sendPointer();
   }
 
   function applyState(previous: PetModel, next: PetModel): void {
@@ -99,7 +75,9 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
         mover.stop();
         window.setPosition(geometry.hiddenX, geometry.y);
         window.showInactive();
-        mover.to(layout.window.x);
+        // Интерактивность считаем по курсору, когда окно встало на место:
+        // в момент показа мышь может уже стоять над строкой ввода.
+        mover.to(layout.window.x, () => activation.sendPointer());
         break;
       case 'leave':
         mover.to(geometry.hiddenX, () => window.hide());
@@ -139,16 +117,16 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
   window.webContents.on('did-finish-load', () => {
     sendModel();
     sendLayout();
+    activation.sendPointer();
   });
 
   return {
     wake(source): void {
       // Фокус окна забирают только вызов по клавише и щелчок;
       // при вызове по имени и уведомлении окно остаётся без фокуса.
-      focusOnAppear = source === 'hotkey' || source === 'click';
       deps.bus.emit({ type: 'wake', source });
-      if (focusOnAppear && !window.isDestroyed() && window.isVisible()) {
-        window.focus();
+      if (source === 'hotkey' || source === 'click') {
+        activation.focus();
       }
     },
     setInteractive(value): void {
@@ -160,7 +138,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     focusWindow(): void {
       if (window.isDestroyed()) return;
       if (!window.isVisible()) showAtRest();
-      window.focus();
+      activation.focus();
     },
     dragBy(deltaX): void {
       if (window.isDestroyed()) return;
@@ -168,6 +146,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
       layout = petLayout(workArea, layout.petX + deltaX, CONTENT);
       window.setPosition(layout.window.x, layout.window.y);
       sendLayout();
+      activation.sendPointer();
     },
     dragEnd(): void {
       void deps.savePetX(layout.petX);
