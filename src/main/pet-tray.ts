@@ -8,6 +8,7 @@ export interface PetTrayDeps {
   wake(): void;
   openChat(): void;
   openSettings(): void;
+  openStand(): void;
   getPetMode(): boolean;
   setPetMode(value: boolean): void;
   quit(): void;
@@ -20,6 +21,7 @@ export function createPetTray(deps: PetTrayDeps): Tray {
   const menu = Menu.buildFromTemplate([
     { label: 'Позвать Тишку', click: () => deps.wake() },
     { label: 'Открыть чат', click: () => deps.openChat() },
+    { label: 'Стенд персонажа', click: () => deps.openStand() },
     { label: 'Подключения', click: () => deps.openSettings() },
     { type: 'separator' },
     {
