@@ -1,5 +1,7 @@
 import { installLinkGuard } from '../shared/links';
 import { timingMark } from '../shared/timing';
+import { SCREEN_LOOK_TOOLS } from '../../core/screen-look';
+import { STOPPED_TITLE } from '../../core/stopped';
 import { createChatFeed } from './feed';
 import { createComposer } from './composer';
 import { initAppShell } from './navigation';
@@ -92,6 +94,13 @@ function initEvents(): void {
       case 'notify':
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;
+      case 'status':
+        // Служебная строка остановки из окна чата живёт только в ленте:
+        // ежа она не поднимает, в историю не пишется.
+        if (event.text === STOPPED_TITLE) {
+          view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.text });
+        }
+        break;
       case 'skill.saved':
         appendSkillSaveCard(view, event);
         break;
@@ -105,10 +114,21 @@ function initEvents(): void {
         break;
       case 'tool.start':
         composer.begin();
+        // Начало просмотра экрана: кнопка с глазом в активном виде.
+        if (SCREEN_LOOK_TOOLS.has(event.tool)) {
+          composer.setLooking(true);
+        }
         setStatus(`Тишка использует инструмент ${event.tool}`);
+        break;
+      case 'tool.end':
+        // Конец просмотра экрана: вид всегда от события ядра, не от кнопки.
+        if (SCREEN_LOOK_TOOLS.has(event.tool)) {
+          composer.setLooking(false);
+        }
         break;
       case 'idle':
         composer.end();
+        composer.setLooking(false);
         clearStatus();
         break;
       default:
@@ -172,6 +192,8 @@ async function refreshKeyState(): Promise<void> {
     const view = await window.tishka.config.get();
     noKeyBanner.hidden = view.gatewayKeySet;
     keyDot.classList.toggle('set', view.gatewayKeySet);
+    // Просмотр экрана выключен в настройках: кнопка с глазом скрыта.
+    composer.setAvailable(view.config.screen.enabled);
   } catch {
     noKeyBanner.hidden = true;
     keyDot.classList.remove('set');

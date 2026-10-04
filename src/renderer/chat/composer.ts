@@ -1,5 +1,6 @@
-// Композер чата: отправка реплик, кнопка «посмотреть на экран» и остановка.
-// Пока Тишка занят, повторная отправка блокируется, а «Отправить» превращается в «Стоп».
+// Композер чата: отправка реплик, кнопка с глазом — переключатель просмотра
+// экрана и остановка. Пока Тишка занят, повторная отправка блокируется,
+// а «Отправить» превращается в «Стоп».
 
 export interface ComposerElements {
   send: HTMLButtonElement;
@@ -21,7 +22,10 @@ export interface ChatComposer {
   escape(): boolean;             // true — нажатие обработано как остановка
   begin(): void;
   end(): void;
+  setLooking(looking: boolean): void;
+  setAvailable(available: boolean): void;
   isBusy(): boolean;
+  isLooking(): boolean;
 }
 
 const SEND_LABEL = 'Отправить';
@@ -35,12 +39,16 @@ function lookText(question: string): string {
 
 export function createComposer(elements: ComposerElements, deps: ComposerDeps): ChatComposer {
   let busy = false;
+  let looking = false;
+  let available = true;   // просмотр экрана разрешён в настройках
 
   function apply(): void {
     elements.send.textContent = busy ? STOP_LABEL : SEND_LABEL;
     elements.send.classList.toggle('stop', busy);
-    elements.screenLook.disabled = busy;
-    elements.screenLook.classList.toggle('busy', busy);
+    // В активном виде кнопка с глазом останавливает, поэтому не гаснет.
+    elements.screenLook.disabled = busy && !looking;
+    elements.screenLook.classList.toggle('active', looking);
+    elements.screenLook.hidden = !available;
   }
 
   // Одинаковое действие второй раз в очередь не ставится: пока Тишка занят,
@@ -67,8 +75,20 @@ export function createComposer(elements: ComposerElements, deps: ComposerDeps): 
   }
 
   function lookAtScreen(): void {
+    // Активный вид: Тишка смотрит на экран, нажатие останавливает просмотр
+    // через существующий канал остановки.
+    if (looking) {
+      deps.stop();
+      return;
+    }
+    // Занят другой работой или просмотр запрещён: запускать нечего.
+    if (busy || !available) {
+      return;
+    }
     const question = elements.input.value.trim();
     if (submit(lookText(question), LOOK_STATUS)) {
+      looking = true;
+      apply();
       elements.input.value = '';
       elements.input.focus();
     }
@@ -109,6 +129,19 @@ export function createComposer(elements: ComposerElements, deps: ComposerDeps): 
         apply();
       }
     },
-    isBusy: () => busy
+    setLooking(value: boolean): void {
+      if (looking !== value) {
+        looking = value;
+        apply();
+      }
+    },
+    setAvailable(value: boolean): void {
+      if (available !== value) {
+        available = value;
+        apply();
+      }
+    },
+    isBusy: () => busy,
+    isLooking: () => looking
   };
 }

@@ -54,6 +54,7 @@ export interface Scenario {
   sendFromComposer(text: string): void;   // отправка текста из строки ежа
   sendFromChat(text: string): void;       // отправка текста из окна чата
   notifyFromSkill(title: string): void;   // уведомление от навыка
+  stopFromChat(): void;                   // остановка из окна чата: строка только в ленте чата
   voiceReady(): void;                     // служба распознавания стала готова
   voiceFailed(message?: string): void;    // служба не поднялась
   wait(ms: number): Promise<void>;        // ход времени
