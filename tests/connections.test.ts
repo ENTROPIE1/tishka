@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  connectionAddress,
   describeConnection,
   planConnection,
   secretName,
@@ -192,8 +193,106 @@ describe('planConnection: ошибки', () => {
     const result = planConnection(draft(), ['exchange', 'weather']);
 
     expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.plan.server.name).toBe('confluence');
+    }
+  });
+});
+
+describe('planConnection: очистка значений', () => {
+  it('обрезает пробелы и переводы строк у адреса и токена до проверки и сохранения', () => {
+    const result = planConnection(
+      draft({
+        fields: { url: '  https://wiki.example.ru \n' },
+        secrets: { token: '  tok-123 \n' }
+      }),
+      []
+    );
+
+    expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.plan.server.name).toBe('confluence');
+    expect(result.plan.server).toMatchObject({
+      env: { CONFLUENCE_URL: 'https://wiki.example.ru' }
+    });
+    expect(result.plan.secretsToSet).toEqual({ CONFLUENCE_TOKEN: 'tok-123' });
+  });
+
+  it('обрезает пробелы у полей и секретов своих серверов', () => {
+    const result = planConnection(
+      draft({
+        template: 'custom-stdio',
+        name: 'weather',
+        fields: { command: '  python ', args: '  -m weather_server ' },
+        secrets: { API_KEY: ' key-789 ' }
+      }),
+      []
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.server).toMatchObject({
+      command: 'python',
+      args: ['-m', 'weather_server']
+    });
+    expect(result.plan.secretsToSet).toEqual({ WEATHER_API_KEY: 'key-789' });
+  });
+});
+
+describe('connectionAddress', () => {
+  it('для Confluence возвращает адрес', () => {
+    const planned = planConnection(draft(), []);
+    if (!planned.ok) throw new Error('план должен собраться');
+
+    expect(connectionAddress(planned.plan.server)).toBe('https://wiki.example.org');
+  });
+
+  it('для Exchange содержит адрес OWA и пользователя', () => {
+    const planned = planConnection(
+      draft({
+        template: 'exchange',
+        fields: { ewsUrl: 'https://ews.example.org', owaUrl: 'https://owa.example.org', user: 'DOM\\user' },
+        secrets: { password: 'pass-456' }
+      }),
+      []
+    );
+    if (!planned.ok) throw new Error('план должен собраться');
+
+    expect(connectionAddress(planned.plan.server)).toBe('https://owa.example.org DOM\\user');
+  });
+
+  it('для своего HTTP-сервера возвращает адрес, для stdio — команду с аргументами', () => {
+    const http = planConnection(
+      draft({ template: 'custom-http', name: 'my-http', fields: { url: 'https://mcp.example.org/rpc' }, secrets: {} }),
+      []
+    );
+    const stdio = planConnection(
+      draft({
+        template: 'custom-stdio',
+        name: 'weather',
+        fields: { command: 'python', args: '-m weather_server --port 8080' },
+        secrets: { API_KEY: 'key-789' }
+      }),
+      []
+    );
+    if (!http.ok || !stdio.ok) throw new Error('планы должны собраться');
+
+    expect(connectionAddress(http.plan.server)).toBe('https://mcp.example.org/rpc');
+    expect(connectionAddress(stdio.plan.server)).toBe('python -m weather_server --port 8080');
+  });
+
+  it('не содержит значений секретов', () => {
+    const secret = 'sekret-password';
+    const planned = planConnection(
+      draft({
+        template: 'exchange',
+        fields: { ewsUrl: 'https://ews.example.org', owaUrl: 'https://owa.example.org', user: 'DOM\\user' },
+        secrets: { password: secret }
+      }),
+      []
+    );
+    if (!planned.ok) throw new Error('план должен собраться');
+
+    expect(connectionAddress(planned.plan.server)).not.toContain(secret);
   });
 });
 

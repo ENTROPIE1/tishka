@@ -122,6 +122,19 @@ function parseMcpServers(value: unknown): McpServerConfig[] {
   return servers;
 }
 
+// Адрес и имена моделей шлюза очищаются от пробелов по краям при загрузке и
+// сохранении настроек.
+export function normalizeConfig(config: Config): Config {
+  return {
+    ...config,
+    llm: {
+      baseUrl: config.llm.baseUrl.trim(),
+      model: config.llm.model.trim(),
+      visionModel: config.llm.visionModel.trim()
+    }
+  };
+}
+
 export function mergeConfig(value: unknown): Config {
   const defaults = defaultConfig();
   if (!isRecord(value)) {
@@ -131,7 +144,7 @@ export function mergeConfig(value: unknown): Config {
   const voice = isRecord(value.voice) ? value.voice : {};
   const persona = isRecord(value.persona) ? value.persona : {};
   const pet = isRecord(value.pet) ? value.pet : {};
-  return {
+  return normalizeConfig({
     llm: {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
       model: pickString(llm.model, defaults.llm.model),
@@ -147,7 +160,7 @@ export function mergeConfig(value: unknown): Config {
     persona: { fyr: pickFyr(persona.fyr, defaults.persona.fyr) },
     pet: { x: pickPetX(pet.x, defaults.pet.x) },
     petMode: pickBoolean(value.petMode, defaults.petMode)
-  };
+  });
 }
 
 export async function loadConfig(dir: string): Promise<Config> {
@@ -163,6 +176,6 @@ export async function saveConfig(dir: string, config: Config): Promise<void> {
   await mkdir(dir, { recursive: true });
   const target = join(dir, CONFIG_FILE);
   const temporary = `${target}.tmp`;
-  await writeFile(temporary, JSON.stringify(config, null, 2), 'utf8');
+  await writeFile(temporary, JSON.stringify(normalizeConfig(config), null, 2), 'utf8');
   await rename(temporary, target);
 }

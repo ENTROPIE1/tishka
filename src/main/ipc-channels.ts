@@ -19,6 +19,7 @@ export const CONNECTIONS_REMOVE_CHANNEL = 'tishka:connections:remove';
 export const CONNECTIONS_STATUS_CHANNEL = 'tishka:connections:status';
 export const CONNECTIONS_RECONNECT_CHANNEL = 'tishka:connections:reconnect';
 export const OPEN_SETTINGS_CHANNEL = 'tishka:open-settings';
+export const CLOSE_SETTINGS_CHANNEL = 'tishka:close-settings';
 export const OPEN_CHAT_CHANNEL = 'tishka:open-chat';
 
 export const PET_MODEL_CHANNEL = 'tishka:pet:model';

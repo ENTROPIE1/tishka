@@ -41,6 +41,25 @@ function fieldValue(fields: Record<string, string>, key: string): string {
   return fields[key] ?? '';
 }
 
+// Пробелы и переводы строк по краям при вставке — частая ошибка, поэтому
+// значения очищаются здесь, до проверки и до сборки сервера.
+function trimRecord(record: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(record)) {
+    result[key] = typeof value === 'string' ? value.trim() : value;
+  }
+  return result;
+}
+
+function cleanDraft(draft: ConnectionDraft): ConnectionDraft {
+  return {
+    template: draft.template,
+    name: typeof draft.name === 'string' ? draft.name.trim() : draft.name,
+    fields: trimRecord(draft.fields),
+    secrets: trimRecord(draft.secrets)
+  };
+}
+
 function addUrlError(errors: string[], value: string, emptyMessage: string): void {
   if (value.length === 0) {
     errors.push(emptyMessage);
@@ -195,19 +214,20 @@ export function planConnection(
   draft: ConnectionDraft,
   existingNames: string[]
 ): { ok: true; plan: ConnectionPlan } | { ok: false; errors: string[] } {
+  const clean = cleanDraft(draft);
   const errors: string[] = [];
-  if (!TEMPLATES.includes(draft.template)) {
+  if (!TEMPLATES.includes(clean.template)) {
     errors.push('Неизвестный шаблон подключения');
   }
-  const nameError = nameErrors(draft, existingNames);
+  const nameError = nameErrors(clean, existingNames);
   if (nameError !== undefined) {
     errors.push(nameError);
   }
-  errors.push(...templateErrors(draft));
+  errors.push(...templateErrors(clean));
   if (errors.length > 0) {
     return { ok: false, errors };
   }
-  return { ok: true, plan: buildServer(draft) };
+  return { ok: true, plan: buildServer(clean) };
 }
 
 function matchesScript(args: string[], script: string): boolean {
@@ -252,4 +272,22 @@ export function describeConnection(server: McpServerConfig): {
     fields: { command: server.command, args: args.join(' ') },
     secretNames: Object.keys(env).filter((key) => isSecretRef(env[key]))
   };
+}
+
+function joinParts(parts: string[]): string {
+  return parts.filter((part) => part.length > 0).join(' ');
+}
+
+// То, по чему человек различает подключения к одной системе. Секреты сюда не
+// попадают: describeConnection возвращает только несекретные поля.
+export function connectionAddress(server: McpServerConfig): string {
+  const described = describeConnection(server);
+  switch (described.template) {
+    case 'exchange':
+      return joinParts([described.fields.owaUrl ?? '', described.fields.user ?? '']);
+    case 'custom-stdio':
+      return joinParts([described.fields.command ?? '', described.fields.args ?? '']);
+    default:
+      return described.fields.url ?? '';
+  }
 }

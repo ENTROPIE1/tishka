@@ -13,3 +13,24 @@ function section(id: string): HTMLElement {
 mountModelSection(section('model-section'));
 mountConnectionsSection(section('connections-section'));
 mountPersonaSection(section('persona-section'));
+
+document.getElementById('settings-close')?.addEventListener('click', () => {
+  void window.tishka.closeSettings();
+});
+
+document.getElementById('settings-open-chat')?.addEventListener('click', () => {
+  void window.tishka.openChat();
+});
+
+// Esc закрывает редактор подключения, если он открыт, иначе — окно настроек.
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') {
+    return;
+  }
+  const editor = document.querySelector('.editor');
+  if (editor !== null) {
+    editor.remove();
+    return;
+  }
+  void window.tishka.closeSettings();
+});

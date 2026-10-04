@@ -11,6 +11,7 @@ import type {
   ConnectionView
 } from './ipc-settings';
 import {
+  CLOSE_SETTINGS_CHANNEL,
   CONFIG_CHANGED_CHANNEL,
   CONFIG_GET_CHANNEL,
   CONFIG_SAVE_CHANNEL,
@@ -114,6 +115,9 @@ const api = {
   },
   openSettings(): Promise<void> {
     return ipcRenderer.invoke(OPEN_SETTINGS_CHANNEL);
+  },
+  closeSettings(): Promise<void> {
+    return ipcRenderer.invoke(CLOSE_SETTINGS_CHANNEL);
   },
   openChat(): Promise<void> {
     return ipcRenderer.invoke(OPEN_CHAT_CHANNEL);

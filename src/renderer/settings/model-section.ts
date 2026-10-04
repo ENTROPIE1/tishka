@@ -60,8 +60,9 @@ export function mountModelSection(root: HTMLElement): void {
           }
         };
         await window.tishka.config.save(next);
-        if (key.value.trim() !== '') {
-          await window.tishka.secrets.set(API_KEY_SECRET, key.value);
+        const trimmedKey = key.value.trim();
+        if (trimmedKey !== '') {
+          await window.tishka.secrets.set(API_KEY_SECRET, trimmedKey);
           key.value = '';
         }
         await refresh();

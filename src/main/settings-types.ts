@@ -10,6 +10,7 @@ export interface ConnectionSecretView {
 export interface ConnectionView {
   name: string;
   template: ConnectionTemplate;
+  address: string;
   fields: Record<string, string>;
   secrets: ConnectionSecretView[];
   state: McpServerState;

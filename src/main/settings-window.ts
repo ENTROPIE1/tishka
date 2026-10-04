@@ -45,3 +45,9 @@ export function openSettingsWindow(): void {
 
   settingsWindow = window;
 }
+
+export function closeSettingsWindow(): void {
+  if (settingsWindow !== undefined && !settingsWindow.isDestroyed()) {
+    settingsWindow.close();
+  }
+}

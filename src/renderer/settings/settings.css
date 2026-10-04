@@ -39,6 +39,9 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.45;
@@ -59,6 +62,8 @@ body {
 }
 
 .settings {
+  flex: 1;
+  width: 100%;
   max-width: 720px;
   margin: 0 auto;
   padding: 18px;
@@ -181,6 +186,32 @@ body {
 .connection-tools {
   font-size: 12px;
   color: var(--muted);
+}
+
+.connection-address {
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-description {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.bottombar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .state {

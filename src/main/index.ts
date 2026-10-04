@@ -13,7 +13,7 @@ import { registerPetHotkey } from './pet-hotkey';
 import { registerPetIpc } from './pet-ipc';
 import { createPetTray } from './pet-tray';
 import { createPetWindow, type PetWindow } from './pet-window';
-import { openSettingsWindow } from './settings-window';
+import { closeSettingsWindow, openSettingsWindow } from './settings-window';
 
 const bus = createEventBus();
 let core: TishkaCore | undefined;
@@ -42,6 +42,7 @@ app.whenReady().then(async () => {
   registerIpc(bus, tishka, secrets);
   registerSettingsIpc(tishka, secrets);
   ipcMain.handle(OPEN_CHAT_CHANNEL, () => {
+    closeSettingsWindow();
     openChatWindow();
   });
 

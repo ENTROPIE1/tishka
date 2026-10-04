@@ -4,6 +4,7 @@ import type { McpStatus } from '../core/mcp/manager';
 import type { SecretStore } from '../core/types';
 import { broadcastConfigChanged } from './ipc';
 import {
+  CLOSE_SETTINGS_CHANNEL,
   CONFIG_GET_CHANNEL,
   CONFIG_SAVE_CHANNEL,
   CONNECTIONS_PLAN_CHANNEL,
@@ -13,7 +14,7 @@ import {
   CONNECTIONS_STATUS_CHANNEL,
   OPEN_SETTINGS_CHANNEL
 } from './ipc-channels';
-import { openSettingsWindow } from './settings-window';
+import { closeSettingsWindow, openSettingsWindow } from './settings-window';
 import {
   configView,
   planDraft,
@@ -65,5 +66,9 @@ export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore): voi
 
   ipcMain.handle(OPEN_SETTINGS_CHANNEL, () => {
     openSettingsWindow();
+  });
+
+  ipcMain.handle(CLOSE_SETTINGS_CHANNEL, () => {
+    closeSettingsWindow();
   });
 }

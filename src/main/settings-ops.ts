@@ -1,5 +1,6 @@
 import type { TishkaCore } from '../core/app';
 import {
+  connectionAddress,
   describeConnection,
   planConnection,
   secretName,
@@ -57,6 +58,7 @@ async function connectionViews(core: TishkaCore, secrets: SecretStore): Promise<
     const view: ConnectionView = {
       name: server.name,
       template: described.template,
+      address: connectionAddress(server),
       fields: described.fields,
       secrets: secretViews,
       state: status?.state ?? 'disabled',

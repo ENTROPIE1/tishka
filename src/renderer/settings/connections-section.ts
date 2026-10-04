@@ -55,6 +55,12 @@ export function mountConnectionsSection(root: HTMLElement): void {
     head.append(el('span', 'connection-tools', `${view.tools} инструментов`));
     box.append(head);
 
+    if (view.address !== '') {
+      const address = el('div', 'connection-address', view.address);
+      address.title = view.address;
+      box.append(address);
+    }
+
     if (view.error !== undefined) {
       box.append(el('div', 'connection-error', view.error));
     }

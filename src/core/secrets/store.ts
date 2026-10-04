@@ -50,7 +50,7 @@ export function createSecretStore(filePath: string, crypto: SecretCrypto): Secre
         throw new SecretsUnavailableError();
       }
       const record = await readRecord();
-      record[name] = value;
+      record[name] = value.trim();
       await writeRecord(record);
     },
     async get(name: string): Promise<string | undefined> {
