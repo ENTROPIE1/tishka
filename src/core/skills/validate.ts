@@ -99,6 +99,10 @@ function parseTrigger(value: unknown, errors: string[], knownTools: string[] | u
         errors.push('Поле at должно быть строкой с датой в формате ISO');
         return undefined;
       }
+      if (Number.isNaN(Date.parse(value.at))) {
+        errors.push('Поле at должно быть датой и временем в формате ISO, например 2026-10-05T09:00');
+        return undefined;
+      }
       return { type: 'schedule', at: value.at };
     }
     if (typeof value.cron !== 'string') {
