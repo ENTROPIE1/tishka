@@ -167,7 +167,7 @@ interface Config {
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран, по умолчанию true
   web: { enabled: boolean };      // разрешено ли читать страницы из интернета, по умолчанию true
-  app: { warmMinutes: number; memoryLimitMb: number; autostart: boolean };   // держать микрофон наготове, предел памяти, запуск вместе с Windows
+  app: { warmMinutes: number; memoryLimitMb: number; autostart: boolean };   // держать микрофон наготове, предел памяти приложения вместе со службой распознавания, запуск вместе с Windows
 }
 
 type McpServerConfig =

@@ -32,7 +32,7 @@ export interface FakeChild {
   stderrHandlers: HandlerMap;
 }
 
-export function makeChild(): FakeChild {
+export function makeChild(pid?: number): FakeChild {
   const handlers: HandlerMap = {};
   const stderrHandlers: HandlerMap = {};
   const on = vi.fn((event: string, cb: (...args: unknown[]) => void) => {
@@ -42,7 +42,7 @@ export function makeChild(): FakeChild {
     stderrHandlers[event] = cb;
   });
   const kill = vi.fn();
-  const child = { kill, on, stderr: { on: stderrOn } } as unknown as ChildProcess;
+  const child = { kill, on, pid, stderr: { on: stderrOn } } as unknown as ChildProcess;
   return { child, kill, handlers, stderrHandlers };
 }
 

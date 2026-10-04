@@ -6,6 +6,7 @@ export interface MemoryMetrics {
 export interface MemoryWatchDeps {
   getMetrics(): MemoryMetrics;
   getLimitMb(): number;
+  beforeCheck?(): void;           // обновить внешние измерения перед проверкой
   isIdle(): boolean;              // нет разговора и выполняющейся просьбы
   reloadWindows(): void;          // перезагрузить окно-питомец и окно чата
   notify(text: string): void;     // одно уведомление перед перезапуском
@@ -40,21 +41,28 @@ export function createMemoryWatch(deps: MemoryWatchDeps): MemoryWatch {
   let timer: ReturnType<typeof setInterval> | undefined;
 
   function check(at: number = now()): void {
+    deps.beforeCheck?.();
     const metrics = deps.getMetrics();
     // Во время разговора ничего не перезапускается, счётчик превышения сбрасывается.
     if (!deps.isIdle()) {
       overSince = undefined;
       return;
     }
-    if (metrics.appMb <= deps.getLimitMb()) {
+    const limit = deps.getLimitMb();
+    if (metrics.appMb + metrics.sttMb <= limit) {
       overSince = undefined;
       notified = false;
       return;
     }
     if (overSince === undefined) {
       overSince = at;
-      deps.log(`память ${Math.round(metrics.appMb)} МБ больше предела, перезагружаю окна`);
-      deps.reloadWindows();
+      const app = Math.round(metrics.appMb);
+      const stt = Math.round(metrics.sttMb);
+      deps.log(`память приложения ${app} МБ и службы распознавания ${stt} МБ больше предела ${limit} МБ`);
+      // Окна перезагружаются, только если предел превысила сама память приложения.
+      if (metrics.appMb > limit) {
+        deps.reloadWindows();
+      }
       return;
     }
     if (at - overSince < graceMs) {

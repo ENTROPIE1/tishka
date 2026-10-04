@@ -172,4 +172,35 @@ describe('createSttService.start', () => {
     expect(kill).toHaveBeenCalled();
     expect(stt.status()).toBe('off');
   });
+
+  it('pid возвращает идентификатор запущенного процесса, после остановки — undefined', async () => {
+    const { child } = makeChild(4242);
+    const spawn = vi.fn(() => child);
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error('connection refused');
+      }
+      return okResponse();
+    });
+    const stt = service(() => configWith('C:\\w\\whisper.exe'), spawn, fetchMock);
+
+    expect(stt.pid()).toBeUndefined();
+    await expect(stt.start()).resolves.toEqual({ ok: true });
+    expect(stt.pid()).toBe(4242);
+
+    stt.stop();
+    expect(stt.pid()).toBeUndefined();
+  });
+
+  it('pid чужой службы — undefined', async () => {
+    const spawn = vi.fn(() => makeChild(4242).child);
+    const fetchMock = vi.fn(async () => okResponse());
+    const stt = service(() => voice(), spawn, fetchMock);
+
+    await expect(stt.start()).resolves.toEqual({ ok: true });
+    expect(spawn).not.toHaveBeenCalled();
+    expect(stt.pid()).toBeUndefined();
+  });
 });

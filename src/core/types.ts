@@ -120,7 +120,7 @@ export interface Config {
   web: { enabled: boolean };      // разрешено ли читать страницы из интернета
   app: {
     warmMinutes: number;          // держать микрофон наготове после последнего обращения
-    memoryLimitMb: number;        // предел памяти приложения без службы распознавания
+    memoryLimitMb: number;        // предел памяти приложения вместе со службой распознавания
     autostart: boolean;           // запуск вместе с Windows свёрнутым
   };
 }

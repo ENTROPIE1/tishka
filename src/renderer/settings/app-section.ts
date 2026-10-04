@@ -22,7 +22,7 @@ export function mountAppSection(root: HTMLElement): SettingsSection {
   root.append(
     checkboxField('Запускать вместе с Windows', autostart, 'Приложение стартует свёрнутым в область уведомлений'),
     field('Держать микрофон наготове, минут', warmMinutes, 'Столько микрофон остаётся открытым после последнего обращения'),
-    field('Предел памяти, МБ', memoryLimit, 'При превышении в простое окна перезагружаются, затем приложение перезапускается')
+    field('Предел памяти приложения и службы, МБ', memoryLimit, 'При превышении в простое окна перезагружаются, затем приложение перезапускается')
   );
   const actions = el('div', 'row');
   actions.append(save);

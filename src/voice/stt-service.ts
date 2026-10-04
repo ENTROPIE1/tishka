@@ -27,6 +27,7 @@ export interface SttService {
   stop(): void;
   transcribe(wav: Uint8Array, prompt?: string): Promise<TranscribeResult>;
   status(): SttStatus;
+  pid(): number | undefined;
 }
 
 const READY_TIMEOUT_MS = 30000;
@@ -44,7 +45,6 @@ export function createSttService(options: SttServiceOptions): SttService {
   let state: SttStatus = 'off';
   let child: ChildProcess | undefined;
   let childRunId = 0;
-
   function killOwnProcess(id: number): void {
     if (childRunId !== id) {
       return;
@@ -60,7 +60,6 @@ export function createSttService(options: SttServiceOptions): SttService {
       }
     }
   }
-
   function spawnProcess(run: RunToken, exe: string, model: string, url: string): void {
     const config = options.getConfig();
     const args = [
@@ -99,7 +98,6 @@ export function createSttService(options: SttServiceOptions): SttService {
       run.wake?.();
     });
   }
-
   async function waitReady(run: RunToken, url: string): Promise<'ready' | 'cancelled' | 'failed' | 'timeout'> {
     const deadline = Date.now() + READY_TIMEOUT_MS;
     while (true) {
@@ -118,7 +116,6 @@ export function createSttService(options: SttServiceOptions): SttService {
       await delayOrWake(run, POLL_MS);
     }
   }
-
   async function start(): Promise<{ ok: boolean; error?: string }> {
     const config = options.getConfig();
     const exe = config.stt.exe.trim();
@@ -194,6 +191,10 @@ export function createSttService(options: SttServiceOptions): SttService {
     start,
     stop,
     transcribe: (wav, prompt) => transcribeHttp(fetchFn, options.getConfig().sttUrl, wav, prompt),
-    status: () => state
+    status: () => state,
+    pid: () => {
+      const config = options.getConfig();
+      return config.stt.exe.trim() === '' || config.stt.model.trim() === '' ? undefined : child?.pid;
+    }
   };
 }

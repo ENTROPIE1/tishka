@@ -11,6 +11,7 @@ import { loginItemSettings, startedHidden } from './autostart';
 import { openMainWindow, reloadMainWindow } from './chat-window';
 import { registerChatTalk, type ChatTalk } from './chat-talk';
 import { createMemoryWatch, type MemoryWatch } from './memory-watch';
+import { createProcessMemory } from './process-memory';
 import { OPEN_CHAT_CHANNEL, PET_SPEAK_DONE_CHANNEL } from './ipc-channels';
 import { registerAutomationIpc } from './ipc-automations';
 import { registerIpc } from './ipc';
@@ -279,9 +280,14 @@ app.whenReady().then(async () => {
     }
   });
 
+  const sttMemory = createProcessMemory({ getPid: () => sttService.pid() });
+
   memoryWatch = createMemoryWatch({
-    getMetrics: () => ({ appMb: applicationMemoryMb(), sttMb: 0 }),
+    getMetrics: () => ({ appMb: applicationMemoryMb(), sttMb: sttMemory.current() }),
     getLimitMb: () => tishka.config().app.memoryLimitMb,
+    beforeCheck: () => {
+      void sttMemory.refresh();
+    },
     isIdle: () => !wakeFlow.isConversation() && !processing,
     reloadWindows: () => {
       pet?.reload();

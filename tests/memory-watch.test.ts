@@ -69,6 +69,28 @@ describe('createMemoryWatch', () => {
     expect(deps.relaunch).not.toHaveBeenCalled();
   });
 
+  it('приложение 900 и служба 700 при пределе 1500 — срабатывает без перезагрузки окон', () => {
+    const { deps, watch } = setup({ getMetrics: () => ({ appMb: 900, sttMb: 700 }) });
+
+    watch.check(0);
+    expect(deps.reloadWindows).not.toHaveBeenCalled();
+
+    watch.check(60000);
+    expect(deps.notify).toHaveBeenCalledWith(MEMORY_NOTICE);
+    expect(deps.relaunch).toHaveBeenCalledTimes(1);
+  });
+
+  it('приложение 900 без службы — предел не превышен', () => {
+    const { deps, watch } = setup({ getMetrics: () => ({ appMb: 900, sttMb: 0 }) });
+
+    watch.check(0);
+    watch.check(600000);
+
+    expect(deps.reloadWindows).not.toHaveBeenCalled();
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(deps.relaunch).not.toHaveBeenCalled();
+  });
+
   it('нормальная память сбрасывает счётчик', () => {
     let mb = 2000;
     const { deps, watch } = setup({ getMetrics: () => ({ appMb: mb, sttMb: 0 }) });
