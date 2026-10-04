@@ -36,13 +36,11 @@ function secretRef(name: string): string {
 
 function asDraft(value: unknown): ConnectionDraft {
   const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  const fields = typeof record['fields'] === 'object' && record['fields'] !== null ? record['fields'] : {};
-  const secrets = typeof record['secrets'] === 'object' && record['secrets'] !== null ? record['secrets'] : {};
   return {
     template: record['template'] as ConnectionTemplate,
     name: typeof record['name'] === 'string' ? record['name'] : '',
-    fields: fields as Record<string, string>,
-    secrets: secrets as Record<string, string>
+    fields: (record['fields'] ?? {}) as Record<string, string>,
+    secrets: (record['secrets'] ?? {}) as Record<string, string>
   };
 }
 
@@ -65,9 +63,7 @@ async function connectionViews(core: TishkaCore, secrets: SecretStore): Promise<
       state: status?.state ?? 'disabled',
       tools: status?.tools ?? 0
     };
-    if (status?.error !== undefined) {
-      view.error = status.error;
-    }
+    if (status?.error !== undefined) view.error = status.error;
     views.push(view);
   }
   return views;
@@ -111,18 +107,12 @@ function preserveStdioEnv(
   if (server.transport !== 'stdio' || draft.template !== 'custom-stdio' || oldServer === undefined) {
     return server;
   }
-  if (oldServer.transport !== 'stdio') {
-    return server;
-  }
+  if (oldServer.transport !== 'stdio') return server;
   const described = describeConnection(oldServer);
-  if (described.template !== 'custom-stdio') {
-    return server;
-  }
+  if (described.template !== 'custom-stdio') return server;
   const env = { ...(server.env ?? {}) };
   for (const field of described.secretNames) {
-    if (env[field] !== undefined) {
-      continue;
-    }
+    if (env[field] !== undefined) continue;
     env[field] = secretRef(secretName(draft.name, field));
   }
   return Object.keys(env).length > 0 ? { ...server, env } : server;
@@ -139,13 +129,12 @@ export function statusViews(core: TishkaCore, secrets: SecretStore): Promise<Con
 // Ключ из поля не возвращается в окно: он уходит только в проверку ядра.
 export function checkGatewayValue(core: TishkaCore, value: unknown): Promise<GatewayCheckResult> {
   const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  const input: { baseUrl: string; model: string; key?: string } = {
+  const input: { baseUrl: string; model: string; key?: string; api?: string } = {
     baseUrl: typeof record['baseUrl'] === 'string' ? record['baseUrl'] : '',
     model: typeof record['model'] === 'string' ? record['model'] : ''
   };
-  if (typeof record['key'] === 'string' && record['key'] !== '') {
-    input.key = record['key'];
-  }
+  if (typeof record['key'] === 'string' && record['key'] !== '') input.key = record['key'];
+  if (typeof record['api'] === 'string' && record['api'] !== '') input.api = record['api'];
   return core.checkGateway(input);
 }
 

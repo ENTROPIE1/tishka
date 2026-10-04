@@ -1,9 +1,11 @@
 import type { GatewayCheckRequest } from './check';
+import { toResponsesRequest } from './responses-format';
 
 export const DEFAULT_TIMEOUT_MS = 20_000;
 const TIMEOUT_ERROR = 'Шлюз не ответил за 20 секунд';
 const UNAVAILABLE_ERROR = 'Шлюз недоступен по указанному адресу';
 export const AUTH_ERROR = 'Ключ шлюза не принят';
+export const CHAT_UNSUPPORTED_ERROR = 'Шлюз не поддерживает формат chat. Выберите формат Responses';
 
 export type ModelsResult =
   | { ok: true; models: string[]; present: boolean }
@@ -48,6 +50,18 @@ function mentionsModel(body: string, model: string): boolean {
     return true;
   }
   return lower.includes('model_not_found') || lower.includes('model not found') || lower.includes('unknown model');
+}
+
+function mentionsChatUnsupported(body: string): boolean {
+  const lower = body.toLowerCase();
+  if (!lower.includes('chat/completions')) {
+    return false;
+  }
+  return (
+    lower.includes('not support') ||
+    lower.includes('unsupported') ||
+    lower.includes('не поддерживается')
+  );
 }
 
 async function safeText(response: Response, apiKey: string): Promise<string> {
@@ -108,33 +122,13 @@ export async function fetchModels(
   return { ok: true, models: [], present: false };
 }
 
-export async function probeChat(
-  doFetch: typeof fetch,
-  baseUrl: string,
+// Общий разбор отказа пробы для обоих форматов.
+async function probeResult(
+  response: Response,
   req: GatewayCheckRequest,
-  timeoutMs: number,
-  modelsPresent: boolean
+  modelsPresent: boolean,
+  chatFormat: boolean
 ): Promise<string | undefined> {
-  let response: Response;
-  try {
-    response = await requestWithKey(
-      doFetch,
-      `${baseUrl}/chat/completions`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: req.model,
-          messages: [{ role: 'user', content: 'ping' }],
-          max_tokens: 1
-        })
-      },
-      req.apiKey,
-      timeoutMs
-    );
-  } catch (error) {
-    return connectionError(error);
-  }
   if (response.ok) {
     return undefined;
   }
@@ -143,8 +137,63 @@ export async function probeChat(
     return modelsPresent ? modelUnavailable(req.model) : AUTH_ERROR;
   }
   const body = await safeText(response, req.apiKey);
+  if (chatFormat && mentionsChatUnsupported(body)) {
+    return CHAT_UNSUPPORTED_ERROR;
+  }
   if (response.status === 404 || mentionsModel(body, req.model)) {
     return modelMissing(req.model);
   }
   return `Шлюз ответил ошибкой ${response.status}`;
+}
+
+// Пробный запрос: ответ шлюза или понятная ошибка связи.
+async function sendProbe(
+  doFetch: typeof fetch,
+  url: string,
+  body: string,
+  req: GatewayCheckRequest,
+  timeoutMs: number
+): Promise<string | Response> {
+  try {
+    return await requestWithKey(
+      doFetch,
+      url,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
+      req.apiKey,
+      timeoutMs
+    );
+  } catch (error) {
+    return connectionError(error);
+  }
+}
+
+export async function probeChat(
+  doFetch: typeof fetch,
+  baseUrl: string,
+  req: GatewayCheckRequest,
+  timeoutMs: number,
+  modelsPresent: boolean
+): Promise<string | undefined> {
+  const body = JSON.stringify({
+    model: req.model,
+    messages: [{ role: 'user', content: 'ping' }],
+    max_tokens: 1
+  });
+  const sent = await sendProbe(doFetch, `${baseUrl}/chat/completions`, body, req, timeoutMs);
+  return typeof sent === 'string' ? sent : probeResult(sent, req, modelsPresent, true);
+}
+
+export async function probeResponses(
+  doFetch: typeof fetch,
+  baseUrl: string,
+  req: GatewayCheckRequest,
+  timeoutMs: number,
+  modelsPresent: boolean
+): Promise<string | undefined> {
+  const wire = toResponsesRequest(
+    { model: req.model, messages: [{ role: 'user', content: 'ping' }] },
+    { maxTokens: 1 }
+  );
+  const sent = await sendProbe(doFetch, `${baseUrl}/responses`, JSON.stringify(wire), req, timeoutMs);
+  return typeof sent === 'string' ? sent : probeResult(sent, req, modelsPresent, false);
 }
