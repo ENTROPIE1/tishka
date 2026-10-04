@@ -1,6 +1,8 @@
 import type { Panel } from '../../core/types';
 import type { PetModel, PetState } from '../../pet/state';
 import { panelElement } from '../shared/panels';
+import { clipForState, type Character } from './character';
+import { SvgHedgehog } from './svg-hedgehog';
 
 const bubble = document.getElementById('bubble') as HTMLElement;
 const say = document.getElementById('say') as HTMLElement;
@@ -9,6 +11,7 @@ const input = document.getElementById('input') as HTMLInputElement;
 const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
 const stateLabel = document.getElementById('state') as HTMLElement;
+const characterModel: Character = new SvgHedgehog();
 
 const STATE_LABELS: Record<PetState, string> = {
   hidden: 'спит за краем',
@@ -79,6 +82,10 @@ function renderModel(model: PetModel): void {
   stateLabel.textContent = STATE_LABELS[model.state];
   say.textContent = model.say ?? '';
   renderCard(model.panel);
+
+  const { clip, flip } = clipForState(model.state);
+  characterModel.setClip(clip);
+  characterModel.setFlip(flip);
 
   // Поле ввода живёт, пока Тишка на экране после вызова; появляется вместе с выходом.
   if (!isOnScreen(model.state)) {
@@ -194,7 +201,13 @@ function initPointer(): void {
 }
 
 window.tishka.onPetModel(renderModel);
+window.tishka.onEvent((event) => {
+  if (event.type === 'speak.level') {
+    characterModel.setMouth(event.level);
+  }
+});
 window.tishka.pet.setInteractive(false);
+void characterModel.mount(character).catch(() => undefined);
 initCharacter();
 initComposer();
 initPointer();

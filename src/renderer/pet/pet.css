@@ -113,22 +113,28 @@ body {
 }
 
 .character {
+  position: relative;
   width: 200px;
   height: 200px;
   flex: none;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  border-radius: 20px;
-  background: var(--accent);
-  color: #ffffff;
-  box-shadow: var(--shadow);
+  background: transparent;
   cursor: grab;
 }
 
 .state-label {
-  font-size: 13px;
-  opacity: 0.9;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 .card {

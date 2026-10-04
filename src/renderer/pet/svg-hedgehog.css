@@ -1,0 +1,118 @@
+.hedgehog {
+  width: 200px;
+  height: 200px;
+  display: block;
+  overflow: visible;
+  --mouth: 0;
+  transform-origin: 50% 100%;
+}
+
+.hedgehog.flipped {
+  transform: scaleX(-1);
+}
+
+.hedgehog .hh-spike { fill: #6b3d1c; stroke: #fff3df; stroke-width: 1; stroke-linejoin: round; }
+.hedgehog .hh-body { fill: #a9662f; stroke: #fff3df; stroke-width: 1.5; }
+.hedgehog .hh-belly { fill: #c98a52; }
+.hedgehog .hh-leg { fill: #8a4f24; stroke: #fff3df; stroke-width: 1; }
+.hedgehog .hh-face { fill: #f4dcbb; stroke: #fff3df; stroke-width: 1.5; }
+.hedgehog .hh-ear { fill: #d79a63; stroke: #fff3df; stroke-width: 1; }
+.hedgehog .hh-eye { fill: #241a12; }
+.hedgehog .hh-glint { fill: #ffffff; }
+.hedgehog .hh-nose { fill: #241a12; }
+.hedgehog .hh-mouth-shape { fill: #7a3b2a; }
+.hedgehog #hh-eyes-happy { display: none; }
+.hedgehog #hh-eyes-happy path { fill: none; stroke: #241a12; stroke-width: 3; stroke-linecap: round; }
+
+.hedgehog #hh-root,
+.hedgehog #hh-head,
+.hedgehog #hh-eyes,
+.hedgehog #hh-ears,
+.hedgehog .hh-leg {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.hedgehog #hh-root { transform-origin: 50% 100%; }
+.hedgehog #hh-head { transform-origin: 25% 70%; }
+.hedgehog #hh-leg-bl,
+.hedgehog #hh-leg-br,
+.hedgehog #hh-leg-fl,
+.hedgehog #hh-leg-fr { transform-origin: 50% 0%; }
+
+.hedgehog.clip-idle #hh-root { animation: hh-breathe 3.6s ease-in-out infinite; }
+.hedgehog.clip-idle #hh-eyes { animation: hh-blink 4.5s ease-in-out infinite; }
+
+.hedgehog.clip-walk #hh-root { animation: hh-wobble 0.5s ease-in-out infinite; }
+.hedgehog.clip-walk #hh-leg-fl,
+.hedgehog.clip-walk #hh-leg-br { animation: hh-step 0.5s ease-in-out infinite; }
+.hedgehog.clip-walk #hh-leg-fr,
+.hedgehog.clip-walk #hh-leg-bl { animation: hh-step 0.5s ease-in-out infinite reverse; }
+
+.hedgehog.clip-listen #hh-head { transform: rotate(-9deg); }
+.hedgehog.clip-listen #hh-ears { transform: translateY(-3px); }
+
+.hedgehog.clip-think #hh-root { animation: hh-wobble 2.4s ease-in-out infinite; }
+.hedgehog.clip-think #hh-head { transform: translateY(-6px) rotate(5deg); }
+
+.hedgehog.clip-work #hh-leg-fl,
+.hedgehog.clip-work #hh-leg-fr { animation: hh-step 0.35s ease-in-out infinite; }
+
+.hedgehog.clip-talk #hh-root { animation: hh-breathe 1.8s ease-in-out infinite; }
+
+.hedgehog.clip-notify #hh-root { animation: hh-jump 0.6s ease-in-out infinite; }
+.hedgehog.clip-notify #hh-leg-fr { animation: hh-wave 0.6s ease-in-out infinite; }
+
+.hedgehog.clip-happy #hh-root { animation: hh-jump 0.5s ease-in-out 2; }
+.hedgehog.clip-happy #hh-eyes { display: none; }
+.hedgehog.clip-happy #hh-eyes-happy { display: inline; }
+
+.hedgehog.clip-confused #hh-head { transform: rotate(13deg); }
+.hedgehog.clip-confused #hh-leg-fr { transform: rotate(-55deg); }
+
+.hedgehog.clip-sleep #hh-root { animation: hh-breathe 5s ease-in-out infinite; }
+.hedgehog.clip-sleep #hh-eyes { transform: scaleY(0.1); }
+
+@keyframes hh-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes hh-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+
+@keyframes hh-wobble {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes hh-step {
+  0%, 100% { transform: rotate(14deg); }
+  50% { transform: rotate(-14deg); }
+}
+
+@keyframes hh-jump {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
+@keyframes hh-wave {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-45deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hedgehog * { animation: none !important; }
+  .hedgehog.clip-listen #hh-head { transform: rotate(-9deg); }
+  .hedgehog.clip-listen #hh-ears { transform: translateY(-3px); }
+  .hedgehog.clip-think #hh-head { transform: translateY(-6px) rotate(5deg); }
+  .hedgehog.clip-work #hh-leg-fl,
+  .hedgehog.clip-work #hh-leg-fr { transform: rotate(-18deg); }
+  .hedgehog.clip-confused #hh-head { transform: rotate(13deg); }
+  .hedgehog.clip-confused #hh-leg-fr { transform: rotate(-55deg); }
+  .hedgehog.clip-happy #hh-eyes { display: none; }
+  .hedgehog.clip-happy #hh-eyes-happy { display: inline; }
+  .hedgehog.clip-sleep #hh-eyes { transform: scaleY(0.1); }
+}

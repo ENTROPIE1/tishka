@@ -13,6 +13,7 @@
   "devDependencies": {
     "electron": "^44.5.1",
     "electron-vite": "^5.0.0",
+    "jsdom": "^30.1.1",
     "tsx": "^4.19.2",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
