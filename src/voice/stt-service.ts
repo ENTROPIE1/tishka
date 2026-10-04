@@ -1,17 +1,25 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Config } from '../core/types';
+import { delayOrWake, reasonFromExit, RunController, type RunToken } from './stt-run';
+import {
+  hasForeignChars,
+  probe,
+  servicePort,
+  transcribeHttp,
+  type TranscribeResult
+} from './stt-http';
 
 export type SttStatus = 'off' | 'starting' | 'ready' | 'error';
 
-export type TranscribeResult =
-  | { ok: true; text: string }
-  | { ok: false; error: string };
+export type { TranscribeResult } from './stt-http';
 
 export interface SttServiceOptions {
   getConfig: () => Config['voice'];
   spawn?: typeof import('node:child_process').spawn;
   fetch?: typeof fetch;
+  fileExists?: (path: string) => boolean;
 }
 
 export interface SttService {
@@ -22,61 +30,28 @@ export interface SttService {
 }
 
 const READY_TIMEOUT_MS = 30000;
-const REQUEST_TIMEOUT_MS = 30000;
 const POLL_MS = 300;
-const NON_ASCII = /[^\x00-\x7F]/;
+const OUTPUT_LIMIT = 2000;
 const CYRILLIC_ERROR = 'Путь к службе распознавания должен быть без кириллицы';
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function baseUrl(url: string): string {
-  return url.replace(/\/+$/, '');
-}
-
-function inferenceUrl(url: string): string {
-  return `${baseUrl(url)}/inference`;
-}
-
-function servicePort(url: string): number {
-  try {
-    const parsed = new URL(url);
-    if (parsed.port !== '') {
-      return Number(parsed.port);
-    }
-    return parsed.protocol === 'https:' ? 443 : 80;
-  } catch {
-    return 8178;
-  }
-}
-
-function hasForeignChars(path: string): boolean {
-  return NON_ASCII.test(path);
-}
-
-// Служба распознавания возвращает пометки вроде [музыка] и (смех), их убираем.
-export function cleanTranscript(text: string): string {
-  return text
-    .replace(/\[[^\]]*\]/g, ' ')
-    .replace(/\([^)]*\)/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
+const CANCELLED = 'Запуск отменён';
+const NOT_CONFIGURED = 'Распознавание речи не настроено';
 
 export function createSttService(options: SttServiceOptions): SttService {
   const spawnFn = options.spawn ?? spawn;
   const fetchFn = options.fetch ?? fetch;
+  const fileExists = options.fileExists ?? existsSync;
+  const runs = new RunController();
   let state: SttStatus = 'off';
   let child: ChildProcess | undefined;
+  let childRunId = 0;
 
-  function stopProcess(): void {
+  function killOwnProcess(id: number): void {
+    if (childRunId !== id) {
+      return;
+    }
     const running = child;
     child = undefined;
+    childRunId = 0;
     if (running !== undefined) {
       try {
         running.kill();
@@ -86,115 +61,139 @@ export function createSttService(options: SttServiceOptions): SttService {
     }
   }
 
-  async function probe(url: string): Promise<boolean> {
-    try {
-      const response = await fetchFn(`${baseUrl(url)}/`, { method: 'GET' });
-      return response.ok;
-    } catch {
-      return false;
-    }
+  function spawnProcess(run: RunToken, exe: string, model: string, url: string): void {
+    const config = options.getConfig();
+    const args = [
+      '-m', model,
+      '-l', 'ru',
+      '-t', String(config.stt.threads),
+      '-ac', String(config.stt.audioCtx),
+      '--host', '127.0.0.1',
+      '--port', String(servicePort(url))
+    ];
+    const spawned = spawnFn(exe, args, {
+      cwd: dirname(exe),
+      windowsHide: true,
+      stdio: ['ignore', 'ignore', 'pipe']
+    });
+    child = spawned;
+    childRunId = run.id;
+    let tail = '';
+    spawned.stderr?.on('data', (chunk: Buffer | string) => {
+      tail = (tail + String(chunk)).slice(-OUTPUT_LIMIT);
+    });
+    spawned.on('error', (error: Error & { code?: string }) => {
+      if (run.failure === undefined) {
+        run.failure = error.code === 'ENOENT' ? 'файл не найден' : error.message;
+      }
+      run.wake?.();
+    });
+    spawned.on('exit', (code: number | null) => {
+      if (childRunId === run.id) {
+        child = undefined;
+        childRunId = 0;
+      }
+      if (run.failure === undefined) {
+        run.failure = reasonFromExit(code, tail);
+      }
+      run.wake?.();
+    });
   }
 
-  async function waitReady(url: string): Promise<boolean> {
+  async function waitReady(run: RunToken, url: string): Promise<'ready' | 'cancelled' | 'failed' | 'timeout'> {
     const deadline = Date.now() + READY_TIMEOUT_MS;
-    while (Date.now() < deadline) {
-      if (await probe(url)) {
-        return true;
+    while (true) {
+      if (run.cancelled) {
+        return 'cancelled';
+      }
+      if (run.failure !== undefined) {
+        return 'failed';
+      }
+      if (await probe(fetchFn, url)) {
+        return 'ready';
       }
       if (Date.now() >= deadline) {
-        break;
+        return 'timeout';
       }
-      await delay(POLL_MS);
+      await delayOrWake(run, POLL_MS);
     }
-    return false;
   }
 
   async function start(): Promise<{ ok: boolean; error?: string }> {
     const config = options.getConfig();
     const exe = config.stt.exe.trim();
+    const model = config.stt.model.trim();
+    const run = runs.begin();
 
-    if (exe !== '') {
-      if (hasForeignChars(exe) || hasForeignChars(config.stt.model)) {
-        state = 'error';
-        return { ok: false, error: CYRILLIC_ERROR };
+    if (exe === '') {
+      const alive = await probe(fetchFn, config.sttUrl);
+      if (run.cancelled) {
+        return { ok: false, error: CANCELLED };
       }
-      state = 'starting';
-      const args = [
-        '-m', config.stt.model,
-        '-l', 'ru',
-        '-t', String(config.stt.threads),
-        '-ac', String(config.stt.audioCtx),
-        '--host', '127.0.0.1',
-        '--port', String(servicePort(config.sttUrl))
-      ];
-      try {
-        child = spawnFn(exe, args, { cwd: dirname(exe), windowsHide: true, stdio: 'ignore' });
-      } catch {
-        state = 'error';
-        return { ok: false, error: 'Не удалось запустить службу распознавания' };
-      }
-      if (typeof child.on === 'function') {
-        child.on('error', () => {
-          state = 'error';
-        });
-      }
-    } else if (state !== 'ready' && state !== 'starting') {
-      state = 'starting';
+      state = alive ? 'ready' : 'off';
+      return alive ? { ok: true } : { ok: false, error: NOT_CONFIGURED };
     }
 
-    const ready = await waitReady(config.sttUrl);
-    if (!ready) {
-      stopProcess();
+    if (hasForeignChars(exe) || hasForeignChars(model)) {
       state = 'error';
-      return { ok: false, error: 'Служба распознавания не ответила за 30 секунд' };
+      return { ok: false, error: CYRILLIC_ERROR };
     }
-    state = 'ready';
-    return { ok: true };
+
+    if (await probe(fetchFn, config.sttUrl)) {
+      if (run.cancelled) {
+        return { ok: false, error: CANCELLED };
+      }
+      state = 'ready';
+      return { ok: true };
+    }
+    if (run.cancelled) {
+      return { ok: false, error: CANCELLED };
+    }
+
+    if (!fileExists(exe)) {
+      state = 'error';
+      return { ok: false, error: `Не найден файл программы: ${exe}` };
+    }
+    if (!fileExists(model)) {
+      state = 'error';
+      return { ok: false, error: `Не найден файл модели: ${model}` };
+    }
+
+    state = 'starting';
+    try {
+      spawnProcess(run, exe, model, config.sttUrl);
+    } catch {
+      state = 'error';
+      return { ok: false, error: 'Служба распознавания не запустилась: файл не найден' };
+    }
+
+    const outcome = await waitReady(run, config.sttUrl);
+    if (outcome === 'ready') {
+      state = 'ready';
+      return { ok: true };
+    }
+    if (outcome === 'cancelled') {
+      killOwnProcess(run.id);
+      return { ok: false, error: CANCELLED };
+    }
+    killOwnProcess(run.id);
+    state = 'error';
+    if (outcome === 'failed') {
+      return { ok: false, error: `Служба распознавания не запустилась: ${run.failure ?? ''}` };
+    }
+    return { ok: false, error: 'Служба распознавания не ответила за 30 секунд' };
   }
 
-  async function transcribe(wav: Uint8Array): Promise<TranscribeResult> {
-    const config = options.getConfig();
-    const bytes = new Uint8Array(wav.length);
-    bytes.set(wav);
-    const form = new FormData();
-    form.append('file', new Blob([bytes.buffer], { type: 'audio/wav' }), 'audio.wav');
-    form.append('response_format', 'json');
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    try {
-      const response = await fetchFn(inferenceUrl(config.sttUrl), {
-        method: 'POST',
-        body: form,
-        signal: controller.signal
-      });
-      if (!response.ok) {
-        return { ok: false, error: `Служба распознавания ответила с ошибкой ${response.status}` };
-      }
-      const data: unknown = await response.json();
-      const raw = isRecord(data) && typeof data.text === 'string' ? data.text : '';
-      const text = cleanTranscript(raw);
-      if (text === '') {
-        return { ok: false, error: 'Не расслышал' };
-      }
-      return { ok: true, text };
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return { ok: false, error: 'Служба распознавания не ответила вовремя' };
-      }
-      return { ok: false, error: 'Не удалось обратиться к службе распознавания' };
-    } finally {
-      clearTimeout(timer);
-    }
+  function stop(): void {
+    runs.cancel();
+    killOwnProcess(childRunId);
+    state = 'off';
   }
 
   return {
     start,
-    stop(): void {
-      stopProcess();
-      state = 'off';
-    },
-    transcribe,
+    stop,
+    transcribe: (wav) => transcribeHttp(fetchFn, options.getConfig().sttUrl, wav),
     status: () => state
   };
 }

@@ -1,7 +1,9 @@
 import type { Config } from '../../core/types';
-import { button, clear, el, field, sectionTitle, selectInput } from './dom';
+import { button, clear, el, field, runWithFeedback, sectionTitle, selectInput } from './dom';
 
 type FyrLevel = Config['persona']['fyr'];
+
+const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
 
 const FYR_OPTIONS: Array<{ value: FyrLevel; label: string }> = [
   { value: 'off', label: 'Выключено' },
@@ -38,8 +40,7 @@ export function mountPersonaSection(root: HTMLElement): void {
   }
 
   save.addEventListener('click', () => {
-    void (async () => {
-      save.disabled = true;
+    void runWithFeedback(save, SAVE_LABELS, async () => {
       try {
         const view = await window.tishka.config.get();
         const next: Config = {
@@ -50,10 +51,9 @@ export function mountPersonaSection(root: HTMLElement): void {
         show(undefined, 'Характер сохранён');
       } catch (error) {
         show(error instanceof Error ? error.message : String(error));
-      } finally {
-        save.disabled = false;
+        throw error;
       }
-    })();
+    });
   });
 
   void refresh();

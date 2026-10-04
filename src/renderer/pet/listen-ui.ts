@@ -1,4 +1,4 @@
-import { createRecorder } from './recorder';
+import { createRecorder } from '../shared/recorder';
 
 export const LISTEN_SAY = 'Слушаю…';
 

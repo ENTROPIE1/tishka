@@ -1,6 +1,7 @@
 import type { Config } from '../../core/types';
-import { button, clear, el, field, sectionTitle, textInput } from './dom';
+import { button, clear, el, field, runWithFeedback, sectionTitle, textInput } from './dom';
 
+const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
 const API_KEY_SECRET = 'DKS_API_KEY';
 const KEY_SET = 'Ключ задан';
 const KEY_MISSING = 'Ключ не задан';
@@ -47,8 +48,7 @@ export function mountModelSection(root: HTMLElement): void {
   }
 
   save.addEventListener('click', () => {
-    void (async () => {
-      save.disabled = true;
+    void runWithFeedback(save, SAVE_LABELS, async () => {
       try {
         const view = await window.tishka.config.get();
         const next: Config = {
@@ -69,10 +69,9 @@ export function mountModelSection(root: HTMLElement): void {
         show(undefined, 'Настройки модели сохранены');
       } catch (error) {
         show(error instanceof Error ? error.message : String(error));
-      } finally {
-        save.disabled = false;
+        throw error;
       }
-    })();
+    });
   });
 
   void refresh();

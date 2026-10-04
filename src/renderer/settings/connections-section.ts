@@ -1,7 +1,9 @@
 import type { ConnectionTemplate } from '../../core/connections';
 import type { ConnectionView } from '../../main/ipc-settings';
 import { openEditor, TEMPLATE_OPTIONS, templateLabel } from './connection-editor';
-import { button, clear, el, sectionTitle, selectInput } from './dom';
+import { button, clear, el, runWithFeedback, sectionTitle, selectInput } from './dom';
+
+const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
 
 function stateLabel(view: ConnectionView): string {
   if (view.state === 'connected') {
@@ -76,17 +78,16 @@ export function mountConnectionsSection(root: HTMLElement): void {
     box.append(editorHost);
 
     check.addEventListener('click', () => {
-      void (async () => {
-        check.disabled = true;
+      void runWithFeedback(check, CHECK_LABELS, async () => {
         try {
           await window.tishka.connections.reconnect(view.name);
-          await refresh();
         } catch (error) {
           showError(error);
-        } finally {
-          check.disabled = false;
+          throw error;
         }
-      })();
+      }).then(() => {
+        void refresh();
+      });
     });
 
     edit.addEventListener('click', () => {

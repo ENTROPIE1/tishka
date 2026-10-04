@@ -1,3 +1,6 @@
+import { createMicButton } from './mic-button';
+import { insertAtCursor } from './text-insert';
+
 export interface AskRequest {
   title: string;
   placeholder?: string;
@@ -46,6 +49,24 @@ export function askCardElement(ask: AskRequest, actions: AskCardActions): HTMLEl
   hint.textContent = 'Слишком длинный текст';
   hint.hidden = true;
   body.append(field, hint);
+
+  // Диктовка доступна, когда карточка живёт в окне приложения.
+  if ('tishka' in window) {
+    const tools = document.createElement('div');
+    tools.className = 'ask-tools';
+    const mic = createMicButton({
+      onText: (text) => {
+        insertAtCursor(field, text);
+        refresh();
+      },
+      onLevel: () => undefined,
+      onListeningChange: (listening) => {
+        tools.classList.toggle('listening', listening);
+      }
+    });
+    tools.append(mic.element);
+    body.append(tools);
+  }
 
   const row = document.createElement('div');
   row.className = 'card-actions';

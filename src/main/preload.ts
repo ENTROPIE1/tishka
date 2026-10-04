@@ -6,6 +6,7 @@ import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import type { Config, TishkaEvent } from '../core/types';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
+import type { TranscribeResult } from '../voice/stt-service';
 import type {
   ConfigView,
   ConnectionPlanResult,
@@ -53,6 +54,7 @@ import {
   USER_TEXT_CHANNEL,
   VOICE_APPLY_CHANNEL,
   VOICE_CHECK_CHANNEL,
+  VOICE_DICTATE_CHANNEL,
   VOICE_STATUS_CHANNEL
 } from './ipc-channels';
 
@@ -202,6 +204,9 @@ const api = {
     },
     apply(hotkey: string): Promise<void> {
       return ipcRenderer.invoke(VOICE_APPLY_CHANNEL, hotkey);
+    },
+    dictate(wav: Uint8Array): Promise<TranscribeResult> {
+      return ipcRenderer.invoke(VOICE_DICTATE_CHANNEL, wav);
     }
   }
 };

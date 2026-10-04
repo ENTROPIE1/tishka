@@ -1,9 +1,12 @@
 import type { ConnectionDraft, ConnectionTemplate } from '../../core/connections';
 import type { ConnectionView } from '../../main/ipc-settings';
 import { TEMPLATES, suggestName } from './connection-templates';
-import { button, clear, el, field, textarea, textInput } from './dom';
+import { button, clear, el, field, runWithFeedback, textarea, textInput } from './dom';
 
 export { TEMPLATE_OPTIONS, templateLabel } from './connection-templates';
+
+const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
+const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
 
 export interface EditorOptions {
   host: HTMLElement;
@@ -106,28 +109,28 @@ export function openEditor(options: EditorOptions): void {
   }
 
   check.addEventListener('click', () => {
-    void (async () => {
+    void runWithFeedback(check, CHECK_LABELS, async () => {
       const result = await window.tishka.connections.plan(build());
-      showErrors(result.ok ? [] : result.errors, result.ok ? 'Проверка прошла' : undefined);
-    })();
+      if (!result.ok) {
+        showErrors(result.errors);
+        throw new Error('Проверка не прошла');
+      }
+      showErrors([], 'Проверка прошла');
+    });
   });
 
   save.addEventListener('click', () => {
-    void (async () => {
-      save.disabled = true;
-      try {
-        const result = await window.tishka.connections.save(build(), options.previousName);
-        if (!result.ok) {
-          showErrors(result.errors);
-          return;
-        }
-        options.onDone();
-      } catch (error) {
-        showErrors([error instanceof Error ? error.message : String(error)]);
-      } finally {
-        save.disabled = false;
+    void runWithFeedback(save, SAVE_LABELS, async () => {
+      const result = await window.tishka.connections.save(build(), options.previousName);
+      if (!result.ok) {
+        showErrors(result.errors);
+        throw new Error('Не удалось сохранить');
       }
-    })();
+    }).then((ok) => {
+      if (ok) {
+        options.onDone();
+      }
+    });
   });
 
   cancel.addEventListener('click', () => {

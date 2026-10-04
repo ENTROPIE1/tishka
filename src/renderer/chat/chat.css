@@ -346,6 +346,10 @@ body {
   border-color: var(--accent);
 }
 
+.ask-tools {
+  display: flex;
+}
+
 .ask-hint {
   font-size: 12px;
   color: var(--accent);
@@ -394,11 +398,88 @@ body {
 .composer {
   flex: none;
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
   padding: 10px 16px;
   border-top: 1px solid var(--border);
   background: var(--surface);
+}
+
+.composer-row {
+  display: flex;
+  gap: 8px;
   align-items: flex-end;
+}
+
+.mic-slot {
+  flex: none;
+  display: flex;
+}
+
+.mic-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.mic-button:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mic-button.recording {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.dictation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dictation-label {
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.dictation .level {
+  flex: 1;
+  height: 5px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dictation .level-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 80ms linear;
 }
 
 .composer-input {

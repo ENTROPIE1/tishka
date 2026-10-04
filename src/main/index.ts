@@ -2,6 +2,7 @@ import { app, globalShortcut, ipcMain, Menu, shell, type Tray } from 'electron';
 import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
 import { saveConfig as persistConfig } from '../core/config';
+import type { Config } from '../core/types';
 import { createEventBus } from '../core/events';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
@@ -25,7 +26,30 @@ let tray: Tray | undefined;
 let stt: SttService | undefined;
 let hotkeys: HotkeyRegistrar | undefined;
 
+// Второй запуск не создаёт копию, а поднимает окно чата работающего приложения.
+const singleInstance = app.requestSingleInstanceLock();
+if (!singleInstance) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    openChatWindow();
+  });
+}
+
+function voiceRestartNeeded(previous: Config, next: Config): boolean {
+  const before = previous.voice;
+  const after = next.voice;
+  return (
+    before.sttUrl !== after.sttUrl ||
+    before.stt.exe !== after.stt.exe ||
+    before.stt.model !== after.stt.model
+  );
+}
+
 app.whenReady().then(async () => {
+  if (!singleInstance) {
+    return;
+  }
   Menu.setApplicationMenu(null);
   const dataDir = app.getPath('userData');
   const appRoot = app.isPackaged ? app.getAppPath() : join(__dirname, '..', '..');
@@ -45,7 +69,15 @@ app.whenReady().then(async () => {
   core = tishka;
 
   registerIpc(bus, tishka, secrets);
-  registerSettingsIpc(tishka, secrets);
+  registerSettingsIpc(tishka, secrets, {
+    // Голос перезапускается сам, если изменились программа, модель или адрес.
+    onConfigSaved: (previous, next) => {
+      if (stt !== undefined && voiceRestartNeeded(previous, next)) {
+        stt.stop();
+        void stt.start().catch(() => undefined);
+      }
+    }
+  });
   ipcMain.handle(OPEN_CHAT_CHANNEL, () => {
     closeSettingsWindow();
     openChatWindow();
@@ -106,6 +138,21 @@ app.whenReady().then(async () => {
 
 // Приложение живёт в области уведомлений, пока пользователь не выйдет из меню значка.
 app.on('window-all-closed', () => undefined);
+
+// Служба распознавания останавливается при любом способе выхода.
+function stopVoice(): void {
+  stt?.stop();
+}
+
+app.on('before-quit', stopVoice);
+process.on('SIGINT', () => {
+  stopVoice();
+  app.quit();
+});
+process.on('SIGTERM', () => {
+  stopVoice();
+  app.quit();
+});
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();

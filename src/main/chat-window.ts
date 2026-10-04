@@ -31,6 +31,13 @@ export function openChatWindow(): void {
   });
 
   window.setMenu(null);
+
+  // Микрофон для диктовки: разрешён только доступ к медиа.
+  window.webContents.session.setPermissionRequestHandler((_contents, permission, callback) => {
+    callback(permission === 'media');
+  });
+  window.webContents.session.setPermissionCheckHandler((_contents, permission) => permission === 'media');
+
   window.on('closed', () => {
     if (chatWindow === window) {
       chatWindow = undefined;

@@ -58,7 +58,9 @@ body {
 }
 
 .bubble {
+  width: fit-content;
   max-width: 100%;
+  align-self: center;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -71,7 +73,12 @@ body {
 }
 
 .say {
+  width: fit-content;
+  max-width: 300px;
+  max-height: calc(8 * 1.45em);
+  overflow-y: auto;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .say:empty {
@@ -120,6 +127,40 @@ body {
 .mic:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.mic-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.mic-button:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.mic-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mic-button.recording {
+  color: #ffffff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ask-tools {
+  display: flex;
 }
 
 .mic-icon {

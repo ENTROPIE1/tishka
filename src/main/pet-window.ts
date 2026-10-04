@@ -7,8 +7,9 @@ import { PET_LISTEN_COMMAND_CHANNEL, PET_MODEL_CHANNEL } from './ipc-channels';
 import { Mover, clamp, type Geometry } from './pet-motion';
 
 const WIDTH = 440;
-// Высота под колонку: облачко, карточка до 300 и персонаж 200.
-const HEIGHT = 660;
+// Высота с запасом вверх под облачко до 8 строк, карточку до 300 и персонажа 200.
+// Содержимое прижато к низу, поэтому рост облачка идёт вверх, а ёжик стоит на месте.
+const HEIGHT = 820;
 const TICK_MS = 250;
 const MIN_VISIBLE = 80;
 

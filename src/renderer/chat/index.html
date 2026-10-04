@@ -29,14 +29,21 @@
     </div>
 
     <footer class="composer">
-      <textarea
-        id="input"
-        class="composer-input"
-        rows="1"
-        placeholder="Написать Тишке…"
-        autofocus
-      ></textarea>
-      <button id="send" type="button" class="send-button">Отправить</button>
+      <div class="composer-row">
+        <span id="mic-slot" class="mic-slot"></span>
+        <textarea
+          id="input"
+          class="composer-input"
+          rows="1"
+          placeholder="Написать Тишке…"
+          autofocus
+        ></textarea>
+        <button id="send" type="button" class="send-button">Отправить</button>
+      </div>
+      <div id="dictation" class="dictation" hidden>
+        <div class="level"><div id="dictation-level" class="level-fill"></div></div>
+        <span class="dictation-label">Слушаю…</span>
+      </div>
     </footer>
 
     <script type="module" src="./chat.ts"></script>

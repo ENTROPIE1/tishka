@@ -149,16 +149,68 @@ body {
   filter: brightness(1.08);
 }
 
+.button:active,
+.button-secondary:active,
+.button-danger:active {
+  filter: brightness(0.92);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+  filter: none;
+}
+
 .button-secondary {
   color: var(--text);
   background: var(--surface-soft);
   border: 1px solid var(--border);
 }
 
+.button-secondary:hover {
+  filter: none;
+  background: var(--accent-soft);
+}
+
 .button-danger {
   color: var(--danger);
   background: none;
   border: 1px solid var(--border);
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mark-ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.mark-error {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.btn-done {
+  box-shadow: 0 0 0 2px var(--ok) inset;
+}
+
+.btn-error {
+  box-shadow: 0 0 0 2px var(--danger) inset;
 }
 
 .connection {
@@ -226,6 +278,10 @@ body {
   color: var(--ok);
 }
 
+.state-off {
+  color: var(--muted);
+}
+
 .state-error {
   color: var(--danger);
 }
@@ -235,7 +291,7 @@ body {
 }
 
 .state-starting {
-  color: var(--accent);
+  color: #c08a00;
 }
 
 .connection-error {

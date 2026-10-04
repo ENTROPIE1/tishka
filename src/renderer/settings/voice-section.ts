@@ -1,13 +1,17 @@
 import type { Config } from '../../core/types';
 import type { VoiceStateView } from '../../main/ipc-settings';
-import { button, clear, el, field, sectionTitle, textInput } from './dom';
+import { button, clear, el, field, runWithFeedback, sectionTitle, textInput } from './dom';
 
 const STATE_LABELS: Record<VoiceStateView['state'], string> = {
-  off: 'выключена',
-  starting: 'запускается',
+  off: 'не настроена',
+  starting: 'запускается…',
   ready: 'готова',
   error: 'ошибка'
 };
+
+const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
+const CHECK_LABELS = { busy: 'Проверяю…', done: 'Готово', error: 'Ошибка' };
+const POLL_MS = 1000;
 
 export function mountVoiceSection(root: HTMLElement): void {
   clear(root);
@@ -16,7 +20,7 @@ export function mountVoiceSection(root: HTMLElement): void {
   const hotkey = textInput();
   const exe = textInput();
   const model = textInput();
-  const state = el('span', 'state', STATE_LABELS.off);
+  const state = el('span', 'state state-off', STATE_LABELS.off);
   const save = button('Сохранить');
   const check = button('Проверить', 'button button-secondary');
   const messages = el('div', 'messages');
@@ -41,8 +45,38 @@ export function mountVoiceSection(root: HTMLElement): void {
   function renderState(view: VoiceStateView): void {
     state.className = `state state-${view.state}`;
     state.textContent = STATE_LABELS[view.state];
+    check.disabled = view.state === 'starting';
     if (view.error !== undefined) {
       show(view.error);
+    } else {
+      clear(messages);
+    }
+  }
+
+  let watchTimer: number | undefined;
+  let watchLeft = 0;
+
+  // Пока служба запускается, метка обновляется сама. Короткая серия проверок
+  // ловит переход в запуск сразу после сохранения настроек.
+  async function watchStatus(): Promise<void> {
+    if (watchTimer !== undefined) {
+      return;
+    }
+    try {
+      const view = await window.tishka.voice.status();
+      renderState(view);
+      const idle = view.state === 'off' && watchLeft > 0;
+      if (view.state === 'starting' || idle) {
+        if (idle) {
+          watchLeft -= 1;
+        }
+        watchTimer = window.setTimeout(() => {
+          watchTimer = undefined;
+          void watchStatus();
+        }, POLL_MS);
+      }
+    } catch (error) {
+      show(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -51,16 +85,11 @@ export function mountVoiceSection(root: HTMLElement): void {
     hotkey.value = view.config.voice.hotkey;
     exe.value = view.config.voice.stt.exe;
     model.value = view.config.voice.stt.model;
-    try {
-      renderState(await window.tishka.voice.status());
-    } catch (error) {
-      show(error instanceof Error ? error.message : String(error));
-    }
+    await watchStatus();
   }
 
   save.addEventListener('click', () => {
-    void (async () => {
-      save.disabled = true;
+    void runWithFeedback(save, SAVE_LABELS, async () => {
       try {
         const view = await window.tishka.config.get();
         const next: Config = {
@@ -77,28 +106,26 @@ export function mountVoiceSection(root: HTMLElement): void {
         };
         await window.tishka.config.save(next);
         await window.tishka.voice.apply(next.voice.hotkey);
-        clear(messages);
+        show();
         messages.append(el('div', 'message-ok', 'Настройки голоса сохранены'));
+        watchLeft = 10;
+        void watchStatus();
       } catch (error) {
         show(error instanceof Error ? error.message : String(error));
-      } finally {
-        save.disabled = false;
+        throw error;
       }
-    })();
+    });
   });
 
   check.addEventListener('click', () => {
-    void (async () => {
-      check.disabled = true;
-      clear(messages);
+    void runWithFeedback(check, CHECK_LABELS, async () => {
       try {
         renderState(await window.tishka.voice.check());
       } catch (error) {
         show(error instanceof Error ? error.message : String(error));
-      } finally {
-        check.disabled = false;
+        throw error;
       }
-    })();
+    });
   });
 
   void refresh();

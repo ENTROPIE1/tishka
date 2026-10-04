@@ -2,7 +2,7 @@ import { ipcMain } from 'electron';
 import type { TishkaCore } from '../core/app';
 import type { McpStatus } from '../core/mcp/manager';
 import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
-import type { SecretStore } from '../core/types';
+import type { Config, SecretStore } from '../core/types';
 import { broadcastConfigChanged } from './ipc';
 import {
   CLOSE_SETTINGS_CHANNEL,
@@ -70,12 +70,18 @@ function memoryPatch(value: unknown): { id: string; patch: UpdateMemoryPatch } |
   return { id: record['id'], patch };
 }
 
-export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore): void {
+export interface SettingsHooks {
+  onConfigSaved?(previous: Config, next: Config): void;
+}
+
+export function registerSettingsIpc(core: TishkaCore, secrets: SecretStore, hooks?: SettingsHooks): void {
   ipcMain.handle(CONFIG_GET_CHANNEL, (): Promise<ConfigView> => configView(core));
 
   ipcMain.handle(CONFIG_SAVE_CHANNEL, async (_event, next: unknown) => {
+    const previous = core.config();
     await saveConfigValue(core, next);
     broadcastConfigChanged();
+    hooks?.onConfigSaved?.(previous, core.config());
   });
 
   ipcMain.handle(CONNECTIONS_STATUS_CHANNEL, (): Promise<ConnectionView[]> => statusViews(core, secrets));

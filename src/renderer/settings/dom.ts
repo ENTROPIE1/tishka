@@ -27,6 +27,45 @@ export function button(label: string, className = 'button'): HTMLButtonElement {
   return node;
 }
 
+export interface FeedbackLabels {
+  busy: string;
+  done: string;
+  error: string;
+}
+
+function setButtonContent(button: HTMLButtonElement, markClass: string, mark: string, label: string): void {
+  const badge = el('span', markClass, mark);
+  button.replaceChildren(badge, document.createTextNode(` ${label}`));
+}
+
+// Долгое действие кнопки: вращающийся значок и текст «...», затем на 2 секунды
+// «Готово» или «Ошибка», после чего прежний текст. Ошибку показывает вызывающий.
+export async function runWithFeedback(
+  button: HTMLButtonElement,
+  labels: FeedbackLabels,
+  action: () => Promise<void>
+): Promise<boolean> {
+  const original = button.textContent ?? '';
+  button.disabled = true;
+  setButtonContent(button, 'spinner', '', labels.busy);
+  let ok = false;
+  try {
+    await action();
+    ok = true;
+  } catch {
+    ok = false;
+  }
+  setButtonContent(button, ok ? 'mark-ok' : 'mark-error', ok ? '✓' : '✕', ok ? labels.done : labels.error);
+  button.classList.add(ok ? 'btn-done' : 'btn-error');
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 2000);
+  });
+  button.classList.remove('btn-done', 'btn-error');
+  button.textContent = original;
+  button.disabled = false;
+  return ok;
+}
+
 export function textInput(value = '', type = 'text'): HTMLInputElement {
   const node = el('input', 'text-input');
   node.type = type;

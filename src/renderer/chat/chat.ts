@@ -1,3 +1,5 @@
+import { createMicButton } from '../shared/mic-button';
+import { insertAtCursor } from '../shared/text-insert';
 import { createChatFeed } from './feed';
 
 const feed = document.getElementById('feed') as HTMLElement;
@@ -8,6 +10,9 @@ const clearButton = document.getElementById('clear-history') as HTMLButtonElemen
 const settingsButton = document.getElementById('open-settings') as HTMLButtonElement;
 const bannerButton = document.getElementById('open-settings-banner') as HTMLButtonElement;
 const noKeyBanner = document.getElementById('no-key') as HTMLElement;
+const micSlot = document.getElementById('mic-slot') as HTMLElement;
+const dictation = document.getElementById('dictation') as HTMLElement;
+const dictationLevel = document.getElementById('dictation-level') as HTMLElement;
 
 const view = createChatFeed(feed);
 
@@ -102,6 +107,28 @@ function initComposer(): void {
   });
 }
 
+// Диктовка в поле ввода: текст вставляется в место курсора и не отправляется сам.
+function initDictation(): void {
+  const mic = createMicButton({
+    onText: (text) => {
+      insertAtCursor(input, text);
+    },
+    onLevel: (level) => {
+      dictationLevel.style.width = `${Math.round(level * 100)}%`;
+    },
+    onListeningChange: (listening) => {
+      dictation.hidden = !listening;
+      if (!listening) {
+        dictationLevel.style.width = '0%';
+      }
+    },
+    onError: (message) => {
+      setStatus(message);
+    }
+  });
+  micSlot.append(mic.element);
+}
+
 function initClearButton(): void {
   clearButton.addEventListener('click', () => {
     if (!window.confirm('Очистить всю переписку с Тишкой?')) {
@@ -146,6 +173,7 @@ window.tishka.config.onChanged(() => {
 initEvents();
 initFeed();
 initComposer();
+initDictation();
 initClearButton();
 initSettingsButtons();
 void loadHistory();
