@@ -2,6 +2,7 @@ import { createMicButton } from '../shared/mic-button';
 import { insertAtCursor } from '../shared/text-insert';
 import { createChatFeed } from './feed';
 import { initAppShell } from './navigation';
+import { mountChatToolbar } from './toolbar';
 
 const feed = document.getElementById('feed') as HTMLElement;
 const statusLine = document.getElementById('status') as HTMLElement;
@@ -46,10 +47,12 @@ function initEvents(): void {
   window.tishka.onEvent((event) => {
     switch (event.type) {
       case 'listen.end':
-        view.appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'user', text: event.text });
+        // Перечитываем историю: ядро могло начать новый разговор и добавить разделитель.
+        void reloadFeed();
         break;
       case 'reply':
         view.appendEntry({
+          kind: 'message',
           id: crypto.randomUUID(),
           at: nowIso(),
           from: 'tishka',
@@ -63,10 +66,10 @@ function initEvents(): void {
         clearStatus();
         break;
       case 'notify':
-        view.appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
+        view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;
       case 'error':
-        view.appendEntry({ id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.message });
+        view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.message });
         clearStatus();
         break;
       case 'think.start':
@@ -147,6 +150,10 @@ async function loadHistory(): Promise<void> {
   view.fill(await window.tishka.history(200));
 }
 
+async function reloadFeed(): Promise<void> {
+  view.refill(await window.tishka.history(200));
+}
+
 function initSettingsButtons(): void {
   const open = (): void => {
     void window.tishka.openSettings();
@@ -180,6 +187,7 @@ initFeed();
 initComposer();
 initDictation();
 initClearButton();
+mountChatToolbar({ feed: view, reload: reloadFeed, loadAll: () => window.tishka.history(2000) });
 initSettingsButtons();
 void loadHistory();
 void refreshKeyState();

@@ -6,12 +6,16 @@ import { renderMarkdown } from '../shared/markdown';
 const STICK_BOTTOM_GAP = 48;
 const USER_LINE_LIMIT = 6;
 const USER_CHAR_LIMIT = 360;
+const HIGHLIGHT_MS = 2000;
 
 export interface ChatFeed {
   appendEntry(entry: HistoryEntry): void;
   appendAskCard(ask: AskRequest): void;
   clear(): void;
   fill(entries: HistoryEntry[]): void;
+  refill(entries: HistoryEntry[]): void;
+  scrollTo(id: string): boolean;
+  highlight(id: string): void;
 }
 
 function timeLabel(at: string): string {
@@ -20,6 +24,15 @@ function timeLabel(at: string): string {
     return '';
   }
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function dividerLabel(at: string): string {
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) {
+    return 'Новый разговор';
+  }
+  const day = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(date);
+  return `Новый разговор · ${day}, ${timeLabel(at)}`;
 }
 
 // Длинное сообщение человека сворачивается до шести строк с кнопкой «Показать целиком».
@@ -47,6 +60,17 @@ function userTextElement(text: string): HTMLElement {
 
 function messageElement(entry: HistoryEntry): HTMLElement {
   const message = document.createElement('div');
+  message.dataset['id'] = entry.id;
+
+  if (entry.kind === 'divider') {
+    message.className = 'divider';
+    const line = document.createElement('span');
+    line.className = 'divider-label';
+    line.textContent = dividerLabel(entry.at);
+    message.append(line);
+    return message;
+  }
+
   message.className = `msg msg-${entry.from}`;
   if (entry.from === 'tishka' && entry.mood !== undefined) {
     message.classList.add(`mood-${entry.mood}`);
@@ -142,5 +166,30 @@ export function createChatFeed(element: HTMLElement): ChatFeed {
     scrollToBottom();
   }
 
-  return { appendEntry, appendAskCard, clear, fill };
+  function refill(entries: HistoryEntry[]): void {
+    clear();
+    fill(entries);
+  }
+
+  function scrollTo(id: string): boolean {
+    const target = element.querySelector<HTMLElement>(`[data-id="${id}"]`);
+    if (target === null) {
+      return false;
+    }
+    target.scrollIntoView?.({ block: 'center' });
+    return true;
+  }
+
+  function highlight(id: string): void {
+    const target = element.querySelector<HTMLElement>(`[data-id="${id}"]`);
+    if (target === null) {
+      return;
+    }
+    target.classList.add('flash');
+    window.setTimeout(() => {
+      target.classList.remove('flash');
+    }, HIGHLIGHT_MS);
+  }
+
+  return { appendEntry, appendAskCard, clear, fill, refill, scrollTo, highlight };
 }

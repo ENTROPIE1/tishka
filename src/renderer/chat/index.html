@@ -9,6 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Тишка</title>
     <link rel="stylesheet" href="./chat.css" />
+    <link rel="stylesheet" href="./search.css" />
     <link rel="stylesheet" href="../settings/settings.css" />
     <link rel="stylesheet" href="./shell.css" />
   </head>
@@ -45,10 +46,22 @@
         <header class="topbar">
           <span class="topbar-title">Тишка</span>
           <div class="topbar-actions">
+            <button id="new-conversation" type="button" class="ghost-button">Новый разговор</button>
+            <button id="search-toggle" type="button" class="icon-button" title="Поиск (Ctrl+F)" aria-label="Поиск">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6.5" />
+                <path d="M15.5 15.5L21 21" />
+              </svg>
+            </button>
             <button id="open-settings" type="button" class="ghost-button">Подключения</button>
             <button id="clear-history" type="button" class="ghost-button">Очистить историю</button>
           </div>
         </header>
+
+        <div id="search-panel" class="search-panel" hidden>
+          <input id="search-input" class="search-input" type="search" placeholder="Поиск по всей истории…" />
+          <div id="search-results" class="search-results" hidden></div>
+        </div>
 
         <main id="feed" class="feed" aria-live="polite"></main>
 

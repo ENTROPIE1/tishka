@@ -84,7 +84,9 @@ async function waitFor(predicate: () => boolean, timeoutMs = 10_000): Promise<vo
 
 const pendingCleanup: Array<() => Promise<void>> = [];
 
-async function setup(options: { fetch?: typeof fetch; secrets?: Record<string, string>; config?: unknown } = {}) {
+async function setup(
+  options: { fetch?: typeof fetch; secrets?: Record<string, string>; config?: unknown; now?: () => Date } = {}
+) {
   const dataDir = await mkdtemp(join(tmpdir(), 'tishka-app-'));
   if (options.config !== undefined) {
     await writeFile(join(dataDir, 'config.json'), JSON.stringify(options.config), 'utf8');
@@ -101,7 +103,7 @@ async function setup(options: { fetch?: typeof fetch; secrets?: Record<string, s
     events: bus,
     openExternal,
     showPanel: () => undefined,
-    now: () => FIXED_NOW,
+    now: options.now ?? (() => FIXED_NOW),
     fetch: options.fetch
   });
   await core.start();
@@ -109,7 +111,7 @@ async function setup(options: { fetch?: typeof fetch; secrets?: Record<string, s
     await core.stop();
     await removeDir(dataDir);
   });
-  return { core, events, openExternal, dataDir };
+  return { core, bus, events, openExternal, dataDir };
 }
 
 afterEach(async () => {
@@ -295,10 +297,10 @@ describe('createTishkaCore', () => {
 
     const entries = core.history();
     const userIndex = entries.findIndex(
-      (entry) => entry.from === 'user' && entry.text === 'расскажи о себе'
+      (entry) => entry.kind === 'message' && entry.from === 'user' && entry.text === 'расскажи о себе'
     );
     const tishkaIndex = entries.findIndex(
-      (entry) => entry.from === 'tishka' && entry.text === 'Привет! Я Тишка.'
+      (entry) => entry.kind === 'message' && entry.from === 'tishka' && entry.text === 'Привет! Я Тишка.'
     );
     expect(userIndex).toBeGreaterThanOrEqual(0);
     expect(tishkaIndex).toBeGreaterThan(userIndex);
@@ -329,5 +331,79 @@ describe('createTishkaCore', () => {
     for (const timer of created) {
       expect(cleared.has(timer)).toBe(true);
     }
+  });
+
+  it('новый разговор очищает контекст агента и добавляет разделитель', async () => {
+    const bodies: string[] = [];
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      bodies.push(String(init?.body));
+      return replyChoice(`r${bodies.length}`, 'ок');
+    });
+    const { core } = await setup({ fetch: fetchMock });
+    const dividers = (): number => core.history().filter((entry) => entry.kind === 'divider').length;
+
+    await core.handleUserText('первый вопрос');
+    const before = dividers();
+
+    core.newConversation();
+    await core.handleUserText('второй вопрос');
+
+    expect(dividers()).toBe(before + 1);
+    expect(bodies[1]).toContain('второй вопрос');
+    expect(bodies[1]).not.toContain('первый вопрос');
+  });
+
+  it('после 31 минуты тишины начинается новый разговор, после 10 минут — нет', async () => {
+    let current = new Date('2026-10-02T10:00:00');
+    const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'ок'));
+    const { core } = await setup({ fetch: fetchMock, now: () => current });
+    const dividers = (): number => core.history().filter((entry) => entry.kind === 'divider').length;
+    const baseline = dividers();
+
+    await core.handleUserText('раз');
+    current = new Date('2026-10-02T10:10:00');
+    await core.handleUserText('два');
+    expect(dividers()).toBe(baseline);
+
+    current = new Date('2026-10-02T10:41:00');
+    await core.handleUserText('три');
+    expect(dividers()).toBe(baseline + 1);
+  });
+
+  it('напоминание Тишки разговор не начинает и не продлевает', async () => {
+    let current = new Date('2026-10-02T10:00:00');
+    const fetchMock = vi.fn<typeof fetch>(async () => replyChoice('r1', 'ок'));
+    const { core, bus } = await setup({ fetch: fetchMock, now: () => current });
+    const dividers = (): number => core.history().filter((entry) => entry.kind === 'divider').length;
+    const baseline = dividers();
+
+    current = new Date('2026-10-02T10:31:00');
+    bus.emit({ type: 'notify', title: 'выпить воды' });
+    bus.emit({ type: 'reply', reply: { say: 'выпить воды' } });
+    expect(dividers()).toBe(baseline);
+
+    current = new Date('2026-10-02T10:32:00');
+    await core.handleUserText('привет');
+    expect(dividers()).toBe(baseline + 1);
+  });
+
+  it('длинное сообщение человека сокращено в контексте и полно в истории', async () => {
+    const bodies: string[] = [];
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      bodies.push(String(init?.body));
+      return replyChoice(`r${bodies.length}`, 'ок');
+    });
+    const { core } = await setup({ fetch: fetchMock });
+    const long = 'я'.repeat(5000);
+
+    await core.handleUserText(long);
+    await core.handleUserText('следующий');
+
+    const stored = core
+      .history()
+      .find((entry) => entry.kind === 'message' && entry.from === 'user' && entry.text.startsWith('я'));
+    expect(stored?.kind === 'message' ? stored.text.length : 0).toBe(5000);
+    expect(bodies[1]).not.toContain(long);
+    expect(bodies[1]).toContain('длинный текст сокращён');
   });
 });

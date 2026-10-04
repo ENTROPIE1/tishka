@@ -3,10 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createEventBus } from '../src/core/events';
-import { createHistory } from '../src/core/history';
+import { createHistory, type HistoryEntry, type HistoryMessage } from '../src/core/history';
 import type { EventBus } from '../src/core/types';
 
 const FIXED_NOW = new Date('2026-10-02T12:30:00');
+
+function messages(entries: HistoryEntry[]): HistoryMessage[] {
+  return entries.filter((entry): entry is HistoryMessage => entry.kind === 'message');
+}
 
 const pendingDirs: string[] = [];
 
@@ -76,7 +80,7 @@ describe('createHistory', () => {
     emitReply(bus, 'второй');
     emitReply(bus, 'третий');
 
-    expect(history.list(2).map((entry) => entry.text)).toEqual(['второй', 'третий']);
+    expect(messages(history.list(2)).map((entry) => entry.text)).toEqual(['второй', 'третий']);
   });
 
   it('история переживает перезапуск: новый экземпляр на том же файле видит записи', async () => {
@@ -113,7 +117,7 @@ describe('createHistory', () => {
 
     const entries = history.list();
     expect(entries).toHaveLength(2);
-    expect(entries.every((entry) => entry.text === 'привет')).toBe(true);
+    expect(messages(entries).every((entry) => entry.text === 'привет')).toBe(true);
     history.stop();
   });
 
@@ -157,6 +161,83 @@ describe('createHistory', () => {
 
     expect(history.list()).toEqual([]);
     expect(await readFile(file, 'utf8')).toBe('');
+    history.stop();
+  });
+
+  it('addDivider пишет разделитель в список и файл', async () => {
+    const file = await tempHistoryPath();
+    const history = createHistory(file, createEventBus(), () => FIXED_NOW);
+    await history.start();
+
+    history.addDivider();
+
+    const entries = history.list();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ kind: 'divider', at: FIXED_NOW.toISOString() });
+
+    const raw = await readFile(file, 'utf8');
+    expect(JSON.parse(raw.trim())).toMatchObject({ kind: 'divider', at: FIXED_NOW.toISOString() });
+    history.stop();
+  });
+
+  it('разделитель переживает перезапуск', async () => {
+    const file = await tempHistoryPath();
+    const first = createHistory(file, createEventBus(), () => FIXED_NOW);
+    await first.start();
+    first.addDivider();
+    first.stop();
+
+    const second = createHistory(file, createEventBus(), () => FIXED_NOW);
+    await second.start();
+
+    expect(second.list()[0]).toMatchObject({ kind: 'divider' });
+    second.stop();
+  });
+
+  it('search находит без учёта регистра и «ё/е», новые первыми, соблюдает предел', async () => {
+    const bus = createEventBus();
+    const history = createHistory(await tempHistoryPath(), bus, () => FIXED_NOW);
+    await history.start();
+
+    bus.emit({ type: 'listen.end', text: 'ёлка и подарки' });
+    bus.emit({ type: 'reply', reply: { say: 'Ёлка большая' } });
+    bus.emit({ type: 'listen.end', text: 'ёщё раз про ёлку' });
+
+    expect(history.search('ЕЛКА')).toHaveLength(2);
+    const found = history.search('елку', 1);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ text: 'ёщё раз про ёлку' });
+    history.stop();
+  });
+
+  it('search ищет в заголовках и содержимом карточек', async () => {
+    const bus = createEventBus();
+    const history = createHistory(await tempHistoryPath(), bus, () => FIXED_NOW);
+    await history.start();
+
+    bus.emit({
+      type: 'reply',
+      reply: {
+        say: 'Готово',
+        show: { kind: 'text', title: 'Заметка', markdown: 'секретный пароль от склада' }
+      }
+    });
+
+    const found = history.search('склад');
+    expect(found).toHaveLength(1);
+    expect(found[0]).toMatchObject({ text: 'Готово' });
+    history.stop();
+  });
+
+  it('пустой запрос возвращает пустой список, разделитель не попадает в результаты', async () => {
+    const bus = createEventBus();
+    const history = createHistory(await tempHistoryPath(), bus, () => FIXED_NOW);
+    await history.start();
+    history.addDivider();
+    bus.emit({ type: 'listen.end', text: 'привет' });
+
+    expect(history.search('   ')).toEqual([]);
+    expect(history.search('привет').every((entry) => entry.kind === 'message')).toBe(true);
     history.stop();
   });
 });

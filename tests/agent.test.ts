@@ -220,6 +220,7 @@ describe('createAgent', () => {
     expect(content).toContain('reply');
     expect(content).toContain('черновиком');
     expect(content).toContain('октября');
+    expect(content).toContain('history_search');
   });
 
   it('история хранит не больше 40 сообщений, системное не вытесняется', async () => {
@@ -249,5 +250,56 @@ describe('createAgent', () => {
     agent.reset();
 
     expect(agent.history()).toEqual([]);
+  });
+
+  it('длинное сообщение человека после ответа сокращено в контексте', async () => {
+    const { registry } = makeRegistry();
+    const { llm } = makeLlm(() => textResponse('Коротко'));
+    const { agent } = makeAgent(llm, registry);
+    const long = 'а'.repeat(5000);
+
+    await agent.handle(long);
+
+    const user = agent.history().find((message) => message.role === 'user');
+    expect(typeof user?.content).toBe('string');
+    expect(user?.content).toContain('длинный текст сокращён');
+    expect((user?.content as string).startsWith('а'.repeat(300))).toBe(true);
+    expect((user?.content as string).length).toBeLessThan(500);
+  });
+
+  it('объём контекста ограничен, системное на месте, ответ инструмента без вызова не остаётся', async () => {
+    const { registry } = makeRegistry({ ok: true, content: 'х'.repeat(6000) });
+    const { llm } = makeLlm((round) =>
+      round === 0
+        ? { text: null, toolCalls: [toolCall('t1', 'echo', { text: 'большой' })] }
+        : textResponse('Коротко')
+    );
+    const { agent } = makeAgent(llm, registry);
+
+    for (let turn = 0; turn < 12; turn += 1) {
+      await agent.handle('в'.repeat(3000));
+    }
+
+    const history = agent.history();
+    const volume = history
+      .filter((message) => message.role !== 'system')
+      .reduce((total, message) => total + (typeof message.content === 'string' ? message.content.length : 0), 0);
+
+    expect(volume).toBeLessThanOrEqual(24_000);
+    expect(history[0].role).toBe('system');
+    expect(history[0].role === 'system' && history[0].content).toContain('Тишка');
+
+    const callIds = new Set<string>();
+    for (const message of history) {
+      if (message.role === 'assistant' && message.toolCalls !== undefined) {
+        for (const call of message.toolCalls) {
+          callIds.add(call.id);
+        }
+      }
+    }
+    const orphanTools = history.filter(
+      (message) => message.role === 'tool' && !callIds.has(message.toolCallId)
+    );
+    expect(orphanTools).toEqual([]);
   });
 });

@@ -1,7 +1,9 @@
 import { join } from 'node:path';
-import { createAgent } from './agent/agent';
+import { createAgent, type Agent } from './agent/agent';
 import { defaultConfig, loadConfig, saveConfig as persistConfig } from './config';
+import { createConversationClock } from './conversation';
 import { createHistory, type HistoryEntry } from './history';
+import { registerHistoryTools } from './history-tool';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
 import { createMemoryReviewer, type MemoryReviewer } from './memory/review';
@@ -43,6 +45,8 @@ export interface TishkaCore {
   saveConfig(next: Config): Promise<void>;   // сохранить настройки и применить их
   reconnect(name: string): Promise<McpStatus | undefined>;   // переподключить один сервер и вернуть его статус
   history(limit?: number): HistoryEntry[];
+  historySearch(query: string, limit?: number): HistoryEntry[];
+  newConversation(): void;         // очищает контекст агента и ставит разделитель в истории
   clearHistory(): Promise<void>;
   memory(): MemoryRecord[];
   memorySearch(query: string): MemoryRecord[];
@@ -92,9 +96,22 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let memory: MemoryStore | undefined;
   let mcp: McpManager | undefined;
   let mcpTask: Promise<void> | undefined;
+  let agent: Agent | undefined;
   let started = false;
   let queue: Promise<unknown> = Promise.resolve();
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
+  const conversation = createConversationClock();
+
+  // Новый разговор: чистый контекст агента плюс разделитель в ленте.
+  function openConversation(at: Date): void {
+    agent?.reset();
+    historyStore.addDivider();
+    conversation.start(at);
+  }
+
+  function newConversation(): void {
+    openConversation(deps.now());
+  }
 
   async function applyMcpServers(servers: McpServerConfig[]): Promise<void> {
     if (mcp === undefined || router === undefined) {
@@ -138,6 +155,10 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   }
 
   async function processUserText(text: string): Promise<Reply> {
+    const now = deps.now();
+    if (conversation.userTurn(now)) {
+      openConversation(now);
+    }
     deps.events.emit({ type: 'listen.end', text });
     let reply: Reply;
     try {
@@ -185,6 +206,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       showPanel: deps.showPanel,
       now: deps.now
     });
+    registerHistoryTools(registry, historyStore);
 
     const memoryStore = createMemoryStore({
       filePath: join(deps.dataDir, 'memory.json'),
@@ -219,7 +241,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     registerSkillTools(registry, { store: skills, registry, events: deps.events });
     registerPresetTools(registry, { presetsDir: deps.presetsDir, store: skills, events: deps.events });
 
-    const agent = createAgent({
+    agent = createAgent({
       llm,
       registry,
       events: deps.events,
@@ -230,6 +252,9 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     });
     router = createRouter({ agent, skills, runner, registry, events: deps.events });
     await router.refreshSkills();
+
+    // Запуск приложения начинает новый разговор: старый контекст в модель не уходит.
+    openConversation(deps.now());
 
     reviewer = createMemoryReviewer({ store: memoryStore, events: deps.events, now: deps.now });
     await scheduler.start();
@@ -290,6 +315,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     saveConfig,
     reconnect,
     history: (limit?: number) => historyStore.list(limit),
+    historySearch: (query: string, limit?: number) => historyStore.search(query, limit),
+    newConversation,
     clearHistory: () => historyStore.clear(),
     memory: () => memory?.list() ?? [],
     memorySearch: (query: string) => memory?.search(query) ?? [],
