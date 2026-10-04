@@ -9,7 +9,8 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "build:mcp": "tsx scripts/build-mcp.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:scenarios": "vitest run tests/scenarios"
   },
   "devDependencies": {
     "electron": "^44.5.1",
