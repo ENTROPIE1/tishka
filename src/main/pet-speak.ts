@@ -115,7 +115,11 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
         return;
       }
       case 'wake':
-        schedule(CANNED.greeting, false);
+        // Приветствие «Слушаю» уместно, только когда человек позвал Тишку сам;
+        // уведомление по триггеру не включает прослушивание.
+        if (event.source !== 'trigger') {
+          schedule(CANNED.greeting, false);
+        }
         return;
       case 'listen.start':
         halt();

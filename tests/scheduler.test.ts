@@ -123,11 +123,22 @@ describe('createScheduler — напоминания', () => {
     expect(h.events).toEqual([
       { type: 'wake', source: 'trigger' },
       { type: 'notify', title: 'Купить хлеб' },
-      { type: 'reply', reply: { say: 'Купить хлеб' } }
+      { type: 'reply', reply: { say: 'Купить хлеб' } },
+      { type: 'idle' }
     ]);
 
     await h.scheduler.tick();
-    expect(h.events).toHaveLength(3);
+    expect(h.events).toHaveLength(4);
+  });
+
+  it('напоминание завершается событием idle, как обычный ответ', async () => {
+    const h = setup({ startNow: local(2026, 10, 5, 9, 0) });
+    await h.scheduler.addReminder(local(2026, 10, 5, 9, 5).toISOString(), 'Купить хлеб');
+
+    h.setNow(local(2026, 10, 5, 9, 5));
+    await h.scheduler.tick();
+
+    expect(h.events.at(-1)).toEqual({ type: 'idle' });
   });
 
   it('состояние переживает перезапуск приложения', async () => {
@@ -283,6 +294,16 @@ describe('createScheduler — навыки', () => {
 
     expect(h.runs).toHaveLength(2);
     expect(h.events).toContainEqual({ type: 'notify', title: 'Сбойный', skillId: 'flaky' });
+  });
+
+  it('навык по расписанию завершается событием idle', async () => {
+    const skill = makeSkill({ id: 'cron-idle', name: 'Крон', trigger: { type: 'schedule', cron: '* * * * *' } });
+    const h = setup({ skills: [skill], startNow: local(2026, 10, 5, 10, 0) });
+
+    await h.scheduler.tick();
+
+    expect(h.runs).toHaveLength(1);
+    expect(h.events.at(-1)).toEqual({ type: 'idle' });
   });
 
   it('напоминание, добавленное во время долгого навыка, не теряется', async () => {

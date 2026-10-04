@@ -72,4 +72,13 @@ describe('createMemoryReviewer', () => {
 
     expect(notifies()).toEqual([]);
   });
+
+  it('обзор памяти завершается событием idle', async () => {
+    await store.add({ text: 'Адрес', reviewDays: 1 });
+    now = new Date(now.getTime() + 2 * DAY_MS);
+
+    await reviewer.tick();
+
+    expect(events.at(-1)).toEqual({ type: 'idle' });
+  });
 });

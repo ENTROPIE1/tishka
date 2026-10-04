@@ -403,6 +403,25 @@ describe('createTishkaCore', () => {
     }
   });
 
+  it('ручной запуск навыка завершается событием idle', async () => {
+    const { core, events } = await setupCore();
+    const saved = await core.skills.save({
+      format: 'tishka-skill/1',
+      id: 'say-hi',
+      name: 'Поздороваться',
+      description: '',
+      phrases: ['поздоровайся'],
+      trigger: { type: 'manual' },
+      steps: [{ id: 'say', say: 'Привет' }]
+    });
+
+    expect(saved.ok).toBe(true);
+    const reply = await core.skills.run('say-hi');
+
+    expect(reply.say).toBe('Привет');
+    expect(events.at(-1)).toEqual({ type: 'idle' });
+  });
+
   it('длинное сообщение человека сокращено в контексте и полно в истории', async () => {
     const bodies: string[] = [];
     const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
