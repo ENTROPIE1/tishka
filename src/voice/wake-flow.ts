@@ -226,7 +226,12 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       pending = undefined;
       if (next !== undefined) {
         handlePhrase(next);
+        return;
       }
+      // После любой обработанной фразы (успех, «Не расслышал», ошибка службы,
+      // фраза не по адресу) отсчёт тишины начинается заново. Во время ответа
+      // armTimer ничего не делает — таймер заведёт завершение ответа.
+      armTimer();
     });
   }
 
