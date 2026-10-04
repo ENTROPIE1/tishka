@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: -8px 0 0;
+  margin: 0;
   padding: 8px 10px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -19,11 +19,19 @@
   box-shadow: var(--shadow);
 }
 
+/* Свёрнутая строка — тонкая полоска только под ёжиком. */
 .composer.collapsed {
+  width: var(--pet-width);
+  margin-left: auto;
   min-height: 10px;
   padding: 0;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.pet.mirrored .composer.collapsed {
+  margin-left: 0;
+  margin-right: auto;
 }
 
 .composer.collapsed .mic,

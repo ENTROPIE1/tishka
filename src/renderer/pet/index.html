@@ -15,12 +15,17 @@
   </head>
   <body>
     <div id="pet" class="pet">
-      <div id="card-host" class="card-host" hidden></div>
-      <div id="bubble" class="bubble" hidden>
-        <div id="say" class="say"></div>
-      </div>
-      <div id="character" class="character">
-        <span id="state" class="state-label"></span>
+      <div class="pet-row">
+        <div id="answers" class="answers">
+          <div id="card-host" class="card-host" hidden></div>
+          <div id="bubble" class="bubble" hidden>
+            <div id="say" class="say"></div>
+          </div>
+        </div>
+        <div class="pet-side">
+          <div id="character" class="character" data-state="hidden"></div>
+          <div id="state-label" class="state-label"></div>
+        </div>
       </div>
       <div id="composer-host" class="composer-host"></div>
     </div>

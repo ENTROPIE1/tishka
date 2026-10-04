@@ -61,6 +61,7 @@ export const PET_WAKE_STATE_CHANNEL = 'tishka:pet:wake-state';
 export const PET_SPEAK_CHANNEL = 'tishka:pet:speak';
 export const PET_SPEAK_STOP_CHANNEL = 'tishka:pet:speak-stop';
 export const PET_SPEAK_DONE_CHANNEL = 'tishka:pet:speak-done';
+export const PET_LAYOUT_CHANNEL = 'tishka:pet:layout';
 
 export const CHAT_TALK_TOGGLE_CHANNEL = 'tishka:chat:talk-toggle';
 export const CHAT_TALK_PHRASE_CHANNEL = 'tishka:chat:talk-phrase';
