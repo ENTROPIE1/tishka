@@ -8,6 +8,7 @@ import { createMemoryReviewer, type MemoryReviewer } from './memory/review';
 import { createMemoryStore, type MemoryRecord, type MemoryStore, type UpdateMemoryPatch } from './memory/store';
 import { registerMemoryTools } from './memory/tools';
 import { createRouter, type Router } from './router';
+import { registerPresetTools } from './skills/presets';
 import { createSkillRunner } from './skills/runner';
 import { createSkillStore } from './skills/store';
 import { registerSkillTools } from './skills/tools';
@@ -216,6 +217,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     watcher = createWatcher({ skills, registry, runner, state, events: deps.events, now: deps.now });
     registerTriggerTools(registry, scheduler, deps.now);
     registerSkillTools(registry, { store: skills, registry, events: deps.events });
+    registerPresetTools(registry, { presetsDir: deps.presetsDir, store: skills, events: deps.events });
 
     const agent = createAgent({
       llm,

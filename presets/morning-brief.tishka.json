@@ -1,0 +1,29 @@
+{
+  "format": "tishka-skill/1",
+  "id": "morning-brief",
+  "name": "Утренняя сводка",
+  "description": "Каждое утро сам собирает встречи на день и делает сводку",
+  "phrases": [],
+  "requires": ["exchange"],
+  "trigger": { "type": "schedule", "cron": "30 9 * * 1-5" },
+  "steps": [
+    {
+      "id": "meetings",
+      "tool": "exchange__list_meetings",
+      "args": { "date": "{{today}}", "days": 1 }
+    },
+    {
+      "id": "digest",
+      "ask": "Вот встречи на сегодня: {{steps.meetings.content}}. Сделай короткую сводку: сколько встреч, какая первая, есть ли окна между ними. Список встреч оформи коротко и по порядку."
+    },
+    {
+      "id": "answer",
+      "say": "Посмотрел твой день, подробности в карточке",
+      "show": {
+        "kind": "text",
+        "title": "Мой день",
+        "markdown": "{{steps.digest.content}}"
+      }
+    }
+  ]
+}

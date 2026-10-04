@@ -1,0 +1,11 @@
+{
+  "format": "tishka-skill/1",
+  "id": "standup-reminder",
+  "name": "Напоминание о планёрке",
+  "description": "По будням напоминает, что скоро планёрка",
+  "phrases": [],
+  "trigger": { "type": "schedule", "cron": "55 10 * * 1-5" },
+  "steps": [
+    { "id": "remind", "say": "Через пять минут планёрка" }
+  ]
+}
