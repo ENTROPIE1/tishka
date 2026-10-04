@@ -28,5 +28,8 @@ export interface PetWindow {
   leave(): void;
   isVisible(): boolean;
   reload(): void;
+  // Сообщения до загрузки страницы не доходят: подписчик вызывается после
+  // каждой загрузки (и сразу, если страница уже загружена).
+  onPageLoaded(listener: () => void): void;
   dispose(): void;
 }

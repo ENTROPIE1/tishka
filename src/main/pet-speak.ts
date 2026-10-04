@@ -1,12 +1,19 @@
-import type { Config, EventBus } from '../core/types';
+import type { Config, EventBus, TishkaEvent } from '../core/types';
 import type { TimingMark } from './timing-log';
+import type { TalkSource } from '../pet/state';
 import { CANNED, CANNED_TEXTS, greetingFor } from '../voice/canned';
-import { createSpeechQueue, type SpeakMessage } from '../voice/speech-queue';
+import { createSpeechQueue, type SpeakMessage, type SpeechItem } from '../voice/speech-queue';
 import { prepareForSpeech } from '../voice/speech-text';
 import { createTtsClient, type TtsHealth } from '../voice/tts-client';
 
+// Шина с источником обращения: озвучка реплики несёт её источник.
+type SpeechBus = EventBus & {
+  source?(): TalkSource;
+  emitAs?(source: TalkSource, event: TishkaEvent): void;
+};
+
 export interface SpeechOutputDeps {
-  bus: EventBus;
+  bus: SpeechBus;
   getConfig(): Config;
   play(message: SpeakMessage, signal: AbortSignal): Promise<void>;
   isReady?(): boolean;   // служба распознавания готова: «слушаю» не обещаем зря
@@ -33,7 +40,7 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
   const cache = new Map<string, Uint8Array>();
   const queue = createSpeechQueue({
     play: (item, signal) => deps.play({ wav: item.wav, volume: volume() }, signal),
-    onStart: (text) => deps.bus.emit({ type: 'speak.start', text }),
+    onStart: (item) => emitStart(item),
     onEnd: () => deps.bus.emit({ type: 'speak.end' })
   });
   let unavailable = false;
@@ -44,6 +51,22 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
   function halt(): void {
     stopToken += 1;
     queue.stop();
+  }
+
+  // Источник реплики фиксируется в момент, когда реплика пришла; озвучка
+  // начинается позже, когда шина уже вернулась к «ежу».
+  function currentSource(): TalkSource {
+    return deps.bus.source?.() ?? 'pet';
+  }
+
+  // Начало речи от имени источника реплики: слушатели видят её источник.
+  function emitStart(item: SpeechItem): void {
+    const event: TishkaEvent = { type: 'speak.start', text: item.text };
+    if (item.source !== undefined && deps.bus.emitAs !== undefined) {
+      deps.bus.emitAs(item.source, event);
+      return;
+    }
+    deps.bus.emit(event);
   }
 
   function volume(): number {
@@ -91,7 +114,7 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     return result.wav;
   }
 
-  async function speak(text: string, force: boolean): Promise<void> {
+  async function speak(text: string, force: boolean, source: TalkSource): Promise<void> {
     if (!force && !deps.getConfig().voice.tts.enabled) {
       return;
     }
@@ -108,11 +131,12 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     if (wav === undefined || token !== stopToken) {
       return;
     }
-    queue.enqueue({ text: prepared, wav });
+    queue.enqueue({ text: prepared, wav, source });
   }
 
   function schedule(text: string, force: boolean): void {
-    chain = chain.then(() => speak(text, force)).catch(() => undefined);
+    const source = currentSource();
+    chain = chain.then(() => speak(text, force, source)).catch(() => undefined);
   }
 
   const unsubscribe = deps.bus.on((event) => {

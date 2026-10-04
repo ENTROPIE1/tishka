@@ -7,6 +7,9 @@ import type { TalkSource } from '../pet/state';
 export interface SourceBus extends EventBus {
   source(): TalkSource;
   run<T>(source: TalkSource, task: () => Promise<T>): Promise<T>;
+  // Событие от имени источника: во время обработки слушатели видят этот
+  // источник, а не текущее значение шины (озвучка реплики из чата).
+  emitAs(source: TalkSource, event: TishkaEvent): void;
 }
 
 export function createSourceBus(inner: EventBus = createEventBus()): SourceBus {
@@ -36,6 +39,15 @@ export function createSourceBus(inner: EventBus = createEventBus()): SourceBus {
     },
     on: (listener) => inner.on(listener),
     source: () => current,
-    run
+    run,
+    emitAs: (source: TalkSource, event: TishkaEvent): void => {
+      const saved = current;
+      current = source;
+      try {
+        inner.emit(event);
+      } finally {
+        current = saved;
+      }
+    }
   };
 }

@@ -80,8 +80,6 @@ export function createPage(deps: PageDeps): PageControl {
       bubbleSay({
         modelSay: model.say,
         state: model.state,
-        listening,
-        conversation: wake?.conversation === true,
         error
       }),
     modelSay: () => model.say,

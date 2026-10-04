@@ -61,10 +61,8 @@ const speaker = createSpeaker({
   onDone: (id) => window.tishka.pet.speakDone(id)
 });
 const petCard = createPetCard({ element: cardHost, refreshBusy });
-const listen = createListenUi(() => updateBubble(), micThreshold);
 const wake = createWakeListener({
   onConversation: (on) => {
-    listen.setConversation(on);
     composer.setListening(on);
   },
   onWaiting: (value) => {
@@ -73,6 +71,7 @@ const wake = createWakeListener({
     updateStateLabel();
   }
 });
+const listen = createListenUi((value) => wake.setRecorderListening(value), micThreshold);
 composer.input.addEventListener('keydown', () => {
   wake.keyboard();
 });
@@ -87,9 +86,10 @@ function refreshBusy(): void {
   window.tishka.pet.setBusy(cardOpen || typing);
 }
 
+// Облачко видно, только когда есть слова: пустой текст прячет его.
 function updateBubble(): void {
   const text = say.textContent ?? '';
-  bubble.hidden = text === '' && !listen.isListening();
+  bubble.hidden = text === '';
 }
 
 function updateStateLabel(): void {

@@ -120,6 +120,15 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
         window.webContents.reload();
       }
     },
+    onPageLoaded(listener): void {
+      window.webContents.on('did-finish-load', () => {
+        if (!window.isDestroyed()) listener();
+      });
+      // Страница могла уже загрузиться: состояние значка нужно сразу.
+      if (!window.isDestroyed() && !window.webContents.isLoading()) {
+        listener();
+      }
+    },
     dispose(): void {
       lifecycle.dispose();
       if (!window.isDestroyed()) window.destroy();

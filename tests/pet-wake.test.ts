@@ -28,7 +28,7 @@ afterEach(() => {
 function register(bus: ReturnType<typeof createEventBus>): PetWake {
   const voice = { ...defaultConfig().voice, wakeEnabled: true };
   const wake = registerPetWake({
-    pet: { wakeState: () => undefined } as never,
+    pet: { wakeState: () => undefined, onPageLoaded: () => undefined } as never,
     flow: {
       conversationOwner: () => null,
       isLeavingSoon: () => false,

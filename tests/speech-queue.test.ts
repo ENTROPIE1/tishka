@@ -78,7 +78,7 @@ describe('speech-queue', () => {
     const onEnd = vi.fn();
     const queue = createSpeechQueue({ play: player.play, onStart, onEnd });
     queue.enqueue(item('a'));
-    expect(onStart).toHaveBeenCalledWith('a');
+    expect(onStart).toHaveBeenCalledWith(item('a'));
     player.finish();
     await flush();
     expect(onEnd).toHaveBeenCalledTimes(1);

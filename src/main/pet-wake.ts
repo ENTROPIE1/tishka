@@ -89,6 +89,10 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
   const warmTimer = setInterval(broadcast, WARM_TICK_MS);
   warmTimer.unref?.();
 
+  // Страница загружается позже первых команд: после загрузки состояние значка
+  // приходит заново, иначе значок остаётся серым при уже идущей записи.
+  deps.pet.onPageLoaded(() => broadcast());
+
   ipcMain.on(PET_WAKE_PHRASE_CHANNEL, (_event, value: unknown) => {
     if (value instanceof Uint8Array) {
       deps.flow.handlePhrase(value);

@@ -3,6 +3,7 @@ import { defaultConfig } from '../src/core/config';
 import { createEventBus } from '../src/core/events';
 import type { Config, TishkaEvent } from '../src/core/types';
 import { createSpeechOutput } from '../src/main/pet-speak';
+import { createSourceBus } from '../src/main/source-bus';
 import { CANNED } from '../src/voice/canned';
 import { prepareForSpeech } from '../src/voice/speech-text';
 
@@ -115,6 +116,36 @@ async function settle(): Promise<void> {
     await Promise.resolve();
   }
 }
+
+describe('createSpeechOutput: источник озвучки', () => {
+  it('озвучка реплики из чата несёт источник чата, а не текущее значение шины', async () => {
+    const bus = createSourceBus();
+    const events: TishkaEvent[] = [];
+    const sources: string[] = [];
+    createSpeechOutput({
+      bus,
+      getConfig: () => config(),
+      play: () => new Promise<void>(() => undefined),
+      fetch: (async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 })) as unknown as typeof fetch
+    });
+    bus.on((event) => {
+      if (event.type === 'speak.start') {
+        events.push(event);
+        sources.push(bus.source());
+      }
+    });
+
+    await bus.run('chat', async () => {
+      bus.emit({ type: 'reply', reply: { say: 'Готово' } });
+    });
+    await flush();
+
+    expect(events).toEqual([{ type: 'speak.start', text: prepareForSpeech('Готово') }]);
+    // озвучка началась после сброса шины на «ежа», но источник — тот же, что у реплики
+    expect(bus.source()).toBe('pet');
+    expect(sources).toEqual(['chat']);
+  });
+});
 
 describe('createSpeechOutput: устойчивость синтеза', () => {
   it('ошибка 500 на одной реплике не глушит следующую', async () => {

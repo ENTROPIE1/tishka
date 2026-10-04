@@ -13,6 +13,7 @@ export interface WakeListenerDeps {
 
 export interface WakeListener {
   setActive(active: boolean): void;
+  setRecorderListening(listening: boolean): void;
   keyboard(): void;
   beginDrag(): void;
   endDrag(): void;
@@ -34,6 +35,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let listener: PhraseListener | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let dragging = false;
+  let recorderListening = false;
   const pause = createListenPause((value) => listener?.pause(value));
 
   function clearRetry(): void {
@@ -100,16 +102,18 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   }
 
   function applyUi(): void {
+    // Полоска уровня видна, пока микрофон действительно пишет: разговор или разовая запись.
+    const capturing = (active && conversation) || recorderListening;
     if (level !== null) {
-      level.hidden = !(active && conversation);
+      level.hidden = !capturing;
     }
-    if (!active || !conversation) {
-      if (levelFill !== null) {
-        levelFill.style.width = '0%';
-      }
+    if (!capturing && levelFill !== null) {
+      levelFill.style.width = '0%';
     }
     if (mic !== null) {
-      mic.classList.toggle('on', conversation);
+      // Значок активен, пока включён разговор или идёт разовая запись строки,
+      // в ожидании службы — значок ожидания, иначе обычный.
+      mic.classList.toggle('on', conversation || recorderListening);
       mic.classList.toggle('waiting', waiting);
       mic.classList.toggle('soon', active && conversation && soon);
     }
@@ -147,6 +151,13 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       applyActive();
       applyUi();
     },
+    setRecorderListening(value): void {
+      if (recorderListening === value) {
+        return;
+      }
+      recorderListening = value;
+      applyUi();
+    },
     keyboard(): void {
       // Набор текста в строке ежа: запись на паузе, возобновление через 2 секунды
       // после последнего нажатия. Значок микрофона при этом не меняется.
@@ -168,6 +179,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     },
     dispose(): void {
       active = false;
+      recorderListening = false;
       pause.dispose();
       stopListener();
     }

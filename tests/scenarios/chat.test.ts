@@ -13,21 +13,24 @@ afterEach(() => {
 
 // Сценарий 10 (Д8): реплика из окна чата не будит и не засвечивает ежа.
 describe('Сценарий 10. Реплика из окна чата', () => {
-  // Найденный дефект (Д8): сам ответ из чата скрытого ежа не поднимает,
+  // Найденный дефект (Д8, Н14): сам ответ из чата скрытого ежа не поднимает,
   // но озвучка ответа приходит позже, когда шина уже считает источник «ёж»,
   // и speak.start поднимает скрытого ежа: состояние «appear» вместо «hidden».
-  it.fails('скрытый ёж не появляется', async () => {
+  // Источник реплики сопровождает озвучку, и скрытый ёж не появляется.
+  it('скрытый ёж не появляется', async () => {
     scenario = createScenario({ sttStatus: 'ready', talkTimeoutSec: 3 });
     const h = scenario;
     h.startApp();
     await h.wait(4000);
     expect(h.observations.visible()).toBe(false);
+    const spokenBefore = h.observations.spoken().length;
 
     h.sendFromChat('привет из чата');
     await h.flush();
     expect(h.observations.visible()).toBe(false);
     expect(h.observations.state()).toBe('hidden');
-    expect(h.observations.spoken()).not.toContain(prepareForSpeech(CANNED.greeting));
+    // ответ из чата озвучивается, но не приветствием
+    expect(h.observations.spoken().slice(spokenBefore)).not.toContain(prepareForSpeech(CANNED.greeting));
   });
 
   it('видимый не показывает облачко и карточку', async () => {
