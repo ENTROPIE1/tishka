@@ -4,7 +4,6 @@ import type { Config, McpServerConfig } from './types';
 
 export const CONFIG_FILE = 'config.json';
 
-type TtsEngine = Config['voice']['ttsEngine'];
 type FyrLevel = Config['persona']['fyr'];
 
 export function defaultConfig(): Config {
@@ -21,7 +20,7 @@ export function defaultConfig(): Config {
       talkTimeoutSec: 30,
       sttUrl: 'http://127.0.0.1:8178',
       stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
-      ttsEngine: 'none'
+      tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
     },
     mcpServers: [],
     persona: { fyr: 'sometimes' },
@@ -53,8 +52,11 @@ function pickNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
-function pickTtsEngine(value: unknown, fallback: TtsEngine): TtsEngine {
-  return value === 'piper' || value === 'silero' || value === 'none' ? value : fallback;
+function pickVolume(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(1, Math.max(0, value));
 }
 
 function pickFyr(value: unknown, fallback: FyrLevel): FyrLevel {
@@ -150,6 +152,7 @@ export function mergeConfig(value: unknown): Config {
   const llm = isRecord(value.llm) ? value.llm : {};
   const voice = isRecord(value.voice) ? value.voice : {};
   const stt = isRecord(voice.stt) ? voice.stt : {};
+  const tts = isRecord(voice.tts) ? voice.tts : {};
   const persona = isRecord(value.persona) ? value.persona : {};
   const pet = isRecord(value.pet) ? value.pet : {};
   return normalizeConfig({
@@ -170,7 +173,11 @@ export function mergeConfig(value: unknown): Config {
         audioCtx: pickNumber(stt.audioCtx, defaults.voice.stt.audioCtx),
         threads: pickNumber(stt.threads, defaults.voice.stt.threads)
       },
-      ttsEngine: pickTtsEngine(voice.ttsEngine, defaults.voice.ttsEngine)
+      tts: {
+        enabled: pickBoolean(tts.enabled, defaults.voice.tts.enabled),
+        url: pickString(tts.url, defaults.voice.tts.url),
+        volume: pickVolume(tts.volume, defaults.voice.tts.volume)
+      }
     },
     mcpServers: parseMcpServers(value.mcpServers),
     persona: { fyr: pickFyr(persona.fyr, defaults.persona.fyr) },

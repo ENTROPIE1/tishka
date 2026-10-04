@@ -7,6 +7,8 @@ import type { Config, TishkaEvent } from '../core/types';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
 import type { WakeState } from '../voice/wake';
+import type { SpeakMessage } from '../voice/speech-queue';
+import type { TtsHealth } from '../voice/tts-client';
 import type { TranscribeResult } from '../voice/stt-service';
 import type {
   ConfigView,
@@ -55,6 +57,9 @@ import {
   PET_WAKE_ESCAPE_CHANNEL,
   PET_WAKE_PHRASE_CHANNEL,
   PET_WAKE_STATE_CHANNEL,
+  PET_SPEAK_CHANNEL,
+  PET_SPEAK_STOP_CHANNEL,
+  PET_SPEAK_DONE_CHANNEL,
   SECRETS_DELETE_CHANNEL,
   SECRETS_HAS_CHANNEL,
   SECRETS_NAMES_CHANNEL,
@@ -63,7 +68,9 @@ import {
   VOICE_APPLY_CHANNEL,
   VOICE_CHECK_CHANNEL,
   VOICE_DICTATE_CHANNEL,
-  VOICE_STATUS_CHANNEL
+  VOICE_STATUS_CHANNEL,
+  SPEECH_HEALTH_CHANNEL,
+  SPEECH_SAY_CHANNEL
 } from './ipc-channels';
 
 const api = {
@@ -217,6 +224,27 @@ const api = {
     wakeError(message: string): void {
       ipcRenderer.send(PET_WAKE_ERROR_CHANNEL, message);
     },
+    speakDone(): void {
+      ipcRenderer.send(PET_SPEAK_DONE_CHANNEL);
+    },
+    onSpeak(listener: (message: SpeakMessage) => void): () => void {
+      const handler = (_event: Electron.IpcRendererEvent, message: SpeakMessage): void => {
+        listener(message);
+      };
+      ipcRenderer.on(PET_SPEAK_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_SPEAK_CHANNEL, handler);
+      };
+    },
+    onSpeakStop(listener: () => void): () => void {
+      const handler = (): void => {
+        listener();
+      };
+      ipcRenderer.on(PET_SPEAK_STOP_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_SPEAK_STOP_CHANNEL, handler);
+      };
+    },
     onWakeState(listener: (state: WakeState) => void): () => void {
       const handler = (_event: Electron.IpcRendererEvent, state: WakeState): void => {
         listener(state);
@@ -248,6 +276,14 @@ const api = {
     },
     dictate(wav: Uint8Array): Promise<TranscribeResult> {
       return ipcRenderer.invoke(VOICE_DICTATE_CHANNEL, wav);
+    }
+  },
+  speech: {
+    health(): Promise<TtsHealth> {
+      return ipcRenderer.invoke(SPEECH_HEALTH_CHANNEL);
+    },
+    say(): Promise<void> {
+      return ipcRenderer.invoke(SPEECH_SAY_CHANNEL);
     }
   }
 };

@@ -3,6 +3,7 @@ import { clipForState, type Character } from './character';
 import { createCharacter } from './character-factory';
 import { createListenUi } from './listen-ui';
 import { createPetCard } from './pet-card';
+import { createSpeaker } from './speaker';
 import { createWakeListener } from './wake-listener';
 
 const bubble = document.getElementById('bubble') as HTMLElement;
@@ -13,6 +14,10 @@ const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
 const stateLabel = document.getElementById('state') as HTMLElement;
 const characterModel: Character = createCharacter('svg');
+const speaker = createSpeaker({
+  setMouth: (level) => characterModel.setMouth(level),
+  onDone: () => window.tishka.pet.speakDone()
+});
 const petCard = createPetCard({ element: cardHost, refreshBusy });
 const listen = createListenUi(() => {
   composer.hidden = false;
@@ -193,6 +198,8 @@ window.tishka.onEvent((event) => {
   }
 });
 window.tishka.pet.setInteractive(false);
+window.tishka.pet.onSpeak((message) => speaker.play(message));
+window.tishka.pet.onSpeakStop(() => speaker.stop());
 void characterModel.mount(character).catch(() => undefined);
 initCharacter();
 initComposer();

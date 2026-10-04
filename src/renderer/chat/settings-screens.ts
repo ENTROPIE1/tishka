@@ -2,6 +2,7 @@ import { mountConnectionsSection } from '../settings/connections-section';
 import { mountMemorySection } from '../settings/memory-section';
 import { mountModelSection } from '../settings/model-section';
 import { mountPersonaSection } from '../settings/persona-section';
+import { mountSpeechSection } from '../settings/speech-section';
 import { mountVoiceSection } from '../settings/voice-section';
 
 function section(id: string): HTMLElement {
@@ -18,5 +19,11 @@ export function mountSettingsScreens(): void {
   mountConnectionsSection(section('connections-section'));
   mountPersonaSection(section('persona-section'));
   mountMemorySection(section('memory-section'));
-  mountVoiceSection(section('voice-section'));
+  const voiceSection = section('voice-section');
+  mountVoiceSection(voiceSection);
+  // Раздел речи идёт под разделом голоса, не меняя его файл.
+  const speechSection = voiceSection.ownerDocument.createElement('section');
+  speechSection.className = 'section';
+  voiceSection.after(speechSection);
+  mountSpeechSection(speechSection);
 }

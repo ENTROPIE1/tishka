@@ -12,7 +12,7 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
     talkTimeoutSec: 30,
     sttUrl: 'http://127.0.0.1:8178',
     stt: { exe: '', model: '', audioCtx: 768, threads: 4 },
-    ttsEngine: 'none',
+    tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 },
     ...overrides
   };
 }
