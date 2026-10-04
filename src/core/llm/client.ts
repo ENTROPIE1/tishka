@@ -38,7 +38,7 @@ export class LlmError extends Error {
 }
 
 export interface LlmClientOptions {
-  baseUrl: string;
+  baseUrl: string | (() => string);
   getApiKey: () => Promise<string | undefined>;
   fetch?: typeof fetch;
 }
@@ -171,7 +171,10 @@ export function createLlmClient(opts: LlmClientOptions): {
   chat(req: ChatRequest): Promise<ChatResponse>;
 } {
   const doFetch = opts.fetch ?? fetch;
-  const baseUrl = opts.baseUrl.replace(/\/+$/, '');
+  const resolveBaseUrl = (): string => {
+    const raw = typeof opts.baseUrl === 'function' ? opts.baseUrl() : opts.baseUrl;
+    return raw.replace(/\/+$/, '');
+  };
 
   async function requestOnce(req: ChatRequest, apiKey: string): Promise<Response> {
     const controller = new AbortController();
@@ -179,7 +182,7 @@ export function createLlmClient(opts: LlmClientOptions): {
       controller.abort();
     }, TIMEOUT_MS);
     try {
-      return await doFetch(`${baseUrl}/chat/completions`, {
+      return await doFetch(`${resolveBaseUrl()}/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
