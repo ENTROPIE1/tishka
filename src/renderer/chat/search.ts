@@ -62,10 +62,17 @@ export function createChatSearch(options: ChatSearchOptions): void {
   let entries: HistoryMessage[] = [];
   let active = -1;
   let requestId = 0;
+  let failed = false;
 
   function render(): void {
     options.results.replaceChildren();
-    options.results.hidden = entries.length === 0;
+    if (failed) {
+      const note = document.createElement('div');
+      note.className = 'search-empty';
+      note.textContent = 'Поиск не удался';
+      options.results.append(note);
+    }
+    options.results.hidden = !failed && entries.length === 0;
     for (const [index, entry] of entries.entries()) {
       const row = document.createElement('button');
       row.type = 'button';
@@ -113,6 +120,7 @@ export function createChatSearch(options: ChatSearchOptions): void {
     const id = (requestId += 1);
     if (query === '') {
       entries = [];
+      failed = false;
       render();
       return;
     }
@@ -122,11 +130,13 @@ export function createChatSearch(options: ChatSearchOptions): void {
         return;
       }
       entries = found;
+      failed = false;
     } catch {
       if (id !== requestId) {
         return;
       }
       entries = [];
+      failed = true;
     }
     render();
   }
@@ -142,6 +152,7 @@ export function createChatSearch(options: ChatSearchOptions): void {
     options.panel.hidden = true;
     options.results.hidden = true;
     entries = [];
+    failed = false;
     options.results.replaceChildren();
     active = -1;
   }

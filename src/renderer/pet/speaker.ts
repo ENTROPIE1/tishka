@@ -7,7 +7,7 @@ const SMOOTHING = 0.4;
 
 export interface SpeakerDeps {
   setMouth(level: number): void;
-  onDone(): void;
+  onDone(id?: number): void;
 }
 
 export interface Speaker {
@@ -31,7 +31,8 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
   let startedAt = 0;
   let lastLevel = 0;
   let generation = 0;
-  let active = false;
+  let pending = false;
+  let pendingId: number | undefined;
 
   function clearPlayback(): void {
     if (timer !== undefined) {
@@ -52,18 +53,21 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
     deps.setMouth(0);
   }
 
-  function finish(): void {
-    if (!active) {
+  // Завершает текущее воспроизведение ровно один раз, включая ещё не начавшееся.
+  function complete(): void {
+    if (!pending) {
       return;
     }
-    active = false;
+    pending = false;
+    const id = pendingId;
+    pendingId = undefined;
     clearPlayback();
-    deps.onDone();
+    deps.onDone(id);
   }
 
   function stop(): void {
     generation += 1;
-    finish();
+    complete();
   }
 
   function ensureContext(): AudioContext {
@@ -72,8 +76,11 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
   }
 
   function play(message: SpeakMessage): void {
-    stop();
+    complete();
+    generation += 1;
     const current = generation;
+    pending = true;
+    pendingId = message.id;
     const audio = ensureContext();
     void audio
       .resume()
@@ -93,9 +100,10 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
         source = node;
         startedAt = audio.currentTime;
         lastLevel = 0;
-        active = true;
         node.onended = () => {
-          finish();
+          if (current === generation) {
+            complete();
+          }
         };
         timer = window.setInterval(() => {
           const elapsed = (audio.currentTime - startedAt) * 1000;
@@ -108,8 +116,7 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
       })
       .catch(() => {
         if (current === generation) {
-          active = true;
-          finish();
+          complete();
         }
       });
   }

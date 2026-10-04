@@ -114,6 +114,12 @@
   color: var(--muted);
 }
 
+.search-empty {
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .search-excerpt {
   font-size: 13px;
   overflow-wrap: anywhere;

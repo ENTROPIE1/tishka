@@ -140,8 +140,15 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     conversation.start(at);
   }
 
+  // Разделитель и часы разговора переключаются сразу, а контекст агента очищается
+  // между ходами: иначе сброс посреди ответа оставил бы в истории висячий шаг.
   function newConversation(): void {
-    openConversation(deps.now());
+    historyStore.addDivider();
+    conversation.start(deps.now());
+    const reset = queue.then(() => {
+      agent?.reset();
+    });
+    queue = reset.catch(() => undefined);
   }
 
   async function applyMcpServers(servers: McpServerConfig[]): Promise<void> {

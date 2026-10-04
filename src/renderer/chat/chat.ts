@@ -9,7 +9,6 @@ const feed = document.getElementById('feed') as HTMLElement;
 const statusLine = document.getElementById('status') as HTMLElement;
 const input = document.getElementById('input') as HTMLTextAreaElement;
 const sendButton = document.getElementById('send') as HTMLButtonElement;
-const clearButton = document.getElementById('clear-history') as HTMLButtonElement;
 const settingsButton = document.getElementById('open-settings') as HTMLButtonElement;
 const bannerButton = document.getElementById('open-settings-banner') as HTMLButtonElement;
 const noKeyBanner = document.getElementById('no-key') as HTMLElement;
@@ -129,18 +128,6 @@ function initScreenLookButton(): void {
   });
 }
 
-function initClearButton(): void {
-  clearButton.addEventListener('click', () => {
-    if (!window.confirm('Очистить всю переписку с Тишкой?')) {
-      return;
-    }
-    void window.tishka.clearHistory().then(() => {
-      view.clear();
-      clearStatus();
-    });
-  });
-}
-
 async function loadHistory(): Promise<void> {
   view.fill(await window.tishka.history(200));
 }
@@ -182,8 +169,13 @@ initFeed();
 initComposer();
 initTalkMode();
 initScreenLookButton();
-initClearButton();
-mountChatToolbar({ feed: view, reload: reloadFeed, loadAll: () => window.tishka.history(2000) });
+mountChatToolbar({
+  feed: view,
+  reload: reloadFeed,
+  loadAll: () => window.tishka.history(2000),
+  setStatus,
+  clearStatus
+});
 initSettingsButtons();
 void loadHistory();
 void refreshKeyState();

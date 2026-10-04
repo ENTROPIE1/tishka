@@ -40,4 +40,37 @@ describe('createChatFeed', () => {
     feed.highlight('a');
     expect(container.querySelector('[data-id="a"]')?.classList.contains('flash')).toBe(true);
   });
+
+  it('refill сохраняет открытую карточку ввода с черновиком и фокусом', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const feed = createChatFeed(container);
+    feed.appendAskCard({ title: 'Текст для итога' });
+    const field = container.querySelector<HTMLTextAreaElement>('.ask-input');
+    if (field === null) {
+      throw new Error('Поле ввода не найдено');
+    }
+    field.value = 'черновик ответа';
+    field.focus();
+
+    feed.refill([message('a', 'привет')]);
+
+    const again = container.querySelector<HTMLTextAreaElement>('.ask-input');
+    expect(again).not.toBeNull();
+    expect(again?.value).toBe('черновик ответа');
+    expect(document.activeElement).toBe(again);
+    expect(container.lastElementChild?.contains(again)).toBe(true);
+  });
+
+  it('refill сохраняет карточку «Навык сохранён» в конце ленты', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const feed = createChatFeed(container);
+    feed.appendSkillCard('morning');
+
+    feed.refill([message('a', 'привет')]);
+
+    expect(container.querySelectorAll('.msg-system')).toHaveLength(1);
+    expect(container.lastElementChild?.textContent).toContain('Навык сохранён');
+  });
 });

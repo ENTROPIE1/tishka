@@ -103,3 +103,34 @@ describe('panelElement: сообщение о копировании', () => {
     expect(copyButton(card).textContent).toBe('Не удалось скопировать');
   });
 });
+
+describe('panelElement: адрес картинки', () => {
+  function imageSrc(path: string): string {
+    const panel: Panel = { kind: 'image', title: 'Снимок', path };
+    const card = panelElement(panel, {});
+    const img = card.querySelector<HTMLImageElement>('img');
+    if (img === null) {
+      throw new Error('Картинка не найдена');
+    }
+    return img.src;
+  }
+
+  it('кодирует #, % и ? в имени файла', () => {
+    const src = imageSrc('C:/shots/итог #1%?.png');
+
+    expect(src).toContain('file:///C:/shots/');
+    expect(src).not.toContain('#');
+    expect(src).not.toContain('?');
+    expect(src).toContain('%23');
+    expect(src).toContain('%25');
+    expect(src).toContain('%3F');
+  });
+
+  it('понимает обратные косые и диск', () => {
+    const src = imageSrc('C:\\каталог\\файл #1.png');
+
+    expect(src).toContain('file:///C:/');
+    expect(src).not.toContain('\\');
+    expect(src).toContain('%23');
+  });
+});

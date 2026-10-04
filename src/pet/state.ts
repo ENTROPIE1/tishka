@@ -21,6 +21,7 @@ export interface PetModel {
   panel?: Panel;                 // карточка результата
   ask?: { title: string; placeholder?: string };   // карточка ввода
   queue: PetState[];             // состояния, которые нужно показать после текущего
+  replies?: number;              // сколько раз приходил ответ; признак новой реплики
 }
 
 export interface PetOpts {
@@ -41,11 +42,11 @@ const IDLE_SLEEP_MS = 300000;
 const BUSY_LIMIT_MS = 90_000;
 
 export function initialPet(now: number): PetModel {
-  return { state: 'hidden', since: now, queue: [] };
+  return { state: 'hidden', since: now, queue: [], replies: 0 };
 }
 
 function enter(model: PetModel, state: PetState, now: number, queue: PetState[] = []): PetModel {
-  const next: PetModel = { state, since: now, queue };
+  const next: PetModel = { state, since: now, queue, replies: model.replies ?? 0 };
   if (state !== 'hidden') {
     if (model.say !== undefined) {
       next.say = model.say;
@@ -93,7 +94,13 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       return { ...model, say: event.text };
     case 'reply': {
       // Новый ответ заменяет прежнюю карточку: показывается либо результат, либо ввод.
-      const base: PetModel = { since: now, queue: [], say: event.reply.say, state: model.state };
+      const base: PetModel = {
+        since: now,
+        queue: [],
+        say: event.reply.say,
+        state: model.state,
+        replies: (model.replies ?? 0) + 1
+      };
       if (event.reply.show !== undefined) {
         base.panel = event.reply.show;
       }
