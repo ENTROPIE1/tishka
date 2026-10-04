@@ -1,5 +1,7 @@
 import { resolveSecrets } from '../secrets/resolve';
 import type { McpServerConfig, SecretStore, ToolRegistry, ToolResult } from '../types';
+import type { TimingMark } from '../../main/timing-log';
+import { createMcpTiming } from './manager-timing';
 import {
   connectMcpServer,
   type McpConnection,
@@ -30,6 +32,7 @@ export interface McpManagerDeps {
   registry: ToolRegistry;
   secrets: SecretStore;
   createConnection?: McpConnectionFactory;
+  mark?: TimingMark;
 }
 
 interface LiveConnection {
@@ -82,6 +85,7 @@ async function credentialsOf(server: McpServerConfig, secrets: SecretStore): Pro
 
 export function createMcpManager(deps: McpManagerDeps): McpManager {
   const connect = deps.createConnection ?? connectMcpServer;
+  const timing = createMcpTiming(deps.mark);
   const live = new Map<string, LiveConnection>();
   const statuses = new Map<string, McpStatus>();
   const chains = new Map<string, Promise<unknown>>();
@@ -131,6 +135,7 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
 
   async function openOne(server: McpServerConfig): Promise<McpStatus> {
     await drop(server.name);
+    const startedAt = timing.start(server.name, server.transport);
     let connection: McpConnection | undefined;
     try {
       const credentials = await credentialsOf(server, deps.secrets);
@@ -142,6 +147,7 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
       live.set(server.name, { connection, tools: tools.length });
       const status: McpStatus = { name: server.name, state: 'connected', tools: tools.length };
       statuses.set(server.name, status);
+      timing.ready(server.name, 'connected', startedAt, { tools: tools.length });
       return status;
     } catch (error) {
       if (connection !== undefined) {
@@ -149,6 +155,7 @@ export function createMcpManager(deps: McpManagerDeps): McpManager {
       }
       const status: McpStatus = { name: server.name, state: 'error', tools: 0, error: shortError(error) };
       statuses.set(server.name, status);
+      timing.ready(server.name, 'error', startedAt, { error: shortError(error) });
       return status;
     }
   }

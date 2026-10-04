@@ -5,6 +5,7 @@ import { PET_LAYOUT_CHANNEL, PET_MODEL_CHANNEL } from './ipc-channels';
 import type { PetActivation } from './pet-activation';
 import type { Mover } from './pet-motion';
 import type { PetPlacement } from './pet-placement';
+import { mark } from './timing-log';
 
 const TICK_MS = 250;
 
@@ -29,6 +30,7 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
   const { window, mover, placement, activation, bus } = deps;
   let model: PetModel = initialPet(Date.now());
   let busy = false;
+  let shown = false;
   let tickTimer: NodeJS.Timeout | undefined;
 
   function sendModel(): void {
@@ -60,6 +62,10 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
         window.showInactive();
         // Когда окно встало на место, считаем интерактивность по курсору.
         activation.sendPointer();
+        if (!shown) {
+          shown = true;
+          mark('pet.window.shown');
+        }
         break;
       case 'leave':
         // Уход — тоже на месте: окно не двигается, персонаж уходит сам,

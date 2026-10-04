@@ -12,6 +12,7 @@ import { createSpeaker } from './speaker';
 import { stateLabel } from './state-label';
 import { createWakeListener } from './wake-listener';
 import { installLinkGuard } from '../shared/links';
+import { timingMark } from '../shared/timing';
 
 const pet = document.getElementById('pet') as HTMLElement;
 const bubble = document.getElementById('bubble') as HTMLElement;
@@ -173,6 +174,8 @@ window.tishka.onPetModel(renderModel);
 window.tishka.onEvent((event) => {
   if (event.type === 'speak.level') {
     characterModel.setMouth(event.level);
+  } else if (event.type === 'reply') {
+    timingMark('reply.shown');
   } else if (event.type === 'error') {
     listen.setError(event.message);
   }

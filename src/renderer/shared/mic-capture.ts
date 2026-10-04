@@ -1,3 +1,5 @@
+import { timingMark } from './timing';
+
 const PROCESSOR_BUFFER = 1024;
 
 const MIC_CONSTRAINTS: MediaStreamConstraints = {
@@ -51,16 +53,20 @@ export function createMicCapture(): MicCapture {
 
   async function start(onFrame: MicFrameHandler): Promise<boolean> {
     const id = (runId += 1);
+    const startedAt = Date.now();
+    timingMark('mic.request');
     let media: MediaStream;
     try {
       media = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
     } catch {
+      timingMark('mic.denied', { ms: Date.now() - startedAt });
       return false;
     }
     if (id !== runId) {
       stopTracks(media);
       return false;
     }
+    timingMark('mic.granted', { ms: Date.now() - startedAt });
     stream = media;
     context = new AudioContext();
     const sourceRate = context.sampleRate;

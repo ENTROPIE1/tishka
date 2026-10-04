@@ -97,7 +97,9 @@ import {
   VOICE_DICTATE_CHANNEL,
   VOICE_STATUS_CHANNEL,
   SPEECH_HEALTH_CHANNEL,
-  SPEECH_SAY_CHANNEL
+  SPEECH_SAY_CHANNEL,
+  TIMING_MARK_CHANNEL,
+  TIMING_OPEN_CHANNEL
 } from './ipc-channels';
 
 const api = {
@@ -403,6 +405,12 @@ const api = {
     say(): Promise<void> {
       return ipcRenderer.invoke(SPEECH_SAY_CHANNEL);
     }
+  },
+  timingMark(event: string, details?: Record<string, string | number | boolean>): void {
+    ipcRenderer.send(TIMING_MARK_CHANNEL, event, details);
+  },
+  openTimingLog(): Promise<void> {
+    return ipcRenderer.invoke(TIMING_OPEN_CHANNEL);
   }
 };
 

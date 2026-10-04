@@ -1,4 +1,5 @@
 import type { Config, EventBus } from '../core/types';
+import type { TimingMark } from './timing-log';
 import { CANNED, CANNED_TEXTS } from '../voice/canned';
 import { createSpeechQueue, type SpeakMessage } from '../voice/speech-queue';
 import { prepareForSpeech } from '../voice/speech-text';
@@ -10,6 +11,7 @@ export interface SpeechOutputDeps {
   play(message: SpeakMessage, signal: AbortSignal): Promise<void>;
   fetch?: typeof fetch;
   now?: () => number;
+  mark?: TimingMark;
 }
 
 export interface SpeechOutput {
@@ -61,10 +63,13 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     if (unavailable && now() < nextProbeAt) {
       return undefined;
     }
+    const startedAt = Date.now();
+    deps.mark?.('tts.request.start', { chars: prepared.length });
     const result = await client().synthesize(prepared);
     if (!result.ok) {
       unavailable = true;
       nextProbeAt = now() + AVAILABILITY_RETRY_MS;
+      deps.mark?.('tts.request.end', { ok: false, chars: prepared.length, ms: Date.now() - startedAt, error: result.error });
       if (!reported) {
         reported = true;
         deps.bus.emit({ type: 'error', message: 'Голос недоступен, говорю текстом' });
@@ -72,6 +77,12 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
       return undefined;
     }
     unavailable = false;
+    deps.mark?.('tts.request.end', {
+      ok: true,
+      chars: prepared.length,
+      bytes: result.wav.length,
+      ms: Date.now() - startedAt
+    });
     if (CANNED_TEXTS.includes(text)) {
       cache.set(text, result.wav);
     }
