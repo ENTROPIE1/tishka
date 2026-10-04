@@ -1,4 +1,5 @@
 import { createRecorder } from '../shared/recorder';
+import { createVad } from '../../voice/vad';
 
 export const LISTEN_SAY = 'Слушаю…';
 
@@ -11,7 +12,7 @@ export interface ListenUi {
 }
 
 // Индикатор записи, кнопка микрофона и связь с главным процессом.
-export function createListenUi(onStart: () => void): ListenUi {
+export function createListenUi(onStart: () => void, getThreshold?: () => number | null): ListenUi {
   const level = document.getElementById('level') as HTMLElement;
   const levelFill = document.getElementById('level-fill') as HTMLElement;
   const mic = document.getElementById('mic') as HTMLElement;
@@ -28,6 +29,7 @@ export function createListenUi(onStart: () => void): ListenUi {
   }
 
   const recorder = createRecorder({
+    makeVad: () => createVad({ threshold: getThreshold?.() ?? undefined }),
     onLevel(value: number): void {
       levelFill.style.width = `${Math.round(value * 100)}%`;
     },

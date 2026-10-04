@@ -10,6 +10,7 @@ export interface MicTestPanel {
 
 export interface MicTestDeps {
   sensitivity(): VadSensitivity;
+  threshold?(): number | null;
   dictate(wav: Uint8Array): Promise<TranscribeResult>;
   showError(message: string): void;
   durationMs?: number;
@@ -62,7 +63,7 @@ export function createMicTestPanel(deps: MicTestDeps): MicTestPanel {
             });
         }
       },
-      { durationMs: deps.durationMs ?? 5000, sensitivity: deps.sensitivity() }
+      { durationMs: deps.durationMs ?? 5000, sensitivity: deps.sensitivity(), threshold: deps.threshold?.() ?? undefined }
     );
     run.start();
   });

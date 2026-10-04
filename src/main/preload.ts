@@ -86,6 +86,7 @@ import {
   SKILL_SAVE_CHANNEL,
   USER_TEXT_CHANNEL,
   VOICE_APPLY_CHANNEL,
+  VOICE_CALIBRATION_CHANNEL,
   VOICE_CHECK_CHANNEL,
   VOICE_DICTATE_CHANNEL,
   VOICE_STATUS_CHANNEL,
@@ -354,6 +355,9 @@ const api = {
     },
     dictate(wav: Uint8Array): Promise<TranscribeResult> {
       return ipcRenderer.invoke(VOICE_DICTATE_CHANNEL, wav);
+    },
+    calibration(active: boolean): Promise<void> {
+      return ipcRenderer.invoke(VOICE_CALIBRATION_CHANNEL, active);
     }
   },
   speech: {

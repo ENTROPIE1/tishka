@@ -427,3 +427,89 @@
   gap: 8px;
   flex-wrap: wrap;
 }
+
+.calib-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.calib {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.calib .level {
+  position: relative;
+  height: 6px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.calib .level-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 80ms linear;
+}
+
+.calib-step {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.calib-countdown {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.calib-scale {
+  position: relative;
+  height: 26px;
+  margin-top: 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.calib-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--muted);
+}
+
+.calib-mark-threshold {
+  background: var(--accent);
+}
+
+.calib-mark-speech {
+  background: var(--ok);
+}
+
+.calib-mark-text {
+  position: absolute;
+  bottom: -16px;
+  left: 0;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.calib-message {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.calib-recognized {
+  font-size: 13px;
+  color: var(--muted);
+}
+

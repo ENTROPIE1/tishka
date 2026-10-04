@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type { SttService, TranscribeResult } from '../voice/stt-service';
 import {
   VOICE_APPLY_CHANNEL,
+  VOICE_CALIBRATION_CHANNEL,
   VOICE_CHECK_CHANNEL,
   VOICE_DICTATE_CHANNEL,
   VOICE_STATUS_CHANNEL
@@ -11,6 +12,7 @@ import type { VoiceStateView } from './settings-types';
 export interface VoiceIpcDeps {
   stt: SttService;
   reloadHotkey(hotkey: string): void;
+  setCalibration(active: boolean): void;
 }
 
 function toBytes(value: unknown): Uint8Array | undefined {
@@ -50,5 +52,11 @@ export function registerVoiceIpc(deps: VoiceIpcDeps): void {
     if (typeof hotkey === 'string' && hotkey.trim() !== '') {
       deps.reloadHotkey(hotkey.trim());
     }
+  });
+
+  // На время калибровки постоянное прослушивание и разговор приостанавливаются,
+  // чтобы микрофон не перехватывало другое окно.
+  ipcMain.handle(VOICE_CALIBRATION_CHANNEL, (_event, value: unknown) => {
+    deps.setCalibration(value === true);
   });
 }

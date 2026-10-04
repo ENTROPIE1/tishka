@@ -17,6 +17,7 @@ export interface WakeState {
   conversation: boolean;
   soon: boolean;
   sensitivity?: 'low' | 'normal' | 'high';
+  threshold?: number | null;
 }
 
 // Состояние режима разговора в окне чата.
@@ -25,6 +26,7 @@ export interface ChatTalkState {
   conversation: boolean;
   soon: boolean;
   sensitivity: 'low' | 'normal' | 'high';
+  threshold?: number | null;
 }
 
 export interface WakeMatch {

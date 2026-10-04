@@ -47,6 +47,7 @@ export function createTalkMode(elements: TalkModeElements, onError: (message: st
     if (state.conversation && listener === undefined) {
       listener = createPhraseListener({
         sensitivity: state.sensitivity,
+        threshold: state.threshold ?? undefined,
         onPhrase: (wav) => window.tishka.chatTalk.phrase(wav),
         onLevel: (level) => {
           elements.levelFill.style.width = `${Math.round(level * 100)}%`;

@@ -15,6 +15,7 @@ export interface MicCheckHandles {
 export interface MicCheckOptions {
   durationMs?: number;
   sensitivity?: VadSensitivity;
+  threshold?: number;
 }
 
 export interface MicCheck {
@@ -34,6 +35,7 @@ export function createMicCheck(handles: MicCheckHandles, options: MicCheckOption
 
   const recorder = createRecorder({
     sensitivity,
+    threshold: options.threshold,
     onLevel(level): void {
       if (level >= SPEECH_LEVEL) {
         heard = true;
@@ -52,6 +54,7 @@ export function createMicCheck(handles: MicCheckHandles, options: MicCheckOption
     makeVad: () =>
       createVad({
         sensitivity,
+        threshold: options.threshold,
         maxMs: durationMs,
         noSpeechMs: 0,
         silenceMs: durationMs + 60000

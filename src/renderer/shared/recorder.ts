@@ -18,6 +18,7 @@ export interface RecorderOptions {
   onLevel(level: number): void;
   onResult(result: ListenResult): void;
   sensitivity?: VadSensitivity;
+  threshold?: number;
   getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   makeVad?: () => Vad;
   targetRate?: number;
@@ -42,7 +43,7 @@ function stopTracks(stream: MediaStream | undefined): void {
 export function createRecorder(options: RecorderOptions): Recorder {
   const getUserMedia =
     options.getUserMedia ?? ((constraints: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(constraints));
-  const makeVad = options.makeVad ?? (() => createVad({ sensitivity: options.sensitivity }));
+  const makeVad = options.makeVad ?? (() => createVad({ sensitivity: options.sensitivity, threshold: options.threshold }));
   const targetRate = options.targetRate ?? TARGET_RATE;
 
   let stream: MediaStream | undefined;

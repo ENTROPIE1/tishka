@@ -23,6 +23,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let conversation = false;
   let soon = false;
   let sensitivity: VadSensitivity = 'normal';
+  let threshold: number | undefined;
   let listener: PhraseListener | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -59,6 +60,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     }
     listener = createPhraseListener({
       sensitivity,
+      threshold,
       onPhrase: (wav) => window.tishka.pet.wakePhrase(wav),
       onLevel: (value) => {
         if (levelFill !== null && conversation) {
@@ -106,11 +108,14 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     const nextSensitivity = state.sensitivity ?? sensitivity;
     const sensitivityChanged = nextSensitivity !== sensitivity;
     sensitivity = nextSensitivity;
+    const nextThreshold = state.threshold ?? undefined;
+    const thresholdChanged = nextThreshold !== threshold;
+    threshold = nextThreshold;
     if (state.conversation !== conversation) {
       conversation = state.conversation;
       deps.onConversation?.(conversation);
     }
-    if (active && (!wasActive || sensitivityChanged) && listener !== undefined) {
+    if (active && (!wasActive || sensitivityChanged || thresholdChanged) && listener !== undefined) {
       stopListener();
     }
     applyActive();

@@ -13,6 +13,7 @@ function makeConfig(): Config {
       wakeEnabled: false,
       talkTimeoutSec: 8,
       sensitivity: 'normal',
+      mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: '',
       stt: { exe: '', model: '', audioCtx: 0, threads: 0 },
       tts: { enabled: false, url: '', volume: 1 }

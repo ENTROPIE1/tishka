@@ -106,6 +106,7 @@ export interface Config {
     wakeEnabled: boolean;                // откликаться на имя
     talkTimeoutSec: number;              // уход по тишине в режиме разговора
     sensitivity: 'low' | 'normal' | 'high';   // порог слышимости микрофона
+    mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null };   // результат калибровки; threshold null — работает sensitivity
     sttUrl: string;                      // адрес службы распознавания
     stt: { exe: string; model: string; audioCtx: number; threads: number };   // автозапуск службы; пустой exe — не запускать
     tts: { enabled: boolean; url: string; volume: number };   // синтез речи: говорить вслух

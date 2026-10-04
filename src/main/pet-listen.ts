@@ -8,6 +8,7 @@ export interface PetListenDeps {
   core: TishkaCore;
   stt: SttService;
   sendCommand(command: ListenCommand): void;
+  onMissedSpeech?(): void;
 }
 
 export interface PetListen {
@@ -70,6 +71,7 @@ export function createPetListen(deps: PetListenDeps): PetListen {
       return;
     }
     if (result.kind === 'nospeech') {
+      deps.onMissedSpeech?.();
       deps.bus.emit({ type: 'error', message: 'Не расслышал' });
       return;
     }
@@ -80,6 +82,9 @@ export function createPetListen(deps: PetListenDeps): PetListen {
 
     void deps.stt.transcribe(result.data).then((outcome) => {
       if (!outcome.ok) {
+        if (outcome.error === 'Не расслышал') {
+          deps.onMissedSpeech?.();
+        }
         deps.bus.emit({ type: 'error', message: outcome.error });
         return;
       }

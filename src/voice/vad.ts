@@ -12,6 +12,7 @@ export interface VadOptions {
   tailMs?: number;         // запас после конца речи в результате
   continuous?: boolean;    // фраза за фразой без пересоздания, шум не сбрасывается
   settleMs?: number;       // первые кадры только в оценку шума (щелчок включения)
+  threshold?: number;      // калиброванный порог речи; с ним sensitivity не применяется
 }
 
 export interface Vad {
@@ -44,7 +45,6 @@ const SENSITIVITY: Record<VadSensitivity, SensitivityConfig> = {
   normal: { k: 2.5, floor: 0.004 },
   high: { k: 1.8, floor: 0.002 }
 };
-
 function rms(frame: Float32Array): number {
   if (frame.length === 0) {
     return 0;
@@ -55,7 +55,6 @@ function rms(frame: Float32Array): number {
   }
   return Math.sqrt(sum / frame.length);
 }
-
 // Обрезка длинной тишины: запас до начала речи и небольшой хвост после конца.
 export function trimSpeech(
   samples: Float32Array,
@@ -72,7 +71,6 @@ export function trimSpeech(
   }
   return samples.slice(from, to);
 }
-
 export function createVad(options: VadOptions = {}): Vad {
   const silenceMs = options.silenceMs ?? 1200;
   const maxMs = options.maxMs ?? 15000;
@@ -103,7 +101,11 @@ export function createVad(options: VadOptions = {}): Vad {
     return sorted[index];
   }
 
+  // Калиброванный порог не опускается ниже текущего шума с запасом.
   function threshold(): number {
+    if (options.threshold !== undefined) {
+      return Math.max(options.threshold, noise() * 1.5);
+    }
     return Math.max(noise() * limits.k, limits.floor);
   }
 

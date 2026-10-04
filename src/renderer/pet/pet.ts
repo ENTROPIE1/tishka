@@ -3,6 +3,7 @@ import { clipForState, type Character } from './character';
 import { createCharacter } from './character-factory';
 import { createComposer } from './composer';
 import { createListenUi } from './listen-ui';
+import { micThreshold } from '../shared/mic-threshold';
 import { createPetCard } from './pet-card';
 import { createSpeaker } from './speaker';
 import { createWakeListener } from './wake-listener';
@@ -54,7 +55,7 @@ const speaker = createSpeaker({
   onDone: () => window.tishka.pet.speakDone()
 });
 const petCard = createPetCard({ element: cardHost, refreshBusy });
-const listen = createListenUi(() => updateBubble());
+const listen = createListenUi(() => updateBubble(), micThreshold);
 createWakeListener({
   onConversation: (on) => {
     listen.setConversation(on);
