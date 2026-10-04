@@ -93,4 +93,22 @@ describe('registerMemoryTools', () => {
     expect(forgotten.ok).toBe(true);
     expect(store.list()).toEqual([]);
   });
+
+  it('memory_update согласует список memory() и событие memory.changed', async () => {
+    const bus = createEventBus();
+    const events: TishkaEvent[] = [];
+    bus.on((event) => events.push(event));
+    const withEvents = createToolRegistry(bus);
+    registerMemoryTools(withEvents, store, bus);
+
+    await withEvents.call('memory_save', { items: [{ text: 'Старое имя' }] });
+    const id = store.list()[0].id;
+    const before = events.filter((event) => event.type === 'memory.changed').length;
+
+    const result = await withEvents.call('memory_update', { id, text: 'Новое имя' });
+
+    expect(result.ok).toBe(true);
+    expect(store.list()[0].text).toBe('Новое имя');
+    expect(events.filter((event) => event.type === 'memory.changed').length).toBe(before + 1);
+  });
 });
