@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { mailDraftLink, meetingDraftLink } from '../mcp-servers/exchange/src/links';
+import {
+  DRAFT_URL_LIMIT,
+  fitMailDraftLink,
+  mailDraftLink,
+  meetingDraftLink
+} from '../mcp-servers/exchange/src/links';
 
 describe('mailDraftLink', () => {
   it('кодирует кириллицу, пробелы и адрес, нормализует косую черту', () => {
@@ -37,6 +42,39 @@ describe('mailDraftLink', () => {
     const url = mailDraftLink('https://mail.example.org/owa', {});
 
     expect(url).toBe('https://mail.example.org/owa/?path=/mail/action/compose');
+  });
+});
+
+describe('fitMailDraftLink', () => {
+  it('короткий текст оставляет ссылку целой', () => {
+    const result = fitMailDraftLink('https://mail.example.org/owa', {
+      to: 'ivan@example.org',
+      subject: 'Привет',
+      body: 'Как дела?'
+    });
+
+    expect(result.truncated).toBe(false);
+    expect(result.body).toBe('Как дела?');
+    expect(result.url).toBe(mailDraftLink('https://mail.example.org/owa', {
+      to: 'ivan@example.org',
+      subject: 'Привет',
+      body: 'Как дела?'
+    }));
+  });
+
+  it('длинный текст сокращается в ссылке, а полный текст возвращается', () => {
+    const body = 'текст письма '.repeat(300);
+    const result = fitMailDraftLink('https://mail.example.org/owa', {
+      to: 'ivan@example.org',
+      subject: 'Отчёт',
+      body
+    });
+
+    expect(result.truncated).toBe(true);
+    expect(result.body).toBe(body);
+    expect(result.url.length).toBeLessThanOrEqual(DRAFT_URL_LIMIT);
+    expect(result.url.startsWith('https://mail.example.org/owa/?path=/mail/action/compose')).toBe(true);
+    expect(result.url).toContain('to=ivan%40example.org');
   });
 });
 

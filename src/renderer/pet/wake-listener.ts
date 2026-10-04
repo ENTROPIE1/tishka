@@ -1,4 +1,4 @@
-import { createPhraseListener, type PhraseListener } from '../shared/phrase-listener';
+import { createPhraseListener, type PhraseListener, type PhraseListenerOptions } from '../shared/phrase-listener';
 import type { VadSensitivity } from '../../voice/vad';
 
 const MIC_RETRY_MS = 30000;
@@ -6,6 +6,7 @@ const MIC_ERROR = 'Не слышу микрофон';
 
 export interface WakeListenerDeps {
   onConversation?(on: boolean): void;
+  createListener?(options: PhraseListenerOptions): PhraseListener;
 }
 
 export interface WakeListener {
@@ -58,7 +59,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     if (listener !== undefined || !active) {
       return;
     }
-    listener = createPhraseListener({
+    const options: PhraseListenerOptions = {
       sensitivity,
       threshold,
       onPhrase: (wav) => window.tishka.pet.wakePhrase(wav),
@@ -68,7 +69,8 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
         }
       },
       onError
-    });
+    };
+    listener = deps.createListener !== undefined ? deps.createListener(options) : createPhraseListener(options);
     void listener.start();
   }
 

@@ -104,6 +104,7 @@ export interface Config {
     hotkey: string;
     wakeWords: string[];
     wakeEnabled: boolean;                // откликаться на имя
+    talkByDefault: boolean;              // включать разговор при появлении по обращению
     talkTimeoutSec: number;              // уход по тишине в режиме разговора
     sensitivity: 'low' | 'normal' | 'high';   // порог слышимости микрофона
     mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null };   // результат калибровки; threshold null — работает sensitivity
@@ -117,6 +118,11 @@ export interface Config {
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран
   web: { enabled: boolean };      // разрешено ли читать страницы из интернета
+  app: {
+    warmMinutes: number;          // держать микрофон наготове после последнего обращения
+    memoryLimitMb: number;        // предел памяти приложения без службы распознавания
+    autostart: boolean;           // запуск вместе с Windows свёрнутым
+  };
 }
 
 export type McpServerConfig =

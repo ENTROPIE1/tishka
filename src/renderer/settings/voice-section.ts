@@ -38,6 +38,8 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   const hotkey = textInput();
   const wakeEnabled = el('input', 'checkbox-input');
   wakeEnabled.type = 'checkbox';
+  const talkByDefault = el('input', 'checkbox-input');
+  talkByDefault.type = 'checkbox';
   const wakeWords = textInput();
   const talkTimeout = textInput('', 'number');
   const exe = textInput();
@@ -85,6 +87,11 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
         'Откликаться на имя',
         wakeEnabled,
         'Микрофон слушается постоянно, речь распознаётся на этом компьютере и никуда не передаётся; фразы без имени сразу отбрасываются'
+      ),
+      checkboxField(
+        'Слушать сразу, как Тишка появился',
+        talkByDefault,
+        'После обращения по имени, клавише или щелчку микрофон остаётся включённым, пока Тишка не уйдёт'
       ),
       field('Имена', wakeWords, 'Через запятую, например: тишка, ёжик'),
       field('Уходить после тишины, секунд', talkTimeout)
@@ -144,6 +151,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     const view = await window.tishka.config.get();
     hotkey.value = view.config.voice.hotkey;
     wakeEnabled.checked = view.config.voice.wakeEnabled;
+    talkByDefault.checked = view.config.voice.talkByDefault;
     wakeWords.value = view.config.voice.wakeWords.join(', ');
     talkTimeout.value = String(view.config.voice.talkTimeoutSec);
     sensitivity.value = view.config.voice.sensitivity;
@@ -157,7 +165,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   save.addEventListener('click', () => {
     void runWithFeedback(save, SAVE_LABELS, async () => {
       try {
-        await saveVoice({ hotkey, wakeEnabled, wakeWords, talkTimeout, sensitivity, exe, model });
+        await saveVoice({ hotkey, wakeEnabled, talkByDefault, wakeWords, talkTimeout, sensitivity, exe, model });
         show();
         messages.append(el('div', 'message-ok', 'Настройки голоса сохранены'));
         watchLeft = 10;

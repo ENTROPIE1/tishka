@@ -1,3 +1,4 @@
+import { installLinkGuard } from '../shared/links';
 import { createChatFeed } from './feed';
 import { initAppShell } from './navigation';
 import { appendSkillSaveCard } from './skill-card';
@@ -95,18 +96,7 @@ function initEvents(): void {
 }
 
 function initFeed(): void {
-  feed.addEventListener('click', (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLAnchorElement)) {
-      return;
-    }
-    const url = target.dataset['url'];
-    if (url === undefined || url === '') {
-      return;
-    }
-    event.preventDefault();
-    void window.tishka.openExternal(url);
-  });
+  installLinkGuard(document);
 }
 
 function initComposer(): void {

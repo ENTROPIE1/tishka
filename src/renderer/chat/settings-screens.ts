@@ -1,4 +1,5 @@
 import { combineSections, type SettingsSection } from '../settings/dom';
+import { mountAppSection } from '../settings/app-section';
 import { mountConnectionsSection } from '../settings/connections-section';
 import { mountMemorySection } from '../settings/memory-section';
 import { mountModelSection } from '../settings/model-section';
@@ -30,6 +31,10 @@ export function mountSettingsScreens(): Partial<Record<ScreenName, SettingsSecti
   const webSection = connectionsSection.ownerDocument.createElement('section');
   webSection.className = 'section';
   connectionsSection.after(webSection);
+  const personaSection = section('persona-section');
+  const appSection = personaSection.ownerDocument.createElement('section');
+  appSection.className = 'section';
+  personaSection.after(appSection);
   return {
     connections: combineSections([
       mountModelSection(section('model-section')),
@@ -38,6 +43,6 @@ export function mountSettingsScreens(): Partial<Record<ScreenName, SettingsSecti
     ]),
     memory: mountMemorySection(section('memory-section')),
     voice: combineSections([voice, speech]),
-    persona: mountPersonaSection(section('persona-section'))
+    persona: combineSections([mountPersonaSection(personaSection), mountAppSection(appSection)])
   };
 }

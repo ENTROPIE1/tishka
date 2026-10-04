@@ -11,6 +11,7 @@ function makeConfig(): Config {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],
       wakeEnabled: false,
+      talkByDefault: true,
       talkTimeoutSec: 8,
       sensitivity: 'normal',
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
@@ -23,7 +24,8 @@ function makeConfig(): Config {
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },
-    web: { enabled: true }
+    web: { enabled: true },
+    app: { warmMinutes: 30, memoryLimitMb: 1500, autostart: false }
   };
 }
 

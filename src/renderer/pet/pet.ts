@@ -9,6 +9,7 @@ import { createPetCard } from './pet-card';
 import { createSpeaker } from './speaker';
 import { stateLabel } from './state-label';
 import { createWakeListener } from './wake-listener';
+import { installLinkGuard } from '../shared/links';
 
 const pet = document.getElementById('pet') as HTMLElement;
 const bubble = document.getElementById('bubble') as HTMLElement;
@@ -197,5 +198,6 @@ window.tishka.pet.onLayout((layout) => {
 window.tishka.pet.onSpeak((message) => speaker.play(message));
 window.tishka.pet.onSpeakStop(() => speaker.stop());
 void characterModel.mount(character).catch(() => undefined);
+installLinkGuard(document);
 initCharacter();
 initPointer();

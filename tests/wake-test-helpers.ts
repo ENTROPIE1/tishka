@@ -9,6 +9,7 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
     hotkey: 'Control+Alt+Space',
     wakeWords: ['тишка'],
     wakeEnabled: true,
+    talkByDefault: false,
     talkTimeoutSec: 30,
     sensitivity: 'normal',
     mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
@@ -23,6 +24,7 @@ export type PhraseScript = string | { error: string };
 
 export interface Harness {
   flow: WakeFlow;
+  bus: ReturnType<typeof createEventBus>;
   transcribe: ReturnType<typeof vi.fn>;
   calls: string[];
   history: string[];
@@ -39,7 +41,8 @@ export const wav = new Uint8Array([1, 2, 3, 4]);
 export function makeHarness(
   scripts: PhraseScript[],
   initial: Config['voice'] = voice(),
-  memoryName?: string
+  memoryName?: string,
+  ready = true
 ): Harness {
   let voiceConfig = initial;
   let index = 0;
@@ -93,11 +96,13 @@ export function makeHarness(
       hiddenCount += 1;
     },
     onSoonChange: () => soonChanges.push(flow.isLeavingSoon()),
+    isReady: () => ready,
     memoryName: () => memoryName
   });
 
   return {
     flow,
+    bus,
     transcribe,
     calls,
     history,
