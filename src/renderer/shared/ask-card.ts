@@ -51,6 +51,8 @@ export function askCardElement(ask: AskRequest, actions: AskCardActions): HTMLEl
   hint.hidden = true;
   body.append(field, hint);
 
+  let disposeMic: (() => void) | undefined;
+
   // Диктовка доступна, когда карточка живёт в окне приложения.
   if ('tishka' in window) {
     const tools = document.createElement('div');
@@ -66,6 +68,7 @@ export function askCardElement(ask: AskRequest, actions: AskCardActions): HTMLEl
       },
       getThreshold: micThreshold
     });
+    disposeMic = () => mic.dispose();
     tools.append(mic.element);
     body.append(tools);
   }
@@ -96,12 +99,18 @@ export function askCardElement(ask: AskRequest, actions: AskCardActions): HTMLEl
       return;
     }
     sent = true;
+    disposeMic?.();
     actions.onSend(text);
     card.replaceChildren();
     const done = document.createElement('div');
     done.className = 'ask-sent';
     done.textContent = 'Текст отправлен';
     card.append(done);
+  }
+
+  function cancelCard(): void {
+    disposeMic?.();
+    actions.onCancel();
   }
 
   field.addEventListener('input', refresh);
@@ -113,10 +122,10 @@ export function askCardElement(ask: AskRequest, actions: AskCardActions): HTMLEl
     }
     if (event.key === 'Escape') {
       event.preventDefault();
-      actions.onCancel();
+      cancelCard();
     }
   });
-  cancel.addEventListener('click', actions.onCancel);
+  cancel.addEventListener('click', cancelCard);
   send.addEventListener('click', sendText);
 
   refresh();

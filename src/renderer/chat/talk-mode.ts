@@ -1,15 +1,21 @@
+import type { VadSensitivity } from '../../voice/vad';
 import type { ChatTalkState } from '../../voice/wake';
 import { MIC_SVG } from '../shared/mic-button';
-import { createPhraseListener, type PhraseListener } from '../shared/phrase-listener';
+import { createPhraseListener, type PhraseListener, type PhraseListenerOptions } from '../shared/phrase-listener';
+import { createVoiceReadiness } from '../shared/voice-readiness';
 
-const READY_POLL_MS = 1500;
-const READY_POLL_LIMIT = 40;
+const MIC_RETRY_MS = 30000;
+const MIC_ERROR = 'Не слышу микрофон';
 const LISTEN_LABEL = 'Слушаю… нажмите на микрофон, чтобы писать текстом';
 
 export interface TalkModeElements {
   level: HTMLElement;
   levelFill: HTMLElement;
   label: HTMLElement;
+}
+
+export interface TalkModeDeps {
+  createListener?(options: PhraseListenerOptions): PhraseListener;
 }
 
 export interface TalkMode {
@@ -20,7 +26,11 @@ export interface TalkMode {
 
 // Переключатель разговора у поля ввода чата: та же wake-flow, что у питомца,
 // только фразами управляет это окно.
-export function createTalkMode(elements: TalkModeElements, onError: (message: string) => void): TalkMode {
+export function createTalkMode(
+  elements: TalkModeElements,
+  onError: (message: string) => void,
+  deps: TalkModeDeps = {}
+): TalkMode {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'mic-button';
@@ -30,11 +40,62 @@ export function createTalkMode(elements: TalkModeElements, onError: (message: st
   button.innerHTML = MIC_SVG;
 
   let listener: PhraseListener | undefined;
-  let attempts = 0;
+  let conversation = false;
+  let sensitivity: VadSensitivity = 'normal';
+  let threshold: number | undefined;
+  let retryTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function clearRetry(): void {
+    if (retryTimer !== undefined) {
+      clearTimeout(retryTimer);
+      retryTimer = undefined;
+    }
+  }
+
+  function scheduleRetry(): void {
+    if (retryTimer !== undefined) {
+      return;
+    }
+    onError(MIC_ERROR);
+    retryTimer = setTimeout(() => {
+      retryTimer = undefined;
+      startListener();
+    }, MIC_RETRY_MS);
+  }
 
   function stopListener(): void {
+    clearRetry();
     listener?.stop();
     listener = undefined;
+  }
+
+  function onListenerError(): void {
+    stopListener();
+    if (conversation) {
+      scheduleRetry();
+    }
+  }
+
+  function startListener(): void {
+    if (listener !== undefined || !conversation) {
+      return;
+    }
+    clearRetry();
+    const options: PhraseListenerOptions = {
+      sensitivity,
+      threshold,
+      onPhrase: (wav) => window.tishka.chatTalk.phrase(wav),
+      onLevel: (level) => {
+        elements.levelFill.style.width = `${Math.round(level * 100)}%`;
+      },
+      onError: onListenerError
+    };
+    listener = deps.createListener !== undefined ? deps.createListener(options) : createPhraseListener(options);
+    void listener.start().then((started) => {
+      if (!started && listener !== undefined) {
+        onListenerError();
+      }
+    });
   }
 
   function apply(state: ChatTalkState): void {
@@ -44,18 +105,15 @@ export function createTalkMode(elements: TalkModeElements, onError: (message: st
       elements.levelFill.style.width = '0%';
     }
     elements.label.textContent = state.conversation ? LISTEN_LABEL : '';
-    if (state.conversation && listener === undefined) {
-      listener = createPhraseListener({
-        sensitivity: state.sensitivity,
-        threshold: state.threshold ?? undefined,
-        onPhrase: (wav) => window.tishka.chatTalk.phrase(wav),
-        onLevel: (level) => {
-          elements.levelFill.style.width = `${Math.round(level * 100)}%`;
-        },
-        onError
-      });
-      void listener.start();
-    } else if (!state.conversation) {
+    sensitivity = state.sensitivity;
+    threshold = state.threshold ?? undefined;
+    if (state.conversation) {
+      conversation = true;
+      if (listener === undefined) {
+        startListener();
+      }
+    } else {
+      conversation = false;
       stopListener();
     }
   }
@@ -66,38 +124,30 @@ export function createTalkMode(elements: TalkModeElements, onError: (message: st
     }
   });
 
-  document.addEventListener('keydown', (event) => {
+  function onKeydown(event: KeyboardEvent): void {
     if (event.key === 'Escape' && listener !== undefined) {
       window.tishka.chatTalk.escape();
     }
-  });
+  }
+
+  document.addEventListener('keydown', onKeydown);
 
   const unsubscribe = window.tishka.chatTalk.onState(apply);
 
-  function refresh(): void {
-    void window.tishka.voice
-      .status()
-      .then((view) => {
-        const ready = view.state === 'ready';
-        button.disabled = !ready;
-        button.title = ready ? 'Разговор голосом' : 'Распознавание речи не настроено';
-        if (!ready && attempts < READY_POLL_LIMIT) {
-          attempts += 1;
-          window.setTimeout(refresh, READY_POLL_MS);
-        }
-      })
-      .catch(() => {
-        button.disabled = true;
-      });
-  }
-
-  refresh();
+  const readiness = createVoiceReadiness({
+    onReady(ready): void {
+      button.disabled = !ready;
+      button.title = ready ? 'Разговор голосом' : 'Распознавание речи не настроено';
+    }
+  });
 
   return {
     button,
     keyboard: () => window.tishka.chatTalk.keyboard(),
     dispose(): void {
       stopListener();
+      readiness.dispose();
+      document.removeEventListener('keydown', onKeydown);
       unsubscribe();
     }
   };
