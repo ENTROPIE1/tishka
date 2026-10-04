@@ -1,6 +1,9 @@
+import type { TalkSource } from '../pet/state';
+
 export interface SpeechItem {
   text: string;
   wav: Uint8Array;
+  source?: TalkSource;   // источник реплики: сопровождает и её озвучку
 }
 
 export interface SpeakMessage {
@@ -11,7 +14,7 @@ export interface SpeakMessage {
 
 export interface SpeechQueueDeps {
   play(item: SpeechItem, signal: AbortSignal): Promise<void>;
-  onStart?(text: string): void;
+  onStart?(item: SpeechItem): void;
   onEnd?(): void;
   maxWaiting?: number;
 }
@@ -44,7 +47,7 @@ export function createSpeechQueue(deps: SpeechQueueDeps): SpeechQueue {
       const controller = new AbortController();
       current = { controller };
       speaking = true;
-      deps.onStart?.(item.text);
+      deps.onStart?.(item);
       try {
         await deps.play(item, controller.signal);
       } catch {

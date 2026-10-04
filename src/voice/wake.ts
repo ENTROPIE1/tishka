@@ -41,10 +41,6 @@ const DISTORTIONS: string[] = [
   'тишко', 'тишку', 'тишке', 'тишки', 'тишкa', 'тихка', 'тышка', 'тишь ка', 'тишка-тишка'
 ];
 
-const DISMISS_PHRASES = [
-  'уходи', 'уйди', 'пока', 'всё, спасибо', 'спасибо, всё', 'отбой', 'хватит', 'можешь идти', 'свободен'
-];
-
 const LATIN: Record<string, string> = {
   a: 'а', b: 'в', c: 'с', e: 'е', h: 'н', k: 'к', m: 'м', o: 'о', p: 'р', t: 'т', x: 'х', y: 'у'
 };
@@ -140,16 +136,132 @@ export function matchWake(text: string, wakeWords: string[]): { matched: false }
   return { matched: false };
 }
 
-// Просьба уйти: фраза целиком, регистр и знаки не важны; имя в начале допускается.
+// Обороты, обращённые к Тишке. Одиночное «свободен» сюда не входит: внутри
+// реплики оно чаще о самом человеке («я сегодня свободен»), поэтому ищется
+// только как фраза целиком.
+const DISMISS_TURNS = [
+  'уходи', 'уйди', 'ты свободен', 'ты пока свободен', 'можешь идти',
+  'можешь быть свободен', 'можешь пока быть свободен', 'иди отдыхай',
+  'пока иди', 'пока не нужен', 'спрячься', 'скройся'
+];
+
+// «Пока», «свободен» и вежливые фразы ищутся только целиком: как оборот
+// внутри реплики они многозначны («подожди, пока загрузится»).
+const DISMISS_PHRASES = [
+  ...DISMISS_TURNS, 'свободен', 'пока', 'всё, спасибо', 'спасибо, всё', 'отбой', 'хватит'
+];
+
+// Порог длины: реплика длиннее — фраза по делу, а не просьба уйти.
+const DISMISS_MAX_WORDS = 5;
+const DISMISS_NEGATION = 'не';
+const DISMISS_QUESTIONS = new Set([
+  'когда', 'почему', 'зачем', 'сколько', 'где', 'куда', 'откуда', 'кто', 'ли', 'разве', 'неужели'
+]);
+// Подлежащее в первом лице: часть реплики о самом человеке («я сегодня
+// свободен», «мне пока не нужен отчёт») просьбой уйти не считается.
+const DISMISS_FIRST_PERSON = new Set(['я', 'мне', 'мы', 'нам']);
+const DISMISS_CLAUSE_SPLIT = /[,.;:!?—–]/;
+
+const DISMISS_TURN_KEYS = DISMISS_TURNS.map((turn) => turn.split(/\s+/).map(key));
+// «Пока не нужен» считается просьбой только без дополнения после него:
+// «пока не нужен» — да, «пока не нужен отчёт» — нет.
+const DISMISS_TURN_NO_COMPLEMENT = DISMISS_TURNS.indexOf('пока не нужен');
+
+// Первое вхождение оборота как подряд идущих слов; -1, если оборота нет.
+function findTurn(words: string[], turn: string[]): number {
+  for (let start = 0; start + turn.length <= words.length; start += 1) {
+    let matched = true;
+    for (let offset = 0; offset < turn.length; offset += 1) {
+      if (words[start + offset] !== turn[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      return start;
+    }
+  }
+  return -1;
+}
+
+// Самый ранний и длинный оборот: в «не можешь быть свободен» отрицание стоит
+// перед «можешь быть свободен», а не перед одиночным «свободен».
+function dismissTurn(words: string[]): { index: number; start: number; length: number } | undefined {
+  let best: { index: number; start: number; length: number } | undefined;
+  for (let index = 0; index < DISMISS_TURN_KEYS.length; index += 1) {
+    const turn = DISMISS_TURN_KEYS[index];
+    const start = findTurn(words, turn);
+    if (start < 0) {
+      continue;
+    }
+    if (best === undefined || start < best.start || (start === best.start && turn.length > best.length)) {
+      best = { index, start, length: turn.length };
+    }
+  }
+  return best;
+}
+
+// Часть реплики о самом человеке: подлежащее в первом лице.
+function isFirstPerson(words: string[]): boolean {
+  for (let i = 0; i < words.length; i += 1) {
+    if (DISMISS_FIRST_PERSON.has(words[i])) {
+      return true;
+    }
+    if (words[i] === 'у' && i + 1 < words.length && words[i + 1] === 'меня') {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Просьба уйти по смыслу: ключевой оборот, обращённый к Тишке, внутри
+// короткой реплики без отрицания, вопроса и частей о самом человеке.
+// Реплика делится на части по знакам, каждая часть проверяется отдельно:
+// «всё хорошо, можешь быть свободен» — просьба.
+function isDismissByMeaning(text: string): boolean {
+  if (text.includes('?')) {
+    return false;
+  }
+  for (const clause of text.split(DISMISS_CLAUSE_SPLIT)) {
+    const words = clause.split(/\s+/).map(key).filter((word) => word !== '');
+    if (words.length === 0 || words.length > DISMISS_MAX_WORDS) {
+      continue;
+    }
+    if (words.some((word) => DISMISS_QUESTIONS.has(word))) {
+      continue;
+    }
+    if (isFirstPerson(words)) {
+      continue;
+    }
+    const turn = dismissTurn(words);
+    if (turn === undefined) {
+      continue;
+    }
+    if (turn.start > 0 && words[turn.start - 1] === DISMISS_NEGATION) {
+      continue;
+    }
+    if (turn.index === DISMISS_TURN_NO_COMPLEMENT && turn.start + turn.length < words.length) {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
+
+// Просьба уйти: фраза целиком или по смыслу; регистр, знаки и вводные слова
+// не важны, имя в начале допускается. Отрицания, вопросы и длинная фраза
+// по делу с оборотом внутри просьбой уйти не считаются.
 export function isDismiss(text: string, wakeWords: string[] = ['тишка']): boolean {
   const whole = squashed(text);
   if (DISMISS_PHRASES.some((phrase) => squashed(phrase) === whole)) {
     return true;
   }
   const match = matchWake(text, wakeWords);
-  if (!match.matched) {
-    return false;
+  if (match.matched && match.rest !== '') {
+    const rest = squashed(match.rest);
+    if (DISMISS_PHRASES.some((phrase) => squashed(phrase) === rest)) {
+      return true;
+    }
   }
-  const rest = squashed(match.rest);
-  return rest !== '' && DISMISS_PHRASES.some((phrase) => squashed(phrase) === rest);
+  return isDismissByMeaning(text);
 }
