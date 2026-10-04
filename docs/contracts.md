@@ -154,7 +154,7 @@ interface SecretStore {
 
 interface Config {
   llm: { baseUrl: string; model: string; visionModel: string };
-  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number }; ttsEngine: 'piper' | 'silero' | 'none' };
+  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number }; tts: { enabled: boolean; url: string; volume: number } };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
