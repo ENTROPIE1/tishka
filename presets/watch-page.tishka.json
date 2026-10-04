@@ -4,6 +4,7 @@
   "name": "Следи за страницей",
   "description": "Сообщает, когда версия страницы изменилась",
   "phrases": [],
+  "requires": ["confluence"],
   "trigger": {
     "type": "watch",
     "tool": "confluence__get_page_version",
@@ -12,9 +13,18 @@
     "field": "version"
   },
   "inputs": [
-    { "name": "page_id", "description": "Номер страницы", "required": true, "default": "" }
+    { "name": "page_id", "description": "Номер страницы Confluence", "required": true, "default": "123456" }
   ],
   "steps": [
-    { "id": "say", "say": "Страница обновилась" }
+    { "id": "page", "tool": "confluence__get_page_version", "args": { "page_id": "{{inputs.page_id}}" } },
+    {
+      "id": "changed",
+      "say": "Страница обновилась",
+      "show": {
+        "kind": "text",
+        "title": "Страница обновилась",
+        "markdown": "Новая версия: {{steps.page.data.version}}\n\nСсылка: {{steps.page.data.url}}"
+      }
+    }
   ]
 }

@@ -2,15 +2,29 @@
   "format": "tishka-skill/1",
   "id": "friday-morning",
   "name": "Утро пятницы",
-  "description": "Открывает ссылки, нужные для начала пятницы",
+  "description": "Открывает страницы, нужные для начала пятницы",
   "phrases": ["утро пятницы", "начинаем пятницу"],
   "trigger": { "type": "manual" },
+  "inputs": [
+    {
+      "name": "mail_page",
+      "description": "Адрес почты",
+      "required": false,
+      "default": "https://example.org/friday"
+    },
+    {
+      "name": "plan_page",
+      "description": "Адрес страницы с планом на день",
+      "required": false,
+      "default": "https://example.org/plan"
+    }
+  ],
   "steps": [
     {
       "id": "open",
       "tool": "open_urls",
       "args": {
-        "urls": ["https://example.org/friday", "https://example.org/plan"]
+        "urls": ["{{inputs.mail_page}}", "{{inputs.plan_page}}"]
       }
     },
     {

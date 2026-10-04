@@ -1,0 +1,29 @@
+{
+  "format": "tishka-skill/1",
+  "id": "my-day",
+  "name": "Мой день",
+  "description": "Собирает встречи на сегодня и делает короткую сводку",
+  "phrases": ["что у меня сегодня", "мой день", "покажи мой день"],
+  "requires": ["exchange"],
+  "trigger": { "type": "manual" },
+  "steps": [
+    {
+      "id": "meetings",
+      "tool": "exchange__list_meetings",
+      "args": { "date": "{{today}}", "days": 1 }
+    },
+    {
+      "id": "digest",
+      "ask": "Вот встречи на сегодня: {{steps.meetings.content}}. Сделай короткую сводку: сколько встреч, какая первая, есть ли окна между ними. Список встреч оформи коротко и по порядку."
+    },
+    {
+      "id": "answer",
+      "say": "Посмотрел твой день, подробности в карточке",
+      "show": {
+        "kind": "text",
+        "title": "Мой день",
+        "markdown": "{{steps.digest.content}}"
+      }
+    }
+  ]
+}

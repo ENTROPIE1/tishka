@@ -1,0 +1,38 @@
+{
+  "format": "tishka-skill/1",
+  "id": "draft-letter",
+  "name": "Письмо по шаблону",
+  "description": "Готовит вежливое короткое письмо и черновик в почте",
+  "phrases": ["подготовь письмо", "напиши письмо", "сделай письмо"],
+  "requires": ["exchange"],
+  "trigger": { "type": "manual" },
+  "inputs": [
+    { "name": "to", "description": "Адрес получателя", "required": true },
+    { "name": "topic", "description": "Тема письма", "required": true },
+    { "name": "points", "description": "Тезисы письма, как есть", "required": true }
+  ],
+  "steps": [
+    {
+      "id": "letter",
+      "ask": "Напиши вежливое короткое письмо по теме «{{inputs.topic}}». Вот тезисы: {{inputs.points}}. Отдай только текст письма, без пояснений."
+    },
+    {
+      "id": "draft",
+      "tool": "exchange__mail_draft_link",
+      "args": {
+        "to": "{{inputs.to}}",
+        "subject": "{{inputs.topic}}",
+        "body": "{{steps.letter.content}}"
+      }
+    },
+    {
+      "id": "answer",
+      "say": "Собрал письмо, черновик ждёт тебя",
+      "show": {
+        "kind": "text",
+        "title": "Черновик письма",
+        "markdown": "[Открыть черновик]({{steps.draft.data.url}})\n\n{{steps.letter.content}}"
+      }
+    }
+  ]
+}

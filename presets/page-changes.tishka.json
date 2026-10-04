@@ -1,0 +1,37 @@
+{
+  "format": "tishka-skill/1",
+  "id": "page-changes",
+  "name": "Что изменилось на странице",
+  "description": "Показывает, кто и когда менял страницу Confluence",
+  "phrases": ["что нового на странице", "что изменилось на странице", "изменения на странице"],
+  "requires": ["confluence"],
+  "trigger": { "type": "manual" },
+  "inputs": [
+    { "name": "page_id", "description": "Номер страницы Confluence", "required": true }
+  ],
+  "steps": [
+    {
+      "id": "version",
+      "tool": "confluence__get_page_version",
+      "args": { "page_id": "{{inputs.page_id}}" }
+    },
+    {
+      "id": "history",
+      "tool": "confluence__get_page_history",
+      "args": { "page_id": "{{inputs.page_id}}", "limit": 5 }
+    },
+    {
+      "id": "digest",
+      "ask": "Текущая версия страницы: {{steps.version.content}}. История версий: {{steps.history.content}}. Коротко расскажи, кто и когда менял страницу."
+    },
+    {
+      "id": "answer",
+      "say": "Посмотрел изменения, подробности в карточке",
+      "show": {
+        "kind": "text",
+        "title": "Изменения страницы",
+        "markdown": "{{steps.digest.content}}"
+      }
+    }
+  ]
+}

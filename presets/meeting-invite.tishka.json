@@ -1,0 +1,35 @@
+{
+  "format": "tishka-skill/1",
+  "id": "meeting-invite",
+  "name": "Позвать на встречу",
+  "description": "Готовит черновик встречи со ссылкой в почте",
+  "phrases": ["назначь встречу", "позови на встречу", "собери встречу"],
+  "requires": ["exchange"],
+  "trigger": { "type": "manual" },
+  "inputs": [
+    { "name": "who", "description": "Кого позвать на встречу", "required": true },
+    { "name": "topic", "description": "Тема встречи", "required": true },
+    { "name": "when", "description": "Когда провести встречу: дата или дата со временем", "required": true }
+  ],
+  "steps": [
+    {
+      "id": "draft",
+      "tool": "exchange__meeting_draft_link",
+      "args": {
+        "subject": "{{inputs.topic}}",
+        "start": "{{inputs.when}}",
+        "end": "{{inputs.when}}",
+        "body": "Участник: {{inputs.who}}"
+      }
+    },
+    {
+      "id": "answer",
+      "say": "Собрал встречу, черновик ждёт тебя",
+      "show": {
+        "kind": "text",
+        "title": "Черновик встречи",
+        "markdown": "[Открыть черновик встречи]({{steps.draft.data.url}})"
+      }
+    }
+  ]
+}
