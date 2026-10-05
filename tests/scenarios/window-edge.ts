@@ -1,9 +1,11 @@
 import type { BrowserWindow } from 'electron';
 import type { PetModel } from '../../src/pet/state';
+import type { TishkaEvent } from '../../src/core/types';
 import type { ListenCommand } from '../../src/voice/listen';
 import type { WakeState } from '../../src/voice/wake';
 import type { SpeakMessage } from '../../src/voice/speech-queue';
 import {
+  EVENT_CHANNEL,
   PET_FOCUS_INPUT_CHANNEL,
   PET_LISTEN_COMMAND_CHANNEL,
   PET_MODEL_CHANNEL,
@@ -53,6 +55,8 @@ export function createWindowEdge(deps: PageDeps): WindowEdge {
       page.pointer();
     } else if (channel === PET_FOCUS_INPUT_CHANNEL) {
       page.focusComposer();
+    } else if (channel === EVENT_CHANNEL) {
+      page.event(payload as TishkaEvent);
     }
   }
 

@@ -45,6 +45,15 @@ const composer = createComposer({
   onFocus: () => window.tishka.pet.focus(),
   onSettings: () => {
     void window.tishka.openSettings();
+  },
+  // Глаз: просьба посмотреть на экран уходит тем же текстом, что из чата,
+  // остановка — общим каналом остановки.
+  onScreenLook: (action) => {
+    if (action.kind === 'send') {
+      window.tishka.sendUserText(action.text);
+    } else if (action.kind === 'stop') {
+      window.tishka.stop();
+    }
   }
 });
 composerHost.append(composer.element);
@@ -211,6 +220,23 @@ window.tishka.pet.onLayout((layout) => {
 });
 window.tishka.pet.onSpeak((message) => speaker.play(message));
 window.tishka.pet.onSpeakStop(() => speaker.stop());
+// Вид кнопки с глазом ведёт ядро: событие о просмотре экрана приходит обоим окнам.
+window.tishka.onScreenLook((looking) => {
+  composer.setLooking(looking);
+});
+// Просмотр экрана выключен в настройках: кнопки с глазом нет.
+async function refreshScreenLook(): Promise<void> {
+  try {
+    const view = await window.tishka.config.get();
+    composer.setScreenLookAvailable(view.config.screen.enabled);
+  } catch {
+    composer.setScreenLookAvailable(false);
+  }
+}
+window.tishka.config.onChanged(() => {
+  void refreshScreenLook();
+});
+void refreshScreenLook();
 void characterModel.mount(character).catch(() => undefined);
 installLinkGuard(document);
 initCharacter();

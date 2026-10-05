@@ -13,6 +13,7 @@ export interface ScenarioOptions {
   warmMinutes?: number;           // сколько держать микрофон после обращения
   tts?: TtsMode;                  // служба синтеза
   reply?: Reply;                  // ответ ядра по умолчанию
+  screenEnabled?: boolean;        // разрешён ли Тишке просмотр экрана
 }
 
 export interface ScenarioObservations {
@@ -30,6 +31,9 @@ export interface ScenarioObservations {
   interactive(): boolean;         // строка принимает щелчки
   composerVisible(): boolean;     // строка ввода видна
   composerCollapsed(): boolean;   // строка свёрнута в полочку
+  eyeOn(): boolean;               // кнопка с глазом у ежа активна
+  eyeHidden(): boolean;           // кнопка с глазом у ежа скрыта настройкой
+  chatEyeOn(): boolean;           // кнопка с глазом в чате активна
   bounds(): WindowRect;           // положение окна
   spoken(): string[];             // что произнесено
   errors(): string[];             // показанные сообщения об ошибках
@@ -55,6 +59,8 @@ export interface Scenario {
   sendFromChat(text: string): void;       // отправка текста из окна чата
   notifyFromSkill(title: string): void;   // уведомление от навыка
   stopFromChat(): void;                   // остановка из окна чата: строка только в ленте чата
+  pressEye(question?: string): void;      // нажатие кнопки с глазом у ежа
+  coreLooksAtScreen(): void;              // ядро начало просмотр экрана: событие инструмента
   voiceReady(): void;                     // служба распознавания стала готова
   voiceFailed(message?: string): void;    // служба не поднялась
   wait(ms: number): Promise<void>;        // ход времени
@@ -70,5 +76,6 @@ export function buildConfig(options: ScenarioOptions): Config {
   config.voice.talkTimeoutSec = options.talkTimeoutSec ?? 30;
   config.voice.tts.enabled = true;
   config.app.warmMinutes = options.warmMinutes ?? 30;
+  config.screen.enabled = options.screenEnabled ?? true;
   return config;
 }

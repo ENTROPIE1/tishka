@@ -1,4 +1,5 @@
 import type { EventBus, Reply } from '../../src/core/types';
+import { STOPPED_TITLE } from '../../src/core/stopped';
 import type { SttStatus, TranscribeResult } from '../../src/voice/stt-service';
 
 export type TtsMode = 'ok' | 'rejected' | 'unreachable';
@@ -68,6 +69,7 @@ export function createFakeTts(mode: TtsMode): FakeTts {
 export interface FakeCore {
   handleUserText(text: string): Promise<Reply>;
   willReply(reply: Reply): void;
+  cancel(): void;
   calls(): string[];
 }
 
@@ -88,6 +90,11 @@ export function createFakeCore(bus: EventBus, fallback: Reply): FakeCore {
       bus.emit({ type: 'reply', reply });
       bus.emit({ type: 'idle' });
       return reply;
+    },
+    // Остановка из окна ежа: уведомление и простой, как у настоящего cancel('pet').
+    cancel(): void {
+      bus.emit({ type: 'notify', title: STOPPED_TITLE });
+      bus.emit({ type: 'idle' });
     }
   };
 }

@@ -10,6 +10,8 @@ import type { Mover } from '../../src/main/pet-motion';
 import type { PetPlacement } from '../../src/main/pet-placement';
 import { defaultPetX, petLayout } from '../../src/pet/layout';
 import { STOPPED_TITLE } from '../../src/core/stopped';
+import { nextScreenLooking } from '../../src/core/screen-look';
+import { EVENT_CHANNEL } from '../../src/main/ipc-channels';
 import { createFakeCore, createFakeStt, createFakeTts } from './edges';
 import { createWindowEdge, WORK_AREA } from './window-edge';
 import { createPetFacade } from './pet-facade';
@@ -40,6 +42,11 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   const tts = createFakeTts(options.tts ?? 'ok');
   const core = createFakeCore(bus, options.reply ?? { say: 'Готово' });
   const isReady = (): boolean => stt.status() === 'ready';
+  // Кнопка с глазом в чате: вид от событий ядра, как в chat.ts и у ежа.
+  let chatLooking = false;
+  bus.on((event) => {
+    chatLooking = nextScreenLooking(chatLooking, event);
+  });
 
   let petWake: PetWake | undefined;
   // Ссылки на модули, которые создаются позже окна: фраза и конец звука.
@@ -47,9 +54,18 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   let speakDone: (id: number | undefined) => void = () => undefined;
   const win = createWindowEdge({
     onPhrase: (wav) => recognize(wav),
-    onSpeakDone: (id) => speakDone(id)
+    onSpeakDone: (id) => speakDone(id),
+    onScreenLookSend: (text) => {
+      void bus.run('pet', () => core.handleUserText(text)).catch(() => undefined);
+    },
+    onScreenLookStop: () => core.cancel(),
+    screenLookAvailable: () => config.screen.enabled
   });
   const { page } = win;
+  // События ядра приходят во все окна, как broadcastEvent в ipc.ts.
+  bus.on((event) => {
+    win.browserWindow.webContents.send(EVENT_CHANNEL, event);
+  });
 
   const layout = petLayout(WORK_AREA, defaultPetX(WORK_AREA), {});
   // Окно создаётся сразу на месте из раскладки, как в createPetWindow.
@@ -129,7 +145,8 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     coreCalls: () => core.calls(),
     sttRequests: () => stt.requests(),
     ttsRequests: () => tts.requests(),
-    conversationOn: () => flow.isConversation()
+    conversationOn: () => flow.isConversation(),
+    chatEyeOn: () => chatLooking
   };
 
   return {
@@ -171,6 +188,13 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     stopFromChat(): void {
       bus.emit({ type: 'status', text: STOPPED_TITLE });
       bus.emit({ type: 'idle' });
+    },
+    pressEye(question?: string): void {
+      page.pressEye(question);
+    },
+    // Ядро начало просмотр экрана: событие инструмента видят кнопки в обоих окнах.
+    coreLooksAtScreen(): void {
+      bus.emit({ type: 'tool.start', tool: 'screen_look' });
     },
     voiceReady(): void {
       stt.setStatus('ready');
