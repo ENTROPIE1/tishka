@@ -80,6 +80,16 @@ curl.exe --noproxy "*" http://127.0.0.1:8179/health
 curl.exe --noproxy "*" -s -o NUL -w "%{http_code}" http://127.0.0.1:8178/
 ```
 
+#### Запуск whisper.cpp против выдумок
+
+На машине со службами `whisper-server` запускают с ключами против выдуманных титров: `-sns` не выдаёт неречевые токены, а `--vad` включает встроенный детектор речи. Файл модели детектора (`ggml-silero-*.bin`) скачивают со страницы выпусков `github.com/ggml-org/whisper.cpp` и кладут рядом с моделью распознавания. Пример строки запуска:
+
+```powershell
+whisper-server -m ggml-small.bin -l ru -t 4 -ac 768 --host 127.0.0.1 --port 8178 -sns --vad --vad-model ggml-silero-v5.1.2.bin
+```
+
+Ключи поддерживаются не всеми сборками: если программа их не понимает, запускайте как раньше. Ключ `-mc 0` не ставьте — он отключает подсказку с именем.
+
 ### Вариант Б: распознавание локально
 
 1. Скачать сборку whisper.cpp для Windows со страницы выпусков `github.com/ggml-org/whisper.cpp` и модель `ggml-small.bin` (huggingface `ggerganov/whisper.cpp`).

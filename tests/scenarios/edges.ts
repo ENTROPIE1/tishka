@@ -1,6 +1,7 @@
 import type { EventBus, Reply } from '../../src/core/types';
 import { STOPPED_TITLE } from '../../src/core/stopped';
 import { CANCELLED_REPLY } from '../../src/core/turn-queue';
+import { filterHallucinations } from '../../src/voice/stt-hallucination';
 import type { SttStatus, TranscribeResult } from '../../src/voice/stt-service';
 
 export type TtsMode = 'ok' | 'rejected' | 'unreachable';
@@ -45,6 +46,11 @@ export function createFakeStt(initial: SttStatus): FakeStt {
         await new Promise<void>((resolve) => {
           setTimeout(resolve, item.holdMs);
         });
+      }
+      // Служба отдаёт текст как есть, отсев выдумок — как у createSttService.
+      if (item.result.ok) {
+        const filtered = filterHallucinations(item.result.text, 0);
+        return filtered.dropped ? NOISE : { ok: true, text: filtered.text };
       }
       return item.result;
     },

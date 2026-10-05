@@ -1,11 +1,12 @@
 import type { ConnectionTemplate } from '../core/connections';
 import type { McpServerState } from '../core/mcp/manager';
 import type { Config, McpServerConfig } from '../core/types';
-import type { SttCheckView, SttStatus } from '../voice/stt-service';
+import type { SttCheckView, SttDetector, SttStatus } from '../voice/stt-service';
 
 export interface VoiceStateView {
   state: SttStatus;
   error?: string;
+  detector?: SttDetector;   // встроенный детектор речи запущенной приложением службы
 }
 
 export type { SttCheckView };

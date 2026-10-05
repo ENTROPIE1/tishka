@@ -120,6 +120,21 @@ describe('mountVoiceSection', () => {
     expect(root.querySelector<HTMLElement>('.remote-fields')?.hidden).toBe(true);
   });
 
+  it('показывает состояние детектора речи службы', async () => {
+    install({ state: 'ready', detector: 'on' });
+    const root = document.createElement('div');
+    mountVoiceSection(root);
+    await flush();
+
+    expect(root.querySelector<HTMLElement>('.detector-state')?.textContent).toBe('включён');
+
+    install({ state: 'ready', detector: 'no-model' });
+    const second = document.createElement('div');
+    mountVoiceSection(second);
+    await flush();
+    expect(second.querySelector<HTMLElement>('.detector-state')?.textContent).toBe('файл модели не найден');
+  });
+
   it('«Перезапустить службу» вызывает проверку службы', async () => {
     vi.useFakeTimers();
     install({ state: 'ready' });
