@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { petCharacterContent, PET_TISHKA_HEIGHT, PET_TISHKA_SIZE } from '../src/pet/character-size';
 import { defaultPetX, PET_LAYOUT_DEFAULTS, petLayout, type WorkArea } from '../src/pet/layout';
 
 const { margin, petWidth, columnWidth: desiredColumn, columnMinWidth, composerHeight } = PET_LAYOUT_DEFAULTS;
@@ -57,5 +58,40 @@ describe('petLayout', () => {
       expect(layout.window.x).toBeGreaterThanOrEqual(screen.x);
       expect(layout.window.x + layout.window.width).toBeLessThanOrEqual(right);
     }
+  });
+});
+
+describe('petLayout с высоким персонажем', () => {
+  const screen: WorkArea = { x: 0, y: 0, width: 1920, height: 1020 };
+
+  it('размер Тишки — по высоте-константе и пропорциям модели', () => {
+    const content = petCharacterContent('tishka');
+    expect(content.petHeight).toBe(PET_TISHKA_HEIGHT);
+    expect(content.petWidth).toBe(PET_TISHKA_SIZE.width);
+    expect(content.petWidth).toBeLessThan(content.petHeight ?? 0);
+  });
+
+  it('окно с высоким персонажем целиком помещается на экране', () => {
+    const content = petCharacterContent('tishka');
+    const layout = petLayout(screen, defaultPetX(screen, content), content);
+
+    expect(layout.petHeight).toBe(PET_TISHKA_HEIGHT);
+    expect(layout.window.x).toBeGreaterThanOrEqual(screen.x);
+    expect(layout.window.x + layout.window.width).toBeLessThanOrEqual(screen.x + screen.width);
+  });
+
+  it('облачко остаётся ниже лица высокого персонажа', () => {
+    const content = petCharacterContent('tishka');
+    const layout = petLayout(screen, defaultPetX(screen, content), content);
+    // Мордочка высокого Тишки — в верхней части фигуры: линия облачка ниже.
+    expect(layout.muzzle).toBeLessThan(layout.petHeight / 2);
+  });
+
+  it('смена персонажа меняет ширину окна, но не его высоту (экран)', () => {
+    const hedgehog = petLayout(screen, defaultPetX(screen), petCharacterContent('hedgehog'));
+    const tishka = petLayout(screen, defaultPetX(screen, petCharacterContent('tishka')), petCharacterContent('tishka'));
+
+    expect(tishka.window.width).toBeLessThan(hedgehog.window.width);
+    expect(tishka.window.height).toBe(hedgehog.window.height);
   });
 });

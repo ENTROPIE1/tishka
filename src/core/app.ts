@@ -37,9 +37,9 @@ import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
 import { registerSpeechModeTool } from './tools/speech-mode';
 import { registerWebTools } from './tools/web';
-import type { Config, EventBus, InputSource, McpServerConfig, Panel, Reply, SecretStore, Skill } from './types';
+import type { Config, EventBus, InputSource, McpServerConfig, Panel, Reply, SecretStore, Skill, TishkaEvent } from './types';
 import { isCancelled } from './cancel';
-import { CANCELLED_REPLY, createTurnQueue } from './turn-queue';
+import { CANCELLED_REPLY, createTurnQueue, REPLACED_NOTE } from './turn-queue';
 import { STOPPED_TITLE } from './stopped';
 import type { WebReader } from './web/types';
 import { createVisionLook, type CaptureResult, type ScreenTarget } from './vision/look';
@@ -50,7 +50,9 @@ export interface CoreDeps {
   presetsDir: string;              // каталог presets/
   appRoot: string;                 // корень приложения, от него считаются относительные пути серверов MCP
   secrets: SecretStore;
-  events: EventBus;
+  // Шина событий; необязательный emitAs позволяет пометить источник «чат» даже
+  // вне хода ядра (служебные строки остановки и вытесненной реплики).
+  events: EventBus & { emitAs?(source: 'chat' | 'pet', event: TishkaEvent): void };
   openExternal(url: string): Promise<void>;
   showPanel(panel: Panel): void;
   now: () => Date;
@@ -176,7 +178,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   const conversation = createConversationClock();
   const turns = createTurnQueue({
     run: (text, signal, source) => processUserText(text, signal, source),
-    reset: () => agent?.reset()
+    reset: () => agent?.reset(),
+    onReplaced: () => emitChatStatus(REPLACED_NOTE)
   });
 
   // Новый разговор: чистый контекст агента плюс разделитель в ленте.
@@ -297,11 +300,21 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     );
   }
 
+  // Служебная строка живёт только в ленте чата: помечаем источник «чат», чтобы
+  // ёж её не показывал. Без пометки (в тестах) шлём обычным событием статуса.
+  function emitChatStatus(text: string): void {
+    if (deps.events.emitAs !== undefined) {
+      deps.events.emitAs('chat', { type: 'status', text });
+      return;
+    }
+    deps.events.emit({ type: 'status', text });
+  }
+
   // Строка остановки: из окна чата — событие статуса, которое ёж не показывает,
   // скрытого ежа оно не поднимает; из окна ежа — уведомление, как раньше.
   function emitStopped(): void {
     if (stopSource === 'chat') {
-      deps.events.emit({ type: 'status', text: STOPPED_TITLE });
+      emitChatStatus(STOPPED_TITLE);
       return;
     }
     deps.events.emit({ type: 'notify', title: STOPPED_TITLE });

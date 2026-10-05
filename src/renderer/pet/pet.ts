@@ -1,8 +1,9 @@
 import type { PetModel, PetState } from '../../pet/state';
 import { clipForState, type Character } from './character';
-import { createCharacter } from './character-factory';
+import { loadCharacter } from './character-factory';
 import { createComposer } from './composer';
 import { composerBusy, composerCollapsed } from './composer-state';
+import { createDrag } from './drag';
 import { applyPetLayout } from './layout-view';
 import { createListenUi } from './listen-ui';
 import { createInteractivity, hitTestRegions } from './interactivity';
@@ -22,15 +23,15 @@ const cardHost = document.getElementById('card-host') as HTMLElement;
 const character = document.getElementById('character') as HTMLElement;
 const stateLabelEl = document.getElementById('state-label') as HTMLElement;
 const composerHost = document.getElementById('composer-host') as HTMLElement;
-const characterModel: Character = createCharacter('svg');
+let characterModel: Character | undefined;
+let characterKind = 'hedgehog';
+let mouthLevel: number | null = null;
 
 let mirrored = false;
 let currentState: PetState = 'hidden';
 let greeting = false;
 let waiting = false;
 let dragging = false;
-let dragMoved = false;
-let dragLastX = 0;
 let onScreen = false;
 
 const composer = createComposer({
@@ -69,7 +70,10 @@ const interactivity = createInteractivity({
 });
 
 const speaker = createSpeaker({
-  setMouth: (level) => characterModel.setMouth(level),
+  setMouth: (level) => {
+    mouthLevel = level;
+    characterModel?.setMouth(level);
+  },
   onDone: (id) => window.tishka.pet.speakDone(id)
 });
 const petCard = createPetCard({ element: cardHost, refreshBusy });
@@ -129,7 +133,7 @@ function applyComposer(state: PetState, visible: boolean): void {
 function applyFlip(): void {
   const { flip } = clipForState(currentState);
   const moving = currentState === 'appear' || currentState === 'leave';
-  characterModel.setFlip(moving ? flip : !mirrored);
+  characterModel?.setFlip(moving ? flip : !mirrored);
 }
 
 function renderModel(model: PetModel): void {
@@ -141,7 +145,7 @@ function renderModel(model: PetModel): void {
   petCard.render(model);
 
   const { clip } = clipForState(model.state);
-  characterModel.setClip(clip);
+  characterModel?.setClip(clip);
   applyFlip();
 
   const visible = isOnScreen(model.state);
@@ -163,53 +167,94 @@ function openComposer(): void {
   composer.focus();
 }
 
+async function requestedCharacter(): Promise<string> {
+  try {
+    const view = await window.tishka.config.get();
+    return view.config.persona.character;
+  } catch {
+    return 'hedgehog';
+  }
+}
+
+// Пересозданному персонажу возвращаем текущее состояние, отражение и рот.
+function applyCurrentCharacter(): void {
+  characterModel?.setClip(clipForState(currentState).clip);
+  applyFlip();
+  if (mouthLevel !== null) {
+    characterModel?.setMouth(mouthLevel);
+  }
+}
+
+async function mountCharacter(kind: string): Promise<void> {
+  characterModel?.dispose();
+  character.replaceChildren();
+  characterModel = undefined;
+  characterModel = await loadCharacter(kind, character, (message) => {
+    window.tishka.timingMark('character.fallback', { message });
+  });
+  applyCurrentCharacter();
+}
+
+// Настройка «persona.character» применяется сразу: окно ежа пересоздаёт персонажа.
+async function refreshCharacter(): Promise<void> {
+  const kind = await requestedCharacter();
+  if (kind === characterKind && characterModel !== undefined) {
+    return;
+  }
+  characterKind = kind;
+  await mountCharacter(kind);
+}
+
 function initCharacter(): void {
-  character.addEventListener('mousedown', (event) => {
+  character.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) {
       return;
     }
-    dragging = true;
-    dragMoved = false;
-    dragLastX = event.screenX;
-    wake.beginDrag();
-    interactivity.set(true);
+    drag.down(event.screenX, event.button);
     event.preventDefault();
   });
 }
 
+// Перетаскивание ежа: указатель нажимают на персонаже, отпускают в любом месте
+// окна или вне его. Конец ловим по отпусканию, отмене указателя, потере фокуса
+// и таймауту без движения — окно не остаётся прилипшим к курсору.
+const drag = createDrag({
+  onBegin: () => {
+    dragging = true;
+    wake.beginDrag();
+    interactivity.set(true);
+  },
+  onMove: (delta) => {
+    window.tishka.pet.dragBy(delta);
+    wake.dragMove();
+  },
+  onEnd: () => {
+    dragging = false;
+    window.tishka.pet.dragEnd();
+    wake.endDrag();
+  },
+  onClick: () => openComposer()
+});
+
 function initPointer(): void {
-  window.addEventListener('mousemove', (event) => {
+  window.addEventListener('pointermove', (event) => {
     if (dragging) {
-      const delta = event.screenX - dragLastX;
-      if (Math.abs(delta) > 3) {
-        dragMoved = true;
-      }
-      dragLastX = event.screenX;
-      if (delta !== 0) {
-        window.tishka.pet.dragBy(delta);
-      }
+      drag.move(event.screenX);
       return;
     }
     interactivity.set(hitTestRegions(regions, event.clientX, event.clientY));
   });
-  window.addEventListener('mouseup', () => {
-    if (!dragging) {
-      return;
-    }
-    dragging = false;
-    window.tishka.pet.dragEnd();
-    wake.endDrag();
-    if (!dragMoved) {
-      openComposer();
-    }
-  });
+  window.addEventListener('pointerup', () => drag.up());
+  window.addEventListener('pointercancel', () => drag.cancel());
+  window.addEventListener('blur', () => drag.cancel());
 }
 
 window.tishka.onPetModel(renderModel);
 window.tishka.pet.onCaption((text) => caption.show(text));
 window.tishka.onEvent((event) => {
   if (event.type === 'speak.level') {
-    characterModel.setMouth(event.level);
+    mouthLevel = event.level;
+    characterModel?.setMouth(event.level);
   } else if (event.type === 'reply') {
     timingMark('reply.shown');
   } else if (event.type === 'error') {
@@ -249,9 +294,10 @@ async function refreshScreenLook(): Promise<void> {
 }
 window.tishka.config.onChanged(() => {
   void refreshScreenLook();
+  void refreshCharacter();
 });
 void refreshScreenLook();
-void characterModel.mount(character).catch(() => undefined);
+void refreshCharacter();
 installLinkGuard(document);
 initCharacter();
 initPointer();

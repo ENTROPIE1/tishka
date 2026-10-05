@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createWakeListener, type WakeListener } from '../src/renderer/pet/wake-listener';
-import { DRAG_RESUME_MS } from '../src/renderer/shared/listen-pause';
+import { DRAG_MAX_MS, DRAG_RESUME_MS } from '../src/renderer/shared/listen-pause';
 import type { PhraseListener } from '../src/renderer/shared/phrase-listener';
 import type { WakeState } from '../src/voice/wake';
 
@@ -77,5 +77,37 @@ describe('пауза записи при перетаскивании ежа', (
 
     // Пауза не снималась: запланированное возобновление отменено вторым нажатием.
     expect(h.pauses).toEqual([true]);
+  });
+
+  it('пауза сама снимается, если событие отпускания потерялось', () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.apply({ active: true, conversation: true, soon: false });
+    h.pauses.length = 0;
+
+    listener?.beginDrag();
+    expect(h.pauses).toEqual([true]);
+
+    vi.advanceTimersByTime(DRAG_MAX_MS - 1);
+    expect(h.pauses).toEqual([true]);
+
+    vi.advanceTimersByTime(1);
+    expect(h.pauses).toEqual([true, false]);
+  });
+
+  it('движение при перетаскивании продлевает паузу', () => {
+    vi.useFakeTimers();
+    const h = harness();
+    h.apply({ active: true, conversation: true, soon: false });
+    h.pauses.length = 0;
+
+    listener?.beginDrag();
+    vi.advanceTimersByTime(DRAG_MAX_MS - 1000);
+    listener?.dragMove();
+    vi.advanceTimersByTime(DRAG_MAX_MS - 1000);
+    expect(h.pauses).toEqual([true]);
+
+    vi.advanceTimersByTime(1000);
+    expect(h.pauses).toEqual([true, false]);
   });
 });

@@ -109,11 +109,28 @@ app.whenReady().then(async () => {
   const handleConfigChanged = (previous: Config, next: Config): void => {
     broadcastConfigChanged();
     // Голос перезапускается сам, если изменились программа, модель или адрес.
+    // Исход доводится до отложенного включения записи, как при первом запуске.
     if (stt !== undefined) {
-      restartVoiceIfNeeded(stt, previous, next);
+      restartVoiceIfNeeded(stt, previous, next, {
+        onReady: () => {
+          wakeFlow.noteReady();
+          petWake?.broadcast();
+          chatTalk?.broadcast();
+        },
+        onFailed: (message) => {
+          wakeFlow.noteFailed(message);
+          petWake?.broadcast();
+          chatTalk?.broadcast();
+        }
+      });
     }
     if (previous.app.autostart !== next.app.autostart) {
       app.setLoginItemSettings(loginItemSettings(next.app.autostart));
+    }
+    // Смена персонажа меняет размер фигуры: окно ежа пересчитывает раскладку,
+    // а страница пересоздаёт самого персонажа (см. pet.ts).
+    if (previous.persona.character !== next.persona.character) {
+      pet?.refreshLayout();
     }
     speech?.warm();
     petWake?.broadcast();

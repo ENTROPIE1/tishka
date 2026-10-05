@@ -18,6 +18,9 @@ export interface PetLayoutContent {
   gap?: number;
   margin?: number;
   composerHeight?: number;
+  // Высота мордочки персонажа над нижним краем: до этой линии поднимаются
+  // облачко и карточка, чтобы не перекрывать лицо.
+  muzzle?: number;
   // Масштаб экрана (1, 1.25, 1.5 …). Положение окна округляется до целого
   // числа физических пикселей, чтобы при перемещении оно не «плыло».
   scale?: number;
@@ -38,12 +41,17 @@ export interface PetLayout {
   petX: number;
   petWidth: number;
   petHeight: number;
+  muzzle: number;
   composerHeight: number;
 }
 
-// Вид раскладки, который главный процесс передаёт окну: только сторона.
+// Вид раскладки, который главный процесс передаёт окну: сторона и размеры
+// персонажа. Размеры — необязательные, старые вызовы задают только сторону.
 export interface PetLayoutView {
   mirrored: boolean;
+  petWidth?: number;
+  petHeight?: number;
+  muzzle?: number;
 }
 
 export const PET_LAYOUT_DEFAULTS = {
@@ -53,7 +61,8 @@ export const PET_LAYOUT_DEFAULTS = {
   petHeight: 200,
   gap: 12,
   margin: 16,
-  composerHeight: 64
+  composerHeight: 64,
+  muzzle: 72
 } as const;
 
 function clamp(value: number, min: number, max: number): number {
@@ -133,6 +142,7 @@ export function petLayout(
   const gap = content.gap ?? PET_LAYOUT_DEFAULTS.gap;
   const margin = content.margin ?? PET_LAYOUT_DEFAULTS.margin;
   const composerHeight = content.composerHeight ?? PET_LAYOUT_DEFAULTS.composerHeight;
+  const muzzle = content.muzzle ?? PET_LAYOUT_DEFAULTS.muzzle;
   const scale = content.scale ?? 1;
 
   const right = workArea.x + workArea.width;
@@ -172,6 +182,7 @@ export function petLayout(
     petX: petLeft,
     petWidth,
     petHeight,
+    muzzle,
     composerHeight
   };
 }

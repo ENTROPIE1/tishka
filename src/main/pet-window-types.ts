@@ -19,6 +19,8 @@ export interface PetWindow {
   focusWindow(): void;
   dragBy(deltaX: number): void;
   dragEnd(): void;
+  // Пересчитать раскладку окна после смены персонажа, не пересоздавая окно.
+  refreshLayout(): void;
   listenCommand(command: ListenCommand): void;
   wakeState(state: WakeState): void;
   // Разовая подпись под ежом (например, «не разобрал»).

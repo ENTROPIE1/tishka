@@ -127,7 +127,7 @@ export interface Config {
     tts: { enabled: boolean; url: string; volume: number };   // синтез речи: говорить вслух
   };
   mcpServers: McpServerConfig[];
-  persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
+  persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; какой персонаж показывается
   calendar: CalendarConfig;   // рабочее время, напоминания календаря
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;

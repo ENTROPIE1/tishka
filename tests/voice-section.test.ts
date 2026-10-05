@@ -21,7 +21,7 @@ function makeConfig(): Config {
       tts: { enabled: false, url: '', volume: 1 }
     },
     mcpServers: [],
-    persona: { fyr: 'sometimes' },
+    persona: { fyr: 'sometimes', character: 'hedgehog' },
     calendar: defaultCalendarConfig(),
     pet: { x: null },
     petMode: false,

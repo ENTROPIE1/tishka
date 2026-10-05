@@ -1,5 +1,5 @@
 import { createPhraseListener, type PhraseListener, type PhraseListenerOptions } from '../shared/phrase-listener';
-import { createListenPause, DRAG_RESUME_MS, TYPING_RESUME_MS } from '../shared/listen-pause';
+import { createListenPause, DRAG_MAX_MS, DRAG_RESUME_MS, TYPING_RESUME_MS } from '../shared/listen-pause';
 
 const MIC_RETRY_MS = 30000;
 const MIC_ERROR = 'Не слышу микрофон';
@@ -21,6 +21,7 @@ export interface WakeListener {
   reset(): void;
   keyboard(): void;
   beginDrag(): void;
+  dragMove(): void;
   endDrag(): void;
   dispose(): void;
 }
@@ -175,9 +176,16 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       pause.hold('typing', TYPING_RESUME_MS);
     },
     beginDrag(): void {
-      // Удержание ежа мышью: пауза до отпускания.
+      // Удержание ежа мышью: пауза до отпускания, но не дольше срока без
+      // движения — потерянные события не оставят запись заглушённой навсегда.
       dragging = true;
-      pause.hold('drag');
+      pause.hold('drag', DRAG_MAX_MS);
+    },
+    dragMove(): void {
+      // Движение продлевает паузу: перетаскивание продолжается.
+      if (dragging) {
+        pause.hold('drag', DRAG_MAX_MS);
+      }
     },
     endDrag(): void {
       if (!dragging) {
