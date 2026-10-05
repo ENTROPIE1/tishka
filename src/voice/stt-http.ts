@@ -1,4 +1,6 @@
 import type { TimingMark } from '../main/timing-log';
+import { filterHallucinations } from './stt-hallucination';
+import { wavDurationSec } from './wav';
 
 export type TranscribeResult =
   | { ok: true; text: string }
@@ -260,7 +262,24 @@ export async function transcribeHttp(
     }
     const data = outcome.data;
     const raw = isRecord(data) && typeof data.text === 'string' ? data.text : '';
-    const text = cleanTranscript(raw);
+    let text = cleanTranscript(raw);
+    // Известные выдумки Whisper: титры и просьбы к зрителю. Полностью
+    // выдуманная фраза — как пустая расшифровка, титры рядом с настоящими
+    // словами вырезаются.
+    if (text !== '' && !isNoiseTranscript(text)) {
+      const hallucination = filterHallucinations(text, wavDurationSec(bytes));
+      if (hallucination.dropped) {
+        mark?.('stt.request.end', {
+          ok: false,
+          reason: 'hallucination',
+          bytes: size,
+          chars: 0,
+          ms: Date.now() - startedAt
+        });
+        return { ok: false, error: 'Не расслышал', empty: true };
+      }
+      text = hallucination.text;
+    }
     // Пустой текст или одни пометки — не речь человека: пустой результат,
     // человеку он не показывается.
     if (text === '' || isNoiseTranscript(text)) {

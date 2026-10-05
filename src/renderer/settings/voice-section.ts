@@ -1,5 +1,6 @@
 import type { VoiceStateView } from '../../main/ipc-settings';
 import type { Config } from '../../core/types';
+import type { SttDetector } from '../../voice/stt-service';
 import {
   button,
   checkboxField,
@@ -20,6 +21,12 @@ const STATE_LABELS: Record<VoiceStateView['state'], string> = {
   starting: 'запускается…',
   ready: 'готова',
   error: 'ошибка'
+};
+
+const DETECTOR_LABELS: Record<SttDetector, string> = {
+  on: 'включён',
+  'no-model': 'файл модели не найден',
+  off: 'выключен'
 };
 
 const SAVE_LABELS = { busy: 'Сохраняю…', done: 'Готово', error: 'Ошибка' };
@@ -54,6 +61,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   const model = textInput();
   const sttUrl = textInput();
   const state = el('span', 'state state-off', STATE_LABELS.off);
+  const detector = el('span', 'state detector-state', DETECTOR_LABELS.off);
   const check = button('Перезапустить службу', 'button button-secondary');
   const checkUrl = button('Проверить', 'button button-secondary');
   const save = button('Сохранить');
@@ -90,7 +98,8 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     field('Где запускать', mode),
     localFields,
     remoteFields,
-    field('Состояние службы', state)
+    field('Состояние службы', state),
+    field('Детектор речи службы', detector)
   );
   const serviceActions = el('div', 'row');
   serviceActions.append(check);
@@ -150,6 +159,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   function renderState(view: VoiceStateView): void {
     state.className = `state state-${view.state}`;
     state.textContent = STATE_LABELS[view.state];
+    detector.textContent = DETECTOR_LABELS[view.detector ?? 'off'];
     check.disabled = view.state === 'starting';
     if (view.error !== undefined) {
       show(view.error);

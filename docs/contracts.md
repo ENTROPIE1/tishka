@@ -104,6 +104,7 @@ type TishkaEvent =
   | { type: 'tool.start'; tool: string }
   | { type: 'tool.end'; tool: string; ok: boolean }
   | { type: 'status'; text: string }   // текст в облачке, состояние не меняется
+  | { type: 'note'; text: string }     // приглушённая служебная строка в ленте чата, не вслух
   | { type: 'reply'; reply: Reply }
   | { type: 'screenshot'; title: string; path: string }   // снимок в ленте чата: в облачке и карточке ежа не показывается
   | { type: 'speak.start'; text: string }
@@ -170,7 +171,7 @@ interface SecretStore {
 }
 
 interface Config {
-  llm: { baseUrl: string; model: string; visionModel: string; api: 'chat' | 'responses' };   // api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses, формат OpenAI Responses)
+  llm: { baseUrl: string; model: string; visionModel: string; fallbackModel: string; visionFallbackModel: string; api: 'chat' | 'responses' };   // fallbackModel/visionFallbackModel — запасные модели на случай отказа основных (пусто — нет запасной); api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses, формат OpenAI Responses)
   voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; показываемый персонаж: 'hedgehog' (прежний ёж, по умолчанию) или 'tishka' (костная модель)
@@ -207,4 +208,6 @@ type McpServerConfig =
 
 Шлюз совместим с OpenAI API (`/chat/completions`). Адрес и имена моделей берутся из `Config.llm`, ключ из `SecretStore` (`DKS_API_KEY`). В тестах и скриптах проверки ключ читается из переменной окружения `DKS_API_KEY`. При `llm.api === 'responses'` клиент отправляет запросы в формате OpenAI Responses (`POST <адрес>/responses`) и приводит ответы к тому же внутреннему виду; остальной код о формате не знает. Неизвестное значение `llm.api` читается как `'chat'`.
 
-Проверка шлюза без сохранения настроек — канал `tishka:config:check-gateway`. Принимает `{ baseUrl: string; model: string; key?: string; api?: 'chat' | 'responses' }`, ключ из поля важнее сохранённого, неизвестный формат читается как `'chat'`. Возвращает `{ ok: boolean; models: string[]; error?: string; ms: number }`. Ключ в окно не возвращается. Адрес нормализуется: пробелы по краям и завершающие `/` убираются, хвост `/chat/completions` отбрасывается, адрес без `http://` или `https://` — ошибка.
+Проверка шлюза без сохранения настроек — канал `tishka:config:check-gateway`. Принимает `{ baseUrl: string; model: string; key?: string; api?: 'chat' | 'responses' }`, ключ из поля важнее сохранённого, неизвестный формат читается как `'chat'`. Возвращает `{ ok: boolean; models: string[]; error?: string; ms: number }`. Ключ в окно не возвращается. Адрес нормализуется: пробелы по краям и завершающие `/` убираются, хвост `/chat/completions` отбрасывается, адрес без `http://` или `https://` — ошибка. Экран «Подключения» → «Модель» проверяет основную и запасную модели по отдельности и показывает результат по каждой.
+
+При ошибке сервера (HTTP 5xx, отказ соединения, истечение времени ожидания) запрос один раз повторяется на запасной модели, если она задана и отличается от основной; при ошибках 4xx перехода нет. После перехода следующие 5 минут запросы идут сразу на запасную, затем снова пробуется основная. Отмена человеком переходом не считается. При переходе в ленту чата уходит одна приглушённая строка `note` «Модель <имя> не отвечает, работаю на <запасная>» (вслух не читается) и в журнал времени — `model.fallback from=… to=… reason=…`. Если запасной нет или она тоже отказала, сообщение называет модель и причину и ведёт в настройки; «Шлюз недоступен» остаётся только для недоступного адреса шлюза. При исчерпанном дневном лимите ключа (`exceeded budget` в теле ответа) сообщение отдельное — «На модель <имя> сегодня исчерпан лимит», тело ответа шлюза в ленту, историю и журналы не попадает.

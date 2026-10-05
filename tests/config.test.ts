@@ -71,6 +71,26 @@ describe('loadConfig', () => {
     expect(config.web).toEqual({ enabled: false });
   });
 
+  it('старые настройки без запасных моделей читаются как пустые', async () => {
+    mockedReadFile.mockResolvedValueOnce(
+      JSON.stringify({ llm: { model: 'Своя модель', visionModel: 'Своя картинка' } }) as never
+    );
+    const config = await loadConfig(dir);
+    expect(config.llm.fallbackModel).toBe('');
+    expect(config.llm.visionFallbackModel).toBe('');
+  });
+
+  it('запасные модели читаются и обрезаются пробелами', async () => {
+    mockedReadFile.mockResolvedValueOnce(
+      JSON.stringify({
+        llm: { fallbackModel: ' DKS-Backup ', visionFallbackModel: ' DKS-Vision-Backup ' }
+      }) as never
+    );
+    const config = await loadConfig(dir);
+    expect(config.llm.fallbackModel).toBe('DKS-Backup');
+    expect(config.llm.visionFallbackModel).toBe('DKS-Vision-Backup');
+  });
+
   it('без поля llm.api формат читается как chat', async () => {
     mockedReadFile.mockResolvedValueOnce(JSON.stringify({ llm: { model: 'Своя модель' } }) as never);
     const config = await loadConfig(dir);
