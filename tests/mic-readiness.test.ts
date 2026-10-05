@@ -101,6 +101,7 @@ describe('talk-mode: повтор открытия микрофона', () => {
         return false;
       },
       pause: () => undefined,
+      reset: () => undefined,
       stop: () => undefined
     };
     let apply: (state: ChatTalkState) => void = () => undefined;
@@ -130,6 +131,7 @@ describe('talk-mode: повтор открытия микрофона', () => {
     const fake: PhraseListener = {
       start: async () => false,
       pause: () => undefined,
+      reset: () => undefined,
       stop: () => undefined
     };
     let apply: (state: ChatTalkState) => void = () => undefined;

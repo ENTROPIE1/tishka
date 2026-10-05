@@ -35,6 +35,7 @@ function harness(): Harness {
     pause: (value) => {
       result.pauses.push(value);
     },
+    reset: () => undefined,
     stop: () => {
       result.stops += 1;
     }

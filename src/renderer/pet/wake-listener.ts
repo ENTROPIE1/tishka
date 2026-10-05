@@ -17,6 +17,8 @@ export interface WakeListenerDeps {
 export interface WakeListener {
   setActive(active: boolean): void;
   setRecorderListening(listening: boolean): void;
+  // Сброс идущей записи: появление ежа или конец ответа.
+  reset(): void;
   keyboard(): void;
   beginDrag(): void;
   endDrag(): void;
@@ -76,7 +78,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       chunkMs: WAKE_CHUNK_MS,
       chunkOverlapMs: WAKE_CHUNK_OVERLAP_MS,
       inConversation: () => conversation,
-      onPhrase: (wav, limitHit) => window.tishka.pet.wakePhrase(wav, limitHit),
+      onPhrase: (wav, limitHit, startedAt) => window.tishka.pet.wakePhrase(wav, limitHit, startedAt),
       onLevel: (value) => {
         if (levelFill !== null && conversation) {
           levelFill.style.width = `${Math.round(value * 100)}%`;
@@ -132,6 +134,11 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     threshold = nextThreshold;
     if (state.conversation !== conversation) {
       conversation = state.conversation;
+      // Включение разговора сбрасывает идущую запись: сказанное до этого
+      // репликой нового разговора не становится.
+      if (conversation) {
+        listener?.reset();
+      }
       deps.onConversation?.(conversation);
     }
     const nextWaiting = state.waiting === true;
@@ -158,6 +165,9 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       }
       recorderListening = value;
       applyUi();
+    },
+    reset(): void {
+      listener?.reset();
     },
     keyboard(): void {
       // Набор текста в строке ежа: запись на паузе, возобновление через 2 секунды

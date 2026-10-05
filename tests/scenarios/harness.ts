@@ -58,6 +58,7 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   const spoken: string[] = [];
   const errors: string[] = [];
   const statuses: string[] = [];
+  const marks: { event: string; details?: Record<string, string | number | boolean> }[] = [];
   bus.on((event) => {
     if (event.type === 'speak.start') {
       spoken.push(event.text);
@@ -80,12 +81,12 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
 
   let petWake: PetWake | undefined;
   // Ссылки на модули, которые создаются позже окна: фраза и конец звука.
-  let recognize: (wav: Uint8Array) => void = () => undefined;
+  let recognize: (wav: Uint8Array, startedAt: number) => void = () => undefined;
   let speakDone: (id: number | undefined) => void = () => undefined;
   // Пауза страницы управляет настоящим слушателем фраз, как в окне ежа.
   let pauseListener: (paused: boolean) => void = () => undefined;
   const win = createWindowEdge({
-    onPhrase: (wav) => recognize(wav),
+    onPhrase: (wav, startedAt) => recognize(wav, startedAt),
     onSpeakDone: (id) => speakDone(id),
     onScreenLookSend: (text) => {
       void bus.run('pet', () => core.handleUserText(text)).catch(() => undefined);
@@ -149,6 +150,11 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       if (command === 'listen') {
         pet.listenCommand('start');
       }
+      // Включение разговора сбрасывает идущую запись окна — та же связка,
+      // что в wake-listener страницы ежа при смене состояния.
+      if (command === 'conversation-on') {
+        audio?.reset();
+      }
       petWake?.broadcast();
     },
     hide: () => pet.leave(),
@@ -159,9 +165,10 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     onSoonChange: () => petWake?.broadcast(),
     onUnheard: (text) => pet.caption(text),
     onUnheardHint: () => bus.emit({ type: 'status', text: UNHEARD_HINT }),
-    onBusyPhrase: (text) => stopPhrase.phrase(text)
+    onBusyPhrase: (text) => stopPhrase.phrase(text),
+    mark: (event, details) => marks.push({ event, details })
   });
-  recognize = (wav) => flow.handlePhrase(wav);
+  recognize = (wav, startedAt) => flow.handlePhrase(wav, false, startedAt);
 
   // Звуковая дорожка окна-питомца: настоящий слушатель фраз с отрезками
   // прослушивания имени, микрофон подставной — звук подаёт feedMic.
@@ -172,10 +179,17 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     chunkOverlapMs: 500,
     inConversation: () => flow.isConversation(),
     capture: mic,
-    onPhrase: (wav, limitHit) => flow.handlePhrase(wav, limitHit)
+    onPhrase: (wav, limitHit, startedAt) => flow.handlePhrase(wav, limitHit, startedAt)
   });
   pauseListener = (value) => audio.pause(value);
   void audio.start();
+  // Появление ежа и конец речи сбрасывают идущую запись — то же, что делает
+  // wake-listener окна ежа по событиям.
+  bus.on((event) => {
+    if (event.type === 'wake' || event.type === 'speak.end') {
+      audio.reset();
+    }
+  });
 
   const speakPlay = createPetSpeakPlay({
     speak: (message) => pet.speak(message),
@@ -214,6 +228,11 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     ttsRequests: () => tts.requests(),
     conversationOn: () => flow.isConversation(),
     chatEyeOn: () => chatLooking,
+    // Причины отброшенных фраз из журнала времени.
+    dropped: () =>
+      marks
+        .filter((item) => item.event === 'phrase.dropped')
+        .map((item) => String(item.details?.reason ?? '')),
     // Кнопка отправки строки ежа: занятому Тишке она показывает остановку.
     sendIsStop: () => page.observations.sendIsStop()
   };
@@ -233,6 +252,10 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     trayCall: () => pet.wake('name'),
     micClick(): void {
       flow.toggleConversation('pet');
+      petWake?.broadcast();
+    },
+    chatTalkToggle(): void {
+      flow.toggleConversation('chat');
       petWake?.broadcast();
     },
     say(text?: string): boolean {

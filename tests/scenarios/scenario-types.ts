@@ -44,6 +44,7 @@ export interface ScenarioObservations {
   sttRequests(): number;          // что ушло на распознавание
   ttsRequests(): number;          // что ушло в службу синтеза
   conversationOn(): boolean;      // включён ли режим разговора
+  dropped(): string[];            // причины отброшенных фраз (phrase.dropped)
 }
 
 export interface Scenario {
@@ -52,6 +53,7 @@ export interface Scenario {
   hotkeyCall(): void;                     // вызов клавишей
   trayCall(): void;                       // щелчок по значку
   micClick(): void;                       // щелчок по микрофону
+  chatTalkToggle(): void;                 // включение разговора в окне чата
   say(text?: string): boolean;            // произнесённая фраза, текст даёт распознавание
   hear(result: string | TranscribeResult, holdMs?: number): void;
                                           // что распознавание услышит в следующей фразе;

@@ -57,7 +57,7 @@ export interface Page {
 }
 
 export interface PageDeps {
-  onPhrase(wav: Uint8Array): void;
+  onPhrase(wav: Uint8Array, startedAt: number): void;
   onSpeakDone(id: number | undefined): void;
   onScreenLookSend(text: string): void;
   onScreenLookStop(): void;
@@ -175,11 +175,12 @@ export function createPage(deps: PageDeps): PageControl {
     },
     // Человек произнёс фразу: уходит на распознавание, только если микрофон
     // пишет и не на паузе (паузу держат печать и удержание ежа мышью).
+    // Фраза несёт время начала — момент, когда человек начал говорить.
     say(): boolean {
       if (!listenerActive || pause.isPaused()) {
         return false;
       }
-      deps.onPhrase(PHRASE_WAV);
+      deps.onPhrase(PHRASE_WAV, Date.now());
       return true;
     },
     typeKey(): void {

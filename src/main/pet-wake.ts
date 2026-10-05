@@ -94,11 +94,12 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
   // приходит заново, иначе значок остаётся серым при уже идущей записи.
   deps.pet.onPageLoaded(() => broadcast());
 
-  ipcMain.on(PET_WAKE_PHRASE_CHANNEL, (_event, value: unknown, limitHit: unknown) => {
+  ipcMain.on(PET_WAKE_PHRASE_CHANNEL, (_event, value: unknown, limitHit: unknown, startedAt: unknown) => {
+    const started = typeof startedAt === 'number' ? startedAt : undefined;
     if (value instanceof Uint8Array) {
-      deps.flow.handlePhrase(value, limitHit === true);
+      deps.flow.handlePhrase(value, limitHit === true, started);
     } else if (value instanceof ArrayBuffer) {
-      deps.flow.handlePhrase(new Uint8Array(value), limitHit === true);
+      deps.flow.handlePhrase(new Uint8Array(value), limitHit === true, started);
     }
   });
 

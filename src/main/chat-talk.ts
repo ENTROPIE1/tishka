@@ -74,13 +74,14 @@ export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
     deps.onChange?.();
   });
 
-  ipcMain.on(CHAT_TALK_PHRASE_CHANNEL, (_event, value: unknown) => {
+  ipcMain.on(CHAT_TALK_PHRASE_CHANNEL, (_event, value: unknown, startedAt: unknown) => {
     if (paused) {
       return;
     }
     const data = bytes(value);
     if (data !== undefined) {
-      deps.flow.handlePhrase(data);
+      const started = typeof startedAt === 'number' ? startedAt : undefined;
+      deps.flow.handlePhrase(data, false, started);
     }
   });
 

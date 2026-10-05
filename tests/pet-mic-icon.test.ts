@@ -35,7 +35,8 @@ function harness(): Harness {
   const phraseListener: PhraseListener = {
     start: async () => true,
     stop: () => undefined,
-    pause: () => undefined
+    pause: () => undefined,
+    reset: () => undefined
   };
   const listener = createWakeListener({ createListener: () => phraseListener });
   return { apply: (state) => handler?.(state), listener, mic, level };

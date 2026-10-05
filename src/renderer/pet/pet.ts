@@ -211,6 +211,10 @@ window.tishka.onEvent((event) => {
     timingMark('reply.shown');
   } else if (event.type === 'error') {
     listen.setError(event.message);
+  } else if (event.type === 'wake' || event.type === 'idle' || event.type === 'speak.end') {
+    // Появление ежа и конец ответа (в том числе речи) — граница записи:
+    // сказанное до неё репликой не становится.
+    wake.reset();
   }
 });
 window.tishka.pet.setInteractive(false);
