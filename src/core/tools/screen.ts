@@ -111,6 +111,8 @@ async function saveShot(deps: ScreenToolsDeps, png: Uint8Array): Promise<string 
 
 // Успешный разбор экрана оставляет снимок в ленте отдельной строкой: в облачке
 // и карточке ежа он не показывается, поэтому идёт событием, а не панелью ответа.
+// Байты снимка после сохранения из данных убираются: шаг навыка, подставляющий
+// данные целиком, не должен получить картинку — остаются источник и путь.
 async function attachShot(deps: ScreenToolsDeps, result: ToolResult): Promise<void> {
   const png = pngOf(result.data);
   if (png === undefined) {
@@ -119,6 +121,11 @@ async function attachShot(deps: ScreenToolsDeps, result: ToolResult): Promise<vo
   const path = await saveShot(deps, png);
   if (path !== undefined) {
     deps.events?.emit({ type: 'screenshot', title: 'Снимок экрана', path });
+  }
+  const data = result.data as Record<string, unknown>;
+  delete data['png'];
+  if (path !== undefined) {
+    data['path'] = path;
   }
 }
 

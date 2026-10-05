@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { McpConnectionFactory } from '../src/core/mcp/connection';
 import type { CaptureResult } from '../src/core/vision/look';
 import { cleanupCores, replyChoice, setupCore, toolChoice } from './core-helpers';
 
@@ -176,3 +177,95 @@ describe('настройки действуют без перезапуска', 
     expect(urls[1].endsWith('/responses')).toBe(true);
   });
 });
+
+describe('сохранение настроек и подключения', () => {
+  interface Log {
+    starts: string[];
+    closed: string[];
+  }
+
+  function trackingFactory(log: Log): McpConnectionFactory {
+    return async (server) => {
+      log.starts.push(server.name);
+      return {
+        listTools: async () => [],
+        callTool: async () => ({ content: [] }),
+        close: async () => {
+          log.closed.push(server.name);
+        }
+      };
+    };
+  }
+
+  const twoServers = [
+    { name: 'confluence', transport: 'http' as const, url: 'https://wiki.example.org' },
+    { name: 'exchange', transport: 'http' as const, url: 'https://mail.example.org' }
+  ];
+
+  it('смена голоса, характера или приложения не запускает и не останавливает серверы', async () => {
+    const log: Log = { starts: [], closed: [] };
+    const { core } = await setupCore({
+      config: { mcpServers: twoServers },
+      createMcpConnection: trackingFactory(log)
+    });
+
+    await core.saveConfig({
+      ...core.config(),
+      voice: { ...core.config().voice, tts: { ...core.config().voice.tts, enabled: true } }
+    });
+    await core.saveConfig({ ...core.config(), persona: { fyr: 'often' } });
+    await core.saveConfig({
+      ...core.config(),
+      app: { ...core.config().app, warmMinutes: 45 }
+    });
+
+    expect(log.starts.sort()).toEqual(['confluence', 'exchange']);
+    expect(log.closed).toEqual([]);
+  });
+
+  it('изменение подключения перезапускает только его', async () => {
+    const log: Log = { starts: [], closed: [] };
+    const { core } = await setupCore({
+      config: { mcpServers: twoServers },
+      createMcpConnection: trackingFactory(log)
+    });
+
+    await core.saveConfig({ ...core.config(), persona: { fyr: 'off' } });
+    expect(log.starts).toEqual(['confluence', 'exchange']);
+
+    const changed = core.config().mcpServers.map((server) =>
+      server.name === 'confluence' ? { ...server, url: 'https://new-wiki.example.org' } : server
+    );
+    await core.saveConfig({ ...core.config(), mcpServers: changed });
+
+    expect(log.starts.filter((name) => name === 'confluence')).toHaveLength(2);
+    expect(log.starts.filter((name) => name === 'exchange')).toHaveLength(1);
+    expect(log.closed).toEqual(['confluence']);
+  });
+
+  it('смена секрета подключения перезапускает сервер', async () => {
+    const log: Log = { starts: [], closed: [] };
+    const server = {
+      name: 'confluence',
+      transport: 'http' as const,
+      url: 'https://wiki.example.org',
+      headers: { Authorization: 'Bearer ${secret:CONFLUENCE_TOKEN}' }
+    };
+    const { core, secrets } = await setupCore({
+      config: { mcpServers: [server] },
+      secrets: { DKS_API_KEY: 'test-key', CONFLUENCE_TOKEN: 'first' },
+      createMcpConnection: trackingFactory(log)
+    });
+
+    await core.saveConfig({ ...core.config() });
+    expect(log.starts).toEqual(['confluence']);
+
+    // Конфигурация подключения не изменилась, но значение секрета другое.
+    await secrets.set('CONFLUENCE_TOKEN', 'second');
+    await core.saveConfig({ ...core.config() });
+
+    expect(log.starts).toEqual(['confluence', 'confluence']);
+    expect(log.closed).toEqual(['confluence']);
+  });
+});
+
