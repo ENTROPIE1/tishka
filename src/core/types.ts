@@ -31,6 +31,12 @@ export interface ToolRegistry {
 
 export type Mood = 'neutral' | 'happy' | 'confused';
 
+// Смена эмоции внутри реплики: at — позиция в знаках очищенного текста say.
+export interface MoodMark {
+  at: number;
+  mood: string;
+}
+
 // Как пришла реплика человека: голосом или набранным текстом.
 export type InputSource = 'voice' | 'text';
 
@@ -47,6 +53,7 @@ export interface Reply {
   show?: Panel;     // подробности в панели и в чате
   ask?: { title: string; placeholder?: string };   // просьба прислать текст: окно показывает карточку ввода
   mood?: Mood;
+  moods?: MoodMark[];   // эмоции, отмеченные метками [имя] внутри say
 }
 
 export type TishkaEvent =

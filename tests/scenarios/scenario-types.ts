@@ -35,6 +35,10 @@ export interface ScenarioObservations {
   eyeOn(): boolean;               // кнопка с глазом у ежа активна
   eyeHidden(): boolean;           // кнопка с глазом у ежа скрыта настройкой
   chatEyeOn(): boolean;           // кнопка с глазом в чате активна
+  speakMoods(): string[];         // эмоции, пришедшие окну со звуком
+  speakMouth(): boolean;          // пришла ли окну дорожка рта
+  faceMood(): string | undefined; // эмоция лица нового персонажа сейчас
+  faceMoods(): string[];          // смены эмоции лица по порядку
   bounds(): WindowRect;           // положение окна
   spoken(): string[];             // что произнесено
   errors(): string[];             // показанные сообщения об ошибках

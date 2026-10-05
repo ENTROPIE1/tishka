@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createAgent } from '../src/core/agent/agent';
-import { EMPTY_REPLY, replyFromText, replyFromToolArgs } from '../src/core/agent/reply';
+import { EMPTY_REPLY, replyFromText, replyFromToolArgs, stripMoodMarks } from '../src/core/agent/reply';
+import { buildSystemPrompt } from '../src/core/agent/prompt';
 import { createEventBus } from '../src/core/events';
 import type { ChatRequest, ChatResponse, ToolCall } from '../src/core/llm/client';
 import type { Reply, ToolDef, ToolRegistry, ToolResult, TishkaEvent } from '../src/core/types';
@@ -110,5 +111,101 @@ describe('reply с ask', () => {
     const system = requests[0].messages[0];
     const content = system.role === 'system' && typeof system.content === 'string' ? system.content : '';
     expect(content).toContain('ask');
+  });
+});
+
+describe('метки эмоций в реплике', () => {
+  it('метка посреди реплики вырезается, позиция остаётся', () => {
+    const result = stripMoodMarks('Сейчас посмотрю. [happy] Нашёл!');
+
+    expect(result.text).toBe('Сейчас посмотрю. Нашёл!');
+    expect(result.text).not.toContain('[');
+    expect(result.moods).toEqual([{ at: 'Сейчас посмотрю. '.length, mood: 'happy' }]);
+  });
+
+  it('неизвестное имя просто убирается', () => {
+    const result = stripMoodMarks('[dance] Привет');
+
+    expect(result.text).toBe('Привет');
+    expect(result.moods).toEqual([]);
+  });
+
+  it('метка в начале и в конце', () => {
+    const result = stripMoodMarks('[happy] Ура! [confused]');
+
+    expect(result.text).toBe('Ура!');
+    expect(result.moods.map((mark) => mark.mood)).toEqual(['happy', 'confused']);
+    expect(result.moods[0].at).toBe(0);
+    expect(result.moods[1].at).toBe(result.text.length);
+  });
+
+  it('метки попадают в ответ инструмента, но не в say', () => {
+    const reply = replyFromToolArgs({ say: 'Готово. [happy] Открыл.' }, null);
+
+    expect(reply.say).toBe('Готово. Открыл.');
+    expect(reply.moods).toEqual([{ at: 'Готово. '.length, mood: 'happy' }]);
+  });
+
+  it('текстовый ответ тоже очищается от меток', () => {
+    const reply = replyFromText('Готово. [confused] Не вышло.');
+
+    expect(reply.say).not.toContain('[');
+    expect(reply.moods?.[0].mood).toBe('confused');
+  });
+
+  it('без меток объект ответа не меняется', () => {
+    const reply = replyFromToolArgs({ say: 'Готово' }, null);
+
+    expect(reply).toEqual({ say: 'Готово', mood: 'neutral' });
+    expect(reply.moods).toBeUndefined();
+  });
+
+  it('ссылка markdown не принимается за метку и остаётся как есть', () => {
+    const result = stripMoodMarks('Читай [docs](https://example.org) дальше');
+
+    expect(result.text).toBe('Читай [docs](https://example.org) дальше');
+    expect(result.moods).toEqual([]);
+  });
+
+  it('сноска и слово с цифрами в скобках остаются', () => {
+    expect(stripMoodMarks('Факт [1] и [2a]')).toEqual({ text: 'Факт [1] и [2a]', moods: [] });
+    expect(stripMoodMarks('вариант [a] тут').text).toBe('вариант [a] тут');
+    expect(stripMoodMarks('два слова [очень длинное имя]').text).toBe('два слова [очень длинное имя]');
+  });
+
+  it('метка с круглой скобкой сразу после не считается эмоцией', () => {
+    const result = stripMoodMarks('Пометка [happy](тест)');
+
+    expect(result.text).toBe('Пометка [happy](тест)');
+    expect(result.moods).toEqual([]);
+  });
+
+  it('в карточке текстового ответа ссылки сохраняются, метка вырезается', () => {
+    const reply = replyFromText('Раз. Два. [happy] Три [docs](https://example.org).');
+    const panel = reply.show;
+
+    expect(panel?.kind).toBe('text');
+    if (panel?.kind === 'text') {
+      expect(panel.markdown).toContain('[docs](https://example.org)');
+      expect(panel.markdown).not.toContain('[happy]');
+    }
+    expect(reply.moods?.[0].mood).toBe('happy');
+  });
+
+  it('подсказка Тишке называет эмоции и правило метки, ежу — нет', () => {
+    const tishka = buildSystemPrompt(NOW, 'sometimes', undefined, undefined, {
+      speechMode: 'voice',
+      userSource: 'voice',
+      character: 'tishka'
+    });
+    const hedgehog = buildSystemPrompt(NOW, 'sometimes', undefined, undefined, {
+      speechMode: 'voice',
+      userSource: 'voice',
+      character: 'hedgehog'
+    });
+
+    expect(tishka).toContain('Метку [эмоция]');
+    expect(tishka).toContain('happy');
+    expect(hedgehog).not.toContain('Метку [эмоция]');
   });
 });

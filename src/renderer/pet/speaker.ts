@@ -1,4 +1,5 @@
 import { envelope } from '../../voice/envelope';
+import { visemeAt, type MoodTimeMark, type MouthTrack } from '../../voice/lipsync';
 import type { SpeakMessage } from '../../voice/speech-queue';
 import { timingMark } from '../shared/timing';
 
@@ -8,6 +9,9 @@ const SMOOTHING = 0.4;
 
 export interface SpeakerDeps {
   setMouth(level: number): void;
+  // Рот по дорожке форм и смена эмоции: у персонажа без них — прежний режим.
+  setViseme?(shape: string | null): void;
+  setMood?(name: string): void;
   onDone(id?: number): void;
 }
 
@@ -34,6 +38,9 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
   let generation = 0;
   let pending = false;
   let pendingId: number | undefined;
+  let track: MouthTrack | undefined;
+  let moodMarks: MoodTimeMark[] | undefined;
+  let appliedMoods = 0;
 
   function clearPlayback(): void {
     if (timer !== undefined) {
@@ -51,7 +58,22 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
     }
     values = [];
     lastLevel = 0;
+    track = undefined;
+    moodMarks = undefined;
+    appliedMoods = 0;
     deps.setMouth(0);
+    deps.setViseme?.(null);
+  }
+
+  // Эмоции применяются по времени звука, последняя остаётся до смены состояния.
+  function applyMoods(elapsedMs: number): void {
+    if (moodMarks === undefined) {
+      return;
+    }
+    while (appliedMoods < moodMarks.length && moodMarks[appliedMoods].at * 1000 <= elapsedMs) {
+      deps.setMood?.(moodMarks[appliedMoods].mood);
+      appliedMoods += 1;
+    }
   }
 
   // Завершает текущее воспроизведение ровно один раз, включая ещё не начавшееся.
@@ -94,6 +116,11 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
         }
         const samples = buffer.getChannelData(0);
         values = envelope(samples, buffer.sampleRate, WINDOW_MS);
+        track = message.mouth;
+        moodMarks = message.moods;
+        appliedMoods = 0;
+        // Настроение ответа задаёт эмоцию в начале звука, метки меняют дальше.
+        deps.setMood?.(message.mood ?? 'neutral');
         const node = audio.createBufferSource();
         node.buffer = buffer;
         const gain = audio.createGain();
@@ -109,11 +136,17 @@ export function createSpeaker(deps: SpeakerDeps): Speaker {
         };
         timer = window.setInterval(() => {
           const elapsed = (audio.currentTime - startedAt) * 1000;
+          applyMoods(elapsed);
+          if (track !== undefined && deps.setViseme !== undefined) {
+            deps.setViseme(visemeAt(track, elapsed / 1000));
+            return;
+          }
           const index = Math.floor(elapsed / WINDOW_MS);
           const target = index >= 0 && index < values.length ? values[index] : 0;
           lastLevel += (target - lastLevel) * SMOOTHING;
           deps.setMouth(lastLevel);
         }, TICK_MS);
+        applyMoods(0);
         node.start();
         timingMark('speak.play.start');
       })

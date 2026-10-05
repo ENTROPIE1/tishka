@@ -1,11 +1,15 @@
-import type { Config, EventBus, TishkaEvent } from '../core/types';
+import type { Config, EventBus, Mood, MoodMark, TishkaEvent } from '../core/types';
 import type { TimingMark } from './timing-log';
 import type { TalkSource } from '../pet/state';
 import { CANNED, CANNED_TEXTS, greetingFor } from '../voice/canned';
 import type { SpeakMessage } from '../voice/speech-queue';
+import { envelope } from '../voice/envelope';
+import { buildMouthTrack, moodTimeMarks, MOUTH_FPS } from '../voice/lipsync';
+import type { MoodTimeMark, MouthTrack } from '../voice/lipsync';
 import { prepareForSpeech } from '../voice/speech-text';
 import { splitForSpeech, PART_PAUSE_MS } from '../voice/speech-parts';
 import { createTtsClient, type TtsHealth } from '../voice/tts-client';
+import { decodeWav } from '../voice/wav';
 
 // Шина с источником обращения: озвучка реплики несёт её источник.
 type SpeechBus = EventBus & {
@@ -42,11 +46,18 @@ interface ReplyJob {
   force: boolean;
   source: TalkSource;
   replyAt: number;   // момент показа ответа: от него считается первый звук
+  moods?: MoodMark[];
+  mood?: Mood;
 }
 
 interface SpeechPart {
   text: string;
   wav?: Uint8Array;   // готовая запись (заготовленная фраза) — синтез не нужен
+}
+
+interface PartTrack {
+  mouth?: MouthTrack;
+  moods?: MoodTimeMark[];
 }
 
 // Связка реплик с синтезом речи: готовит текст, ходит в службу, отдаёт звук в окно.
@@ -182,6 +193,52 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     return result.wav;
   }
 
+  // Дорожка рта и моменты эмоций строятся из готового WAV части той же
+  // раскладкой букв, что ушла в синтез. Непонятный WAV — прежний режим рта.
+  function trackFor(prepared: string, wav: Uint8Array, moods: MoodMark[] | undefined): PartTrack {
+    const decoded = decodeWav(wav);
+    if (decoded === null) {
+      return {};
+    }
+    const values = envelope(decoded.samples, decoded.sampleRate, 1000 / MOUTH_FPS);
+    const mouth = buildMouthTrack(prepared, values, MOUTH_FPS);
+    if (moods === undefined || moods.length === 0) {
+      return { mouth };
+    }
+    return { mouth, moods: moodTimeMarks(prepared, moods, values, MOUTH_FPS) };
+  }
+
+  // Метки эмоций считались по тексту say до подготовки, а части — это уже
+  // подготовленный текст. Позиция метки переводится по доле длины и попадает
+  // в ту часть, где лежит, с пересчётом относительно начала части.
+  function moodsForParts(moods: MoodMark[] | undefined, sayLength: number, parts: SpeechPart[]): MoodMark[][] {
+    const byPart: MoodMark[][] = parts.map(() => []);
+    if (moods === undefined || moods.length === 0 || parts.length === 0) {
+      return byPart;
+    }
+    const total = parts.reduce((sum, part) => sum + part.text.length, 0);
+    if (total === 0 || sayLength <= 0) {
+      byPart[0]?.push(...moods);
+      return byPart;
+    }
+    const starts: number[] = [];
+    let offset = 0;
+    for (const part of parts) {
+      starts.push(offset);
+      offset += part.text.length;
+    }
+    for (const mark of moods) {
+      const clamped = Math.min(Math.max(mark.at, 0), sayLength);
+      const position = (clamped / sayLength) * total;
+      let index = 0;
+      while (index < parts.length - 1 && position >= starts[index]! + parts[index]!.text.length) {
+        index += 1;
+      }
+      byPart[index]?.push({ at: Math.max(0, position - starts[index]!), mood: mark.mood });
+    }
+    return byPart;
+  }
+
   function delay(ms: number, signal: AbortSignal): Promise<void> {
     return new Promise<void>((resolve) => {
       if (signal.aborted) {
@@ -227,12 +284,14 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     if (parts.length === 0) {
       return;
     }
+    const partMoods = moodsForParts(job.moods, trimmed.length, parts);
     const token = stopToken;
     const controller = new AbortController();
     currentReply = { controller };
     try {
       let nextSynth: Promise<Uint8Array | undefined> | undefined;
       let started = false;
+      let moodPending = job.mood;
       for (let index = 0; index < parts.length; index += 1) {
         if (token !== stopToken) {
           return;
@@ -269,7 +328,12 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
           emitStart(job.source, prepared);
           deps.mark?.('speech.first', { ms: now() - job.replyAt, parts: parts.length });
         }
-        await deps.play({ wav, volume: volume() }, controller.signal);
+        const track = trackFor(part.text, wav, partMoods[index]);
+        await deps.play(
+          { wav, volume: volume(), mood: moodPending, mouth: track.mouth, moods: track.moods },
+          controller.signal
+        );
+        moodPending = undefined;
         if (token !== stopToken) {
           return;
         }
@@ -298,8 +362,8 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     }
   }
 
-  function schedule(text: string, force: boolean): void {
-    const job: ReplyJob = { text, force, source: currentSource(), replyAt: now() };
+  function schedule(text: string, force: boolean, moods?: MoodMark[], mood?: Mood): void {
+    const job: ReplyJob = { text, force, source: currentSource(), replyAt: now(), moods, mood };
     jobs.push(job);
     bumpLive(1);
     while (jobs.length > MAX_WAITING) {
@@ -355,7 +419,7 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
         if (event.reply.say === CANNED.farewell) {
           halt();
         }
-        schedule(event.reply.say, false);
+        schedule(event.reply.say, false, event.reply.moods, event.reply.mood);
         return;
       }
       case 'wake':

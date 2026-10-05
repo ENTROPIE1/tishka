@@ -16,7 +16,7 @@ export interface AgentDeps {
   registry: ToolRegistry;
   events: EventBus;
   getModel: () => string;
-  getPersona?: () => { fyr: FyrLevel };
+  getPersona?: () => { fyr: FyrLevel; character?: 'hedgehog' | 'tishka' };
   getSpeechMode?: () => SpeechMode;
   memory?: { search(query: string, limit?: number): MemoryLine[] };
   now: () => Date;
@@ -98,14 +98,16 @@ export function createAgent(deps: AgentDeps): Agent {
   let rounds = 0;
 
   function refreshSystemMessage(userText: string, source: InputSource): void {
-    const fyr = deps.getPersona?.().fyr ?? 'sometimes';
+    const persona = deps.getPersona?.();
+    const fyr = persona?.fyr ?? 'sometimes';
     const guide = skillGuide(stepTools(deps.registry));
     const block = memoryBlock(deps.memory?.search(userText, 8) ?? []);
     const system: ChatMessage = {
       role: 'system',
       content: buildSystemPrompt(deps.now(), fyr, guide, block, {
         speechMode: deps.getSpeechMode?.() ?? 'text',
-        userSource: source
+        userSource: source,
+        character: persona?.character
       })
     };
     if (history[0]?.role === 'system') {
