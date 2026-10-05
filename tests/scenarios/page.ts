@@ -6,6 +6,7 @@ import type { TishkaEvent } from '../../src/core/types';
 import { nextScreenLooking } from '../../src/core/screen-look';
 import { bubbleSay } from '../../src/renderer/pet/listen-ui';
 import { createStateCaption } from '../../src/renderer/pet/state-caption';
+import { createMoodTrack } from '../../src/renderer/pet/mood-track';
 import { stateLabel } from '../../src/renderer/pet/state-label';
 import { composerBusy, composerCollapsed } from '../../src/renderer/pet/composer-state';
 import { screenLookAction, type ScreenLookAction } from '../../src/renderer/shared/screen-look-request';
@@ -36,6 +37,10 @@ export interface PageObservations {
   sendIsStop(): boolean; // кнопка отправки стала кнопкой остановки
   eyeOn(): boolean;      // кнопка с глазом у ежа активна: Тишка смотрит на экран
   eyeHidden(): boolean;  // кнопка скрыта: просмотр экрана выключен
+  speakMoods(): string[];   // эмоции, пришедшие окну вместе со звуком
+  speakMouth(): boolean;    // пришла ли дорожка рта
+  faceMood(): string | undefined;   // эмоция лица нового персонажа сейчас
+  faceMoods(): string[];            // смены эмоции лица по порядку
 }
 
 export interface Page {
@@ -95,6 +100,18 @@ export function createPage(deps: PageDeps): PageControl {
   let visible = false;
   let eyeLooking = false;
   let speechTimer: ReturnType<typeof setTimeout> | undefined;
+  let speakMoods: string[] = [];
+  let speakMouth = false;
+  let faceMood: string | undefined;
+  const faceMoods: string[] = [];
+  // Та же связка эмоции лица, что в окне ежа: настроение ответа, метки речи,
+  // сброс в покое и при уходе.
+  const mood = createMoodTrack({
+    setMood: (name) => {
+      faceMood = name;
+      faceMoods.push(name);
+    }
+  });
 
   function onScreen(state: PetState): boolean {
     return state !== 'hidden' && state !== 'leave';
@@ -121,13 +138,18 @@ export function createPage(deps: PageDeps): PageControl {
     composerCollapsed: () => composerCollapsed(model.state),
     sendIsStop: () => composerBusy(model.state),
     eyeOn: () => eyeLooking,
-    eyeHidden: () => !deps.screenLookAvailable()
+    eyeHidden: () => !deps.screenLookAvailable(),
+    speakMoods: () => speakMoods,
+    speakMouth: () => speakMouth,
+    faceMood: () => faceMood,
+    faceMoods: () => faceMoods
   };
 
   return {
     observations,
     model(next: PetModel): void {
       model = next;
+      mood.state(next.state);
     },
     wakeState(state: WakeState): void {
       wake = state;
@@ -142,6 +164,9 @@ export function createPage(deps: PageDeps): PageControl {
       listening = command === 'start';
     },
     speak(message: SpeakMessage): void {
+      speakMoods = message.moods?.map((mark) => mark.mood) ?? [];
+      speakMouth = message.mouth !== undefined;
+      mood.reply(message.mood);
       if (speechTimer !== undefined) {
         clearTimeout(speechTimer);
       }
@@ -195,6 +220,9 @@ export function createPage(deps: PageDeps): PageControl {
     // События ядра доходят до окна, как broadcastEvent: по ним окно ведёт
     // кнопку с глазом — то же правило, что в preload окна ежа.
     event(next: TishkaEvent): void {
+      if (next.type === 'reply') {
+        mood.reply(next.reply.mood);
+      }
       eyeLooking = nextScreenLooking(eyeLooking, next);
     },
     // Нажатие кнопки с глазом: то же решение, что в строке ввода ежа.

@@ -3,6 +3,7 @@ import { STOPPED_TITLE } from '../../src/core/stopped';
 import { CANCELLED_REPLY } from '../../src/core/turn-queue';
 import { filterHallucinations } from '../../src/voice/stt-hallucination';
 import type { SttStatus, TranscribeResult } from '../../src/voice/stt-service';
+import { encodeWav } from '../../src/voice/wav';
 
 export type TtsMode = 'ok' | 'rejected' | 'unreachable';
 
@@ -83,7 +84,10 @@ export function createFakeTts(mode: TtsMode): FakeTts {
     if (fake.mode === 'rejected') {
       return new Response('{}', { status: 500 });
     }
-    return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+    // Готовый WAV: из него главный процесс строит дорожку рта и эмоций.
+    const samples = new Float32Array(16000).fill(0.5);
+    const wav = encodeWav(samples, 16000);
+    return new Response(wav.buffer as ArrayBuffer, { status: 200 });
   }) as unknown as typeof fetch;
   return fake;
 }

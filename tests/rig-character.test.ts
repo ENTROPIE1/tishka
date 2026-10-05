@@ -13,6 +13,7 @@ class FakePlayer implements RigCharacterPlayer {
   clipList: string[] = ['idle', 'walk', 'listen', 'think', 'work', 'talk', 'notify', 'happy', 'confused', 'sleep'];
   played: string[] = [];
   mouth: string | null = null;
+  moods: string[] = [];
   flip = false;
 
   async load(): Promise<void> {
@@ -36,6 +37,10 @@ class FakePlayer implements RigCharacterPlayer {
 
   setMouth(shape: string | null): void {
     this.mouth = shape;
+  }
+
+  setMood(name: string): void {
+    this.moods.push(name);
   }
 
   setFlip(flipped: boolean): void {
@@ -109,6 +114,30 @@ describe('RigCharacter', () => {
     expect(player.mouth).toBe('m_a');
     character.setMouth(-5);
     expect(player.mouth).toBeNull();
+  });
+
+  it('форма рта из дорожки речи главнее громкости', async () => {
+    const player = new FakePlayer();
+    const character = new RigCharacter(player);
+    await character.mount(document.createElement('div'));
+
+    character.setViseme('m_o');
+    expect(player.mouth).toBe('m_o');
+    character.setMouth(0.3);
+    expect(player.mouth).toBe('m_teeth');
+    character.setViseme(null);
+    expect(player.mouth).toBeNull();
+  });
+
+  it('эмоция применяется и после монтирования, и заранее', async () => {
+    const player = new FakePlayer();
+    const character = new RigCharacter(player);
+    character.setMood('happy');
+    await character.mount(document.createElement('div'));
+
+    expect(player.moods).toEqual(['happy']);
+    character.setMood('confused');
+    expect(player.moods).toEqual(['happy', 'confused']);
   });
 
   it('dispose останавливает проигрыватель', async () => {

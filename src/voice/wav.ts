@@ -30,6 +30,65 @@ export function wavDurationSec(bytes: Uint8Array): number {
   return 0;
 }
 
+export interface WavSamples {
+  samples: Float32Array;
+  sampleRate: number;
+}
+
+// Разбор WAV 8/16/32 бит PCM в моно-сэмплы от -1 до 1: нужен для огибающей
+// громкости и дорожки рта в главном процессе. Незнакомый формат даёт null.
+export function decodeWav(bytes: Uint8Array): WavSamples | null {
+  if (bytes.length < HEADER_BYTES) {
+    return null;
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (view.getUint32(0, true) !== 0x46464952 || view.getUint32(8, true) !== 0x45564157) {
+    return null;
+  }
+  let channels = 1;
+  let sampleRate = 0;
+  let bits = 0;
+  let dataOffset = -1;
+  let dataSize = 0;
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+    const size = view.getUint32(offset + 4, true);
+    if (id === 'fmt ' && offset + 24 <= bytes.length) {
+      channels = Math.max(1, view.getUint16(offset + 10, true));
+      sampleRate = view.getUint32(offset + 12, true);
+      bits = view.getUint16(offset + 22, true);
+    }
+    if (id === 'data') {
+      dataOffset = offset + 8;
+      dataSize = Math.min(size, bytes.length - dataOffset);
+      break;
+    }
+    offset += 8 + size + (size % 2);
+  }
+  if (dataOffset < 0 || sampleRate <= 0 || (bits !== 8 && bits !== 16 && bits !== 32)) {
+    return null;
+  }
+  const bytesPerSample = bits / 8;
+  const count = Math.floor(dataSize / (bytesPerSample * channels));
+  const samples = new Float32Array(count);
+  for (let index = 0; index < count; index += 1) {
+    let sum = 0;
+    for (let channel = 0; channel < channels; channel += 1) {
+      const at = dataOffset + (index * channels + channel) * bytesPerSample;
+      if (bits === 8) {
+        sum += (view.getUint8(at) - 128) / 128;
+      } else if (bits === 16) {
+        sum += view.getInt16(at, true) / 32768;
+      } else {
+        sum += view.getInt32(at, true) / 2147483648;
+      }
+    }
+    samples[index] = sum / channels;
+  }
+  return { samples, sampleRate };
+}
+
 function writeAscii(view: DataView, offset: number, text: string): void {
   for (let i = 0; i < text.length; i += 1) {
     view.setUint8(offset + i, text.charCodeAt(i));

@@ -8,6 +8,7 @@ import { createListenUi } from './listen-ui';
 import { createInteractivity, hitTestRegions } from './interactivity';
 import { micThreshold } from '../shared/mic-threshold';
 import { createPetCard } from './pet-card';
+import { createMoodTrack } from './mood-track';
 import { createSpeaker } from './speaker';
 import { createStateCaption } from './state-caption';
 import { stateLabel } from './state-label';
@@ -70,11 +71,18 @@ const interactivity = createInteractivity({
   setInteractive: (value) => window.tishka.pet.setInteractive(value)
 });
 
+// Эмоция лица нового персонажа: настроение ответа, метки посреди речи,
+// сброс в покое и при уходе. Прежний ёж setMood не реализует.
+const faceMood = createMoodTrack({ setMood: (name) => characterModel?.setMood?.(name) });
+
 const speaker = createSpeaker({
   setMouth: (level) => {
     mouthLevel = level;
     characterModel?.setMouth(level);
   },
+  // Новый персонаж ведёт рот по дорожке речи и меняет эмоцию по времени звука.
+  setViseme: (shape) => characterModel?.setViseme?.(shape),
+  setMood: (name) => faceMood.mark(name),
   onDone: (id) => window.tishka.pet.speakDone(id)
 });
 const petCard = createPetCard({ element: cardHost, refreshBusy });
@@ -147,6 +155,7 @@ function renderModel(model: PetModel): void {
 
   const { clip } = clipForState(model.state);
   characterModel?.setClip(clip);
+  faceMood.state(model.state);
   applyFlip();
 
   const visible = isOnScreen(model.state);
@@ -180,6 +189,7 @@ async function requestedCharacter(): Promise<string> {
 // Пересозданному персонажу возвращаем текущее состояние, отражение и рот.
 function applyCurrentCharacter(): void {
   characterModel?.setClip(clipForState(currentState).clip);
+  faceMood.apply();
   applyFlip();
   if (mouthLevel !== null) {
     characterModel?.setMouth(mouthLevel);
@@ -255,6 +265,7 @@ window.tishka.onEvent((event) => {
     mouthLevel = event.level;
     characterModel?.setMouth(event.level);
   } else if (event.type === 'reply') {
+    faceMood.reply(event.reply.mood);
     timingMark('reply.shown');
   } else if (event.type === 'error') {
     listen.setError(event.message);
