@@ -419,11 +419,28 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     memory = memoryStore;
     registerMemoryTools(registry, memoryStore, deps.events);
 
+    // Запасная модель для запрошенной: у модели картинок своя настройка.
+    const fallbackFor = (model: string): string | undefined => {
+      const vision = config.llm.visionModel.trim();
+      if (vision !== '' && model === vision) {
+        return config.llm.visionFallbackModel.trim() || undefined;
+      }
+      if (model === config.llm.model.trim()) {
+        return config.llm.fallbackModel.trim() || undefined;
+      }
+      return undefined;
+    };
+
     const llm = createLlmClient({
       baseUrl: () => config.llm.baseUrl,
       getApiKey: gatewayKey,
       api: () => config.llm.api,
-      fetch: deps.fetch
+      fetch: deps.fetch,
+      fallbackModel: fallbackFor,
+      onFallback: ({ from, to }) => {
+        deps.events.emit({ type: 'note', text: `Модель ${from} не отвечает, работаю на ${to}` });
+      },
+      mark: deps.mark
     });
 
     const capture = deps.captureScreen;

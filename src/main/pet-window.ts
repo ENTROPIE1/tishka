@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
+import { petCharacterContent } from '../pet/character-size';
 import { PET_CAPTION_CHANNEL, PET_LISTEN_COMMAND_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
 import { guardNavigation } from './navigation-guard';
 import { createPetActivation } from './pet-activation';
@@ -11,8 +12,12 @@ import type { PetWindow, PetWindowDeps } from './pet-window-types';
 
 export type { PetWindow, PetWindowDeps } from './pet-window-types';
 
+function characterContent(config: { persona?: { character?: 'hedgehog' | 'tishka' } }): ReturnType<typeof petCharacterContent> {
+  return petCharacterContent(config.persona?.character ?? 'hedgehog');
+}
+
 export function createPetWindow(deps: PetWindowDeps): PetWindow {
-  const placement = new PetPlacement(deps.getConfig().pet.x, {});
+  const placement = new PetPlacement(deps.getConfig().pet.x, () => characterContent(deps.getConfig()));
   const window = new BrowserWindow({
     ...placement.bounds(), x: placement.geometry.hiddenX,
     show: false, frame: false, transparent: true, resizable: false,
@@ -82,6 +87,14 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     },
     dragEnd(): void {
       void deps.savePetX(placement.layout.petX);
+    },
+    // Смена персонажа в настройках: те же место и экран, новые размеры окна.
+    refreshLayout(): void {
+      if (window.isDestroyed()) return;
+      placement.refresh();
+      window.setBounds(placement.bounds());
+      lifecycle.sendLayout();
+      activation.sendPointer();
     },
     listenCommand(command): void {
       send(PET_LISTEN_COMMAND_CHANNEL, command);

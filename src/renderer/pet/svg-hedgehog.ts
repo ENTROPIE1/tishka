@@ -1,3 +1,4 @@
+import { PET_HEDGEHOG_SIZE, type PetCharacterSize } from '../../pet/character-size';
 import { CLIP_NAMES, type Character, type ClipName } from './character';
 import { hedgehogMarkup } from './svg-hedgehog-markup';
 
@@ -57,6 +58,10 @@ export class SvgHedgehog implements Character {
 
   clips(): ClipName[] {
     return [...CLIP_NAMES];
+  }
+
+  metrics(): PetCharacterSize {
+    return PET_HEDGEHOG_SIZE;
   }
 
   dispose(): void {

@@ -40,7 +40,10 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
   }
 
   function sendLayout(): void {
-    if (!window.isDestroyed()) window.webContents.send(PET_LAYOUT_CHANNEL, { mirrored: placement.layout.mirrored });
+    if (!window.isDestroyed()) {
+      const { mirrored, petWidth, petHeight, muzzle } = placement.layout;
+      window.webContents.send(PET_LAYOUT_CHANNEL, { mirrored, petWidth, petHeight, muzzle });
+    }
   }
 
   function showAtRest(): void {

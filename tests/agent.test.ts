@@ -292,7 +292,7 @@ describe('createAgent', () => {
     expect(llm.chat).toHaveBeenCalledTimes(2);
   });
 
-  it('LlmError возвращает Reply с mood confused и событие error', async () => {
+  it('LlmError возвращает Reply с mood confused и понятное событие error', async () => {
     const { registry } = makeRegistry();
     const llm = {
       chat: vi.fn(async (): Promise<ChatResponse> => {
@@ -304,7 +304,27 @@ describe('createAgent', () => {
     const answer = await agent.handle('привет');
 
     expect(answer.mood).toBe('confused');
-    expect(events).toContainEqual({ type: 'error', message: 'нет сети' });
+    const error = events.find((event): event is Extract<TishkaEvent, { type: 'error' }> => event.type === 'error');
+    expect(error?.message).toContain('Шлюз недоступен');
+    expect(error?.message).not.toContain('нет сети');
+  });
+
+  it('ошибка сервера называет модель и ведёт в настройки', async () => {
+    const { registry } = makeRegistry();
+    const llm = {
+      chat: vi.fn(async (): Promise<ChatResponse> => {
+        throw new LlmError('server', 'Шлюз моделей недоступен, код ответа 500');
+      })
+    };
+    const { agent, events } = makeAgent(llm, registry);
+
+    const answer = await agent.handle('привет');
+
+    expect(answer.mood).toBe('confused');
+    const error = events.find((event): event is Extract<TishkaEvent, { type: 'error' }> => event.type === 'error');
+    expect(error?.message).toContain('dks-local');
+    expect(error?.message).toContain('ошибка сервера');
+    expect(error?.message).toContain('Подключениях');
   });
 
   it('длинный результат инструмента обрезается с пометкой', async () => {

@@ -105,6 +105,11 @@ function initEvents(): void {
       case 'notify':
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;
+      case 'note':
+        // Приглушённая служебная строка ленты: о переходе на запасную модель,
+        // вслух не читается и в историю не пишется.
+        view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.text });
+        break;
       case 'status':
         // Служебные строки остановки и вытесненной реплики живут только в ленте:
         // ежа они не поднимают, в историю не пишутся.

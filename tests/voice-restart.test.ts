@@ -7,7 +7,7 @@ type SttMode = Config['voice']['stt']['mode'];
 
 function config(mode: SttMode, exe = '', model = '', sttUrl = 'http://127.0.0.1:8178'): Config {
   return {
-    llm: { baseUrl: '', model: '', visionModel: '', api: 'chat' },
+    llm: { baseUrl: '', model: '', visionModel: '', fallbackModel: '', visionFallbackModel: '', api: 'chat' },
     voice: {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],
@@ -21,7 +21,7 @@ function config(mode: SttMode, exe = '', model = '', sttUrl = 'http://127.0.0.1:
       tts: { enabled: false, url: '', volume: 1 }
     },
     mcpServers: [],
-    persona: { fyr: 'sometimes' },
+    persona: { fyr: 'sometimes', character: 'hedgehog' },
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },

@@ -126,6 +126,11 @@ app.whenReady().then(async () => {
     if (previous.app.autostart !== next.app.autostart) {
       app.setLoginItemSettings(loginItemSettings(next.app.autostart));
     }
+    // Смена персонажа меняет размер фигуры: окно ежа пересчитывает раскладку,
+    // а страница пересоздаёт самого персонажа (см. pet.ts).
+    if (previous.persona.character !== next.persona.character) {
+      pet?.refreshLayout();
+    }
     speech?.warm();
     petWake?.broadcast();
     chatTalk?.broadcast();
