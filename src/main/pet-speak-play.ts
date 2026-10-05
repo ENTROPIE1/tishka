@@ -1,9 +1,9 @@
+import { wavDurationSec } from '../voice/wav';
 import type { SpeakMessage } from '../voice/speech-queue';
 
 export interface PetSpeakPlayDeps {
   speak(message: SpeakMessage): void;
   stopSpeaking(): void;
-  timeoutMs?: number;
   setTimer?: (handler: () => void, ms: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
 }
@@ -14,7 +14,14 @@ export interface PetSpeakPlay {
   abort(): void;
 }
 
-const DEFAULT_TIMEOUT_MS = 60000;
+const SPEECH_MARGIN_MS = 5000;
+const MIN_TIMEOUT_MS = 15000;
+
+// Страховочный срок считается от длины звука: сама запись плюс запас.
+// Минимум страхует зависший звук, когда длину записи определить не удалось.
+export function speakTimeoutMs(wav: Uint8Array): number {
+  return Math.max(wavDurationSec(wav) * 1000 + SPEECH_MARGIN_MS, MIN_TIMEOUT_MS);
+}
 
 interface PendingPlay {
   id: number;
@@ -26,7 +33,6 @@ interface PendingPlay {
 // по сроку или при вытеснении следующим play. Номер воспроизведения отделяет
 // запоздавшее speak-done прежнего звука от текущего.
 export function createPetSpeakPlay(deps: PetSpeakPlayDeps): PetSpeakPlay {
-  const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const setTimer = deps.setTimer ?? ((handler, ms) => setTimeout(handler, ms));
   const clearTimer = deps.clearTimer ?? ((timer) => clearTimeout(timer));
   let lastId = 0;
@@ -54,7 +60,7 @@ export function createPetSpeakPlay(deps: PetSpeakPlayDeps): PetSpeakPlay {
       const timer = setTimer(() => {
         deps.stopSpeaking();
         settle();
-      }, timeoutMs);
+      }, speakTimeoutMs(message.wav));
       const cleanup = (): void => {
         clearTimer(timer);
         signal.removeEventListener('abort', onAbort);

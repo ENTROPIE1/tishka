@@ -70,7 +70,34 @@ describe('registerScreenTools', () => {
     const result = await registry.call('screen_look', { question: 'что за ошибка?' });
 
     expect(result).toEqual({ ok: true, content: 'ошибка про доступ' });
-    expect(look).toHaveBeenCalledWith('что за ошибка?', 'screen');
+    expect(look).toHaveBeenCalledWith('что за ошибка?', 'screen', { answerDirectly: false });
+  });
+
+  it('answer_directly=true доходит до разбора, готовый ответ возвращается агенту', async () => {
+    const reply = { say: 'Открыта таблица', mood: 'neutral' } as const;
+    const look = vi.fn(async (_question, _target, opts?: { answerDirectly?: boolean }) => ({
+      ok: true,
+      content: 'Открыта таблица',
+      ...(opts?.answerDirectly === true ? { reply } : {})
+    }));
+    const registry = createToolRegistry(createEventBus());
+    registerScreenTools(registry, makeDeps({ look }), true);
+
+    const result = await registry.call('screen_look', { answer_directly: true });
+
+    expect(look).toHaveBeenCalledWith(undefined, 'screen', { answerDirectly: true });
+    expect(result.ok).toBe(true);
+    expect(result.reply).toEqual(reply);
+  });
+
+  it('без answer_directly готового ответа в результате нет', async () => {
+    const registry = createToolRegistry(createEventBus());
+    registerScreenTools(registry, makeDeps(), true);
+
+    const result = await registry.call('screen_look', {});
+
+    expect(result.ok).toBe(true);
+    expect(result.reply).toBeUndefined();
   });
 
   it('при снимке в облачке появляется «Смотрю на экран…»', async () => {

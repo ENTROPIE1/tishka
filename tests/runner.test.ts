@@ -148,6 +148,30 @@ describe('createSkillRunner', () => {
     expect(result.reply?.say).toBe('Готово!');
   });
 
+  it('готовый ответ шага-инструмента не обрывает остальные шаги навыка', async () => {
+    const registry = registryWith({
+      screen_look: async (): Promise<ToolResult> => ({
+        ok: true,
+        content: 'Открыта таблица с планом',
+        reply: { say: 'Открыта таблица с планом', mood: 'neutral' }
+      })
+    });
+    const ask = vi.fn(async () => 'на экране таблица с планом');
+    const skill = makeSkill({
+      steps: [
+        { id: 'shot', tool: 'screen_look', args: { answer_directly: true } },
+        { id: 'note', ask: 'что на экране: {{steps.shot.content}}' },
+        { id: 'out', say: 'Записал: {{steps.note.content}}' }
+      ]
+    });
+
+    const result = await runnerFor(registry, ask).run(skill);
+
+    expect(result.ok).toBe(true);
+    expect(result.reply?.say).toBe('Записал: на экране таблица с планом');
+    expect(ask).toHaveBeenCalledWith('что на экране: Открыта таблица с планом');
+  });
+
   it('пресет friday-morning вызывает open_urls один раз и возвращает свою реплику', async () => {
     const raw = readFileSync(new URL('../presets/friday-morning.tishka.json', import.meta.url), 'utf8');
     const validated = validateSkill(JSON.parse(raw) as unknown, ['open_urls']);

@@ -12,7 +12,6 @@ export interface ScreenCapture {
 
 export const HIDE_DELAY_MS = 150;
 
-const MAX_BYTES = 4 * 1024 * 1024;
 const JPEG_QUALITY = 85;
 const CAPTURE_ERROR = 'Не получилось сделать снимок экрана';
 
@@ -40,6 +39,7 @@ export async function withHiddenPet<T>(
 
 interface Encoded {
   png: Uint8Array;
+  jpeg?: Uint8Array;
   width: number;
   height: number;
 }
@@ -54,22 +54,28 @@ function encode(image: Electron.NativeImage): Encoded | undefined {
     fitted.width === size.width && fitted.height === size.height
       ? image
       : image.resize({ width: fitted.width, height: fitted.height, quality: 'best' });
-  const png = resized.toPNG();
-  const bytes = png.length > MAX_BYTES ? resized.toJPEG(JPEG_QUALITY) : png;
-  return { png: new Uint8Array(bytes), width: fitted.width, height: fitted.height };
+  const png = new Uint8Array(resized.toPNG());
+  // Модели уходит сжатая копия: PNG в разы больше, а загрузка снимка в шлюз
+  // занимает заметную часть разбора экрана.
+  const jpeg = new Uint8Array(resized.toJPEG(JPEG_QUALITY));
+  const encoded: Encoded = { png, width: fitted.width, height: fitted.height };
+  if (jpeg.length > 0) {
+    encoded.jpeg = jpeg;
+  }
+  return encoded;
 }
 
 async function grab(target: ScreenTarget): Promise<CaptureResult> {
   try {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     const scale = display.scaleFactor > 0 ? display.scaleFactor : 1;
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: {
-        width: Math.max(1, Math.round(display.size.width * scale)),
-        height: Math.max(1, Math.round(display.size.height * scale))
-      }
-    });
+    // Кадр запрашивается сразу уменьшенным: меньше снимок — быстрее снимок и
+    // кодирование; detail для разбора это не снижает.
+    const full = {
+      width: Math.max(1, Math.round(display.size.width * scale)),
+      height: Math.max(1, Math.round(display.size.height * scale))
+    };
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: fitSize(full.width, full.height) });
     const source = sources.find((item) => item.display_id === String(display.id)) ?? sources[0];
     if (source === undefined) {
       return { ok: false, error: CAPTURE_ERROR };
@@ -81,6 +87,7 @@ async function grab(target: ScreenTarget): Promise<CaptureResult> {
     return {
       ok: true,
       png: encoded.png,
+      jpeg: encoded.jpeg,
       width: encoded.width,
       height: encoded.height,
       source: `${target === 'window' ? 'Окно' : 'Монитор'} ${encoded.width}×${encoded.height}`

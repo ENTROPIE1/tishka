@@ -1,11 +1,11 @@
 import { mkdir, readdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { EventBus, Panel, ToolDef, ToolRegistry, ToolResult } from '../types';
-import type { CaptureResult, ScreenTarget } from '../vision/look';
+import type { CaptureResult, LookOptions, ScreenTarget } from '../vision/look';
 
 export interface ScreenToolsDeps {
   capture(target: ScreenTarget): Promise<CaptureResult>;
-  look(question: string | undefined, target: ScreenTarget): Promise<ToolResult>;
+  look(question: string | undefined, target: ScreenTarget, opts?: LookOptions): Promise<ToolResult>;
   screenshotsDir: string;
   now(): Date;
   events?: EventBus;
@@ -33,6 +33,10 @@ function readQuestion(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
 
+function readAnswerDirectly(value: unknown): boolean {
+  return value === true;
+}
+
 // Оставляет не больше max последних снимков, старые удаляются.
 export async function pruneShots(dir: string, max: number = MAX_SHOTS): Promise<void> {
   const names = (await readdir(dir)).filter((name) => SHOT_NAME.test(name)).sort();
@@ -51,12 +55,16 @@ const targetProperty = {
 const screenLook: ToolDef = {
   name: 'screen_look',
   description:
-    'Делает снимок экрана и разбирает его моделью с картинками только по явной просьбе про экран, окно или то, что открыто: «посмотри на экран», «что у меня открыто», «видишь ошибку в окне?». Одиночные и расплывчатые реплики («видишь?», «смотри», «ну как») — не повод вызывать инструмент.',
+    'Делает снимок экрана и разбирает его моделью с картинками только по явной просьбе про экран, окно или то, что открыто: «посмотри на экран», «что у меня открыто», «видишь ошибку в окне?». Одиночные и расплывчатые реплики («видишь?», «смотри», «ну как») — не повод вызывать инструмент. answer_directly=true ставь только когда разбор экрана и есть вся просьба; в составных просьбах («посмотри и …») результат нужен тебе для следующих действий — там answer_directly не передавай.',
   inputSchema: {
     type: 'object',
     properties: {
       question: { type: 'string', description: 'Вопрос человека о том, что видно на экране' },
-      target: targetProperty
+      target: targetProperty,
+      answer_directly: {
+        type: 'boolean',
+        description: 'true — готовый ответ показать человеку сразу, без твоей обработки. По умолчанию false'
+      }
     },
     additionalProperties: false
   },
@@ -86,7 +94,9 @@ export function registerScreenTools(registry: ToolRegistry, deps: ScreenToolsDep
 
   registry.register(screenLook, async (args) => {
     deps.events?.emit({ type: 'status', text: 'Смотрю на экран…' });
-    return deps.look(readQuestion(args.question), readTarget(args.target));
+    return deps.look(readQuestion(args.question), readTarget(args.target), {
+      answerDirectly: readAnswerDirectly(args.answer_directly)
+    });
   });
 
   registry.register(screenShot, async (args) => {

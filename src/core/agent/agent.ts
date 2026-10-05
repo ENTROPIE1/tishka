@@ -99,6 +99,10 @@ export function createAgent(deps: AgentDeps): Agent {
     return [...deps.registry.list().filter((def) => def.name !== REPLY_TOOL_NAME), replyTool];
   }
 
+  function isSkillTool(name: string): boolean {
+    return deps.registry.list().some((def) => def.name === name && def.source === 'skill');
+  }
+
   function finish(reply: Reply): Reply {
     deps.events.emit({ type: 'reply', reply });
     return reply;
@@ -179,6 +183,11 @@ export function createAgent(deps: AgentDeps): Agent {
       push({ role: 'assistant', content: response.text, toolCalls: calls });
 
       let finalReply: Reply | null = null;
+      let toolReply: Reply | null = null;
+      // Прямой ответ инструмента достаётся человеку, только когда вызов
+      // единственный в этом шаге и пришёл не из навыка: иначе результат
+      // нужен основной модели, чтобы доделать составную просьбу.
+      const singleCall = calls.length === 1;
       for (const call of calls) {
         if (isReplyToolCall(call.name)) {
           finalReply = replyFromToolArgs(call.args, response.text);
@@ -187,9 +196,15 @@ export function createAgent(deps: AgentDeps): Agent {
         }
         const result = await callTool(call.name, call.args, signal);
         push({ role: 'tool', toolCallId: call.id, content: toolResultToText(result) });
+        if (singleCall && !isSkillTool(call.name) && result.ok && result.reply !== undefined) {
+          toolReply = result.reply;
+        }
       }
       if (finalReply !== null) {
         return finish(finalReply);
+      }
+      if (toolReply !== null) {
+        return finish(toolReply);
       }
     }
 

@@ -8,10 +8,11 @@ import {
 } from '../src/core/vision/look';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
 const VISION_MODEL = 'DKS-Vision';
 
 function okCapture(): CaptureResult {
-  return { ok: true, png: PNG, width: 1920, height: 1080, source: 'Монитор 1920×1080' };
+  return { ok: true, png: PNG, jpeg: JPEG, width: 1920, height: 1080, source: 'Монитор 1920×1080' };
 }
 
 function makeChat(text = 'На экране открыт редактор'): {
@@ -42,8 +43,8 @@ function userParts(req: ChatRequest): { text: string; image: string } {
 }
 
 describe('fitSize', () => {
-  it('уменьшает длинную сторону до 1920', () => {
-    expect(fitSize(3840, 2160)).toEqual({ width: 1920, height: 1080 });
+  it('уменьшает длинную сторону до 1600', () => {
+    expect(fitSize(3840, 2160)).toEqual({ width: 1600, height: 900 });
   });
 
   it('маленькую картинку не увеличивает', () => {
@@ -51,7 +52,7 @@ describe('fitSize', () => {
   });
 
   it('вертикальный снимок тоже вписывает по длинной стороне', () => {
-    expect(fitSize(1080, 3840)).toEqual({ width: 540, height: 1920 });
+    expect(fitSize(1080, 3840)).toEqual({ width: 450, height: 1600 });
   });
 });
 
@@ -72,7 +73,71 @@ describe('createVisionLook', () => {
     expect(requests[0].messages[0].role).toBe('system');
     const parts = userParts(requests[0]);
     expect(parts.text).toBe('Что за ошибка?');
-    expect(parts.image.startsWith('data:image/png;base64,')).toBe(true);
+    expect(parts.image.startsWith('data:image/jpeg;base64,')).toBe(true);
+  });
+
+  it('при answer_directly ответ приходит человеку как готовый Reply', async () => {
+    const { chat } = makeChat('Слева редактор, справа терминал. Ошибок нет.');
+    const look = createVisionLook({
+      capture: async () => okCapture(),
+      chat,
+      visionModel: VISION_MODEL
+    });
+
+    const result = await look.look(undefined, 'screen', { answerDirectly: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.reply).toEqual({
+      say: 'Слева редактор, справа терминал. Ошибок нет.',
+      mood: 'neutral'
+    });
+  });
+
+  it('подсказка модели с картинками звучит в тоне Тишки', async () => {
+    const { chat, requests } = makeChat();
+    const look = createVisionLook({ capture: async () => okCapture(), chat, visionModel: VISION_MODEL });
+
+    await look.look(undefined, 'screen');
+
+    const system = requests[0].messages[0];
+    expect(system.role).toBe('system');
+    expect(system.content).toContain('Тишка');
+    expect(system.content).toContain('на «ты»');
+  });
+
+  it('без answer_directly разбор уходит основной модели без готового Reply', async () => {
+    const { chat } = makeChat('Слева редактор, справа терминал. Ошибок нет.');
+    const look = createVisionLook({ capture: async () => okCapture(), chat, visionModel: VISION_MODEL });
+
+    const result = await look.look(undefined, 'screen');
+
+    expect(result.ok).toBe(true);
+    expect(result.content).toBe('Слева редактор, справа терминал. Ошибок нет.');
+    expect(result.reply).toBeUndefined();
+  });
+
+  it('длинный ответ целиком уходит в карточку, вслух — первые два предложения', async () => {
+    const answer = 'Первое предложение. Второе предложение. Третье предложение.';
+    const { chat } = makeChat(answer);
+    const look = createVisionLook({ capture: async () => okCapture(), chat, visionModel: VISION_MODEL });
+
+    const result = await look.look(undefined, 'screen', { answerDirectly: true });
+
+    expect(result.reply?.say).toBe('Первое предложение. Второе предложение.');
+    expect(result.reply?.show).toEqual({ kind: 'text', title: 'Ответ', markdown: answer });
+  });
+
+  it('без сжатой копии модель получает PNG', async () => {
+    const { chat, requests } = makeChat();
+    const look = createVisionLook({
+      capture: async () => ({ ok: true, png: PNG, width: 1920, height: 1080, source: 'Монитор' }),
+      chat,
+      visionModel: VISION_MODEL
+    });
+
+    await look.look(undefined, 'screen');
+
+    expect(userParts(requests[0]).image.startsWith('data:image/png;base64,')).toBe(true);
   });
 
   it('без вопроса использует общий вопрос', async () => {

@@ -375,7 +375,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
           target,
           {
             capture,
-            look: (question, screenTarget) => visionLook.look(question, screenTarget),
+            look: (question, screenTarget, opts) => visionLook.look(question, screenTarget, opts),
             screenshotsDir: join(deps.dataDir, 'screenshots'),
             now: deps.now,
             events: deps.events

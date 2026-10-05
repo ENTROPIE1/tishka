@@ -172,6 +172,126 @@ describe('createAgent', () => {
     expect(toolMessages(agent.history()).some((m) => m.content.includes('всё сломалось'))).toBe(true);
   });
 
+  it('простой вопрос об экране отвечает за один шаг прямым ответом', async () => {
+    const { registry, calls } = makeRegistry({
+      ok: true,
+      content: 'Открыт редактор и терминал',
+      reply: { say: 'Открыт редактор', mood: 'neutral' }
+    });
+    const { llm } = makeLlm(() => ({
+      text: null,
+      toolCalls: [toolCall('t1', 'screen_look', { answer_directly: true })]
+    }));
+    const { agent, events } = makeAgent(llm, registry);
+
+    const answer = await agent.handle('что на экране');
+
+    expect(answer).toEqual({ say: 'Открыт редактор', mood: 'neutral' });
+    expect(calls).toHaveLength(1);
+    expect(llm.chat).toHaveBeenCalledTimes(1);
+    expect(events).toContainEqual({ type: 'reply', reply: { say: 'Открыт редактор', mood: 'neutral' } });
+    expect(toolMessages(agent.history())[0].content).toContain('Открыт редактор');
+  });
+
+  it('составная просьба не обрывается прямым ответом: оба результата уходят модели', async () => {
+    const screenDef: ToolDef = {
+      name: 'screen_look',
+      description: 'снимок экрана',
+      inputSchema: { type: 'object', properties: {} },
+      source: 'builtin',
+      readOnly: true
+    };
+    const memoryDef: ToolDef = {
+      name: 'memory_write',
+      description: 'запись в память',
+      inputSchema: { type: 'object', properties: {} },
+      source: 'builtin',
+      readOnly: false
+    };
+    const calls: { name: string; args: Record<string, unknown> }[] = [];
+    const registry: ToolRegistry = {
+      register: vi.fn(),
+      unregisterSource: vi.fn(),
+      list: () => [screenDef, memoryDef],
+      call: vi.fn(async (name: string): Promise<ToolResult> => {
+        calls.push({ name, args: {} });
+        return name === 'screen_look'
+          ? { ok: true, content: 'Открыт редактор', reply: { say: 'Открыт редактор', mood: 'neutral' } }
+          : { ok: true, content: 'Записал в память' };
+      })
+    };
+    const { llm } = makeLlm((round) =>
+      round === 0
+        ? {
+            text: null,
+            toolCalls: [
+              toolCall('t1', 'screen_look', { answer_directly: true }),
+              toolCall('t2', 'memory_write', { text: 'на экране редактор' })
+            ]
+          }
+        : { text: null, toolCalls: [replyCall('r1', { say: 'Посмотрел и записал' })] }
+    );
+    const { agent, events } = makeAgent(llm, registry);
+
+    const answer = await agent.handle('посмотри на экран и запиши в память');
+
+    expect(calls).toHaveLength(2);
+    expect(answer).toEqual({ say: 'Посмотрел и записал', mood: 'neutral' });
+    expect(llm.chat).toHaveBeenCalledTimes(2);
+    expect(events).not.toContainEqual({ type: 'reply', reply: { say: 'Открыт редактор', mood: 'neutral' } });
+    const tools = toolMessages(agent.history());
+    expect(tools[0].content).toContain('Открыт редактор');
+    expect(tools[1].content).toContain('Записал в память');
+  });
+
+  it('вызов из навыка не обрывается прямым ответом', async () => {
+    const skillDef: ToolDef = {
+      name: 'skill__look-and-note',
+      description: 'навык: посмотреть и записать',
+      inputSchema: { type: 'object', properties: {} },
+      source: 'skill',
+      readOnly: false
+    };
+    const registry: ToolRegistry = {
+      register: vi.fn(),
+      unregisterSource: vi.fn(),
+      list: () => [skillDef],
+      call: vi.fn(async (): Promise<ToolResult> => ({
+        ok: true,
+        content: 'Навык выполнился',
+        reply: { say: 'Открыт редактор', mood: 'neutral' }
+      }))
+    };
+    const { llm } = makeLlm((round) =>
+      round === 0
+        ? { text: null, toolCalls: [toolCall('t1', 'skill__look-and-note', {})] }
+        : { text: null, toolCalls: [replyCall('r1', { say: 'Навык выполнился' })] }
+    );
+    const { agent, events } = makeAgent(llm, registry);
+
+    const answer = await agent.handle('запусти навык');
+
+    expect(answer).toEqual({ say: 'Навык выполнился', mood: 'neutral' });
+    expect(llm.chat).toHaveBeenCalledTimes(2);
+    expect(events).not.toContainEqual({ type: 'reply', reply: { say: 'Открыт редактор', mood: 'neutral' } });
+  });
+
+  it('ошибочный результат с готовым ответом ход не завершает', async () => {
+    const { registry, calls } = makeRegistry({ ok: false, content: '', reply: { say: 'нет' }, error: 'сбой' });
+    const { llm } = makeLlm((round) =>
+      round === 0
+        ? { text: null, toolCalls: [toolCall('t1', 'echo', { text: 'раз' })] }
+        : { text: null, toolCalls: [replyCall('r1', { say: 'Сделал' })] }
+    );
+    const { agent } = makeAgent(llm, registry);
+
+    const answer = await agent.handle('сбой');
+
+    expect(answer).toEqual({ say: 'Сделал', mood: 'neutral' });
+    expect(calls).toHaveLength(1);
+    expect(llm.chat).toHaveBeenCalledTimes(2);
+  });
+
   it('LlmError возвращает Reply с mood confused и событие error', async () => {
     const { registry } = makeRegistry();
     const llm = {

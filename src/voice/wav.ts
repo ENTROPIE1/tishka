@@ -1,5 +1,35 @@
 const HEADER_BYTES = 44;
 
+// Длительность WAV-записи в секундах: блок данных, делённый на байты в секунду
+// из заголовка fmt. Неопознанный или повреждённый файл даёт 0 — вызывающий
+// тогда берёт минимальный страховочный срок.
+export function wavDurationSec(bytes: Uint8Array): number {
+  if (bytes.length < HEADER_BYTES) {
+    return 0;
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const riff = view.getUint32(0, true);
+  const wave = view.getUint32(8, true);
+  if (riff !== 0x46464952 || wave !== 0x45564157) {
+    return 0;
+  }
+  let byteRate = 0;
+  let offset = 12;
+  while (offset + 8 <= bytes.length) {
+    const id = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+    const size = view.getUint32(offset + 4, true);
+    if (id === 'fmt ' && offset + 20 <= bytes.length) {
+      byteRate = view.getUint32(offset + 16, true);
+    }
+    if (id === 'data') {
+      const available = Math.min(size, bytes.length - offset - 8);
+      return byteRate > 0 ? available / byteRate : 0;
+    }
+    offset += 8 + size + (size % 2);
+  }
+  return 0;
+}
+
 function writeAscii(view: DataView, offset: number, text: string): void {
   for (let i = 0; i < text.length; i += 1) {
     view.setUint8(offset + i, text.charCodeAt(i));
