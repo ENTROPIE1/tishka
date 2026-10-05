@@ -6,7 +6,7 @@ import { mountVoiceSection } from '../src/renderer/settings/voice-section';
 
 function makeConfig(): Config {
   return {
-    llm: { baseUrl: '', model: '', visionModel: '', api: 'chat' },
+    llm: { baseUrl: '', model: '', visionModel: '', fallbackModel: '', visionFallbackModel: '', api: 'chat' },
     voice: {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],

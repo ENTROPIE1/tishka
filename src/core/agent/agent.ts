@@ -33,13 +33,46 @@ const MAX_ROUNDS = 8;
 const MAX_TOOL_CONTENT = 6000;
 const TRUNCATED_MARK = '\n[обрезано]';
 
-const ERROR_PHRASES: Record<LlmError['kind'], string> = {
-  auth: 'Ключ шлюза моделей не подошёл, проверь настройки',
-  limit: 'Шлюз моделей просит подождать, попробуй ещё раз чуть позже',
-  network: 'Не получилось связаться со шлюзом моделей',
-  server: 'Шлюз моделей сейчас недоступен',
-  bad_response: 'Шлюз моделей ответил что-то непонятное'
-};
+const SETTINGS_HINT = 'Смените модель в «Подключениях»';
+const GATEWAY_DOWN = 'Шлюз недоступен. Проверьте адрес в «Подключениях»';
+
+// Человеку достаётся понятная причина без тела ответа шлюза: имя модели и
+// вид отказа. Идентификатор ключа и почта из тела сюда не попадают.
+function errorToHuman(kind: LlmError['kind'] | undefined, budget: boolean, model: string): {
+  feed: string;
+  say: string;
+} {
+  if (budget) {
+    return {
+      feed: `На модель ${model} сегодня исчерпан лимит. ${SETTINGS_HINT}`,
+      say: 'На эту модель сегодня исчерпан лимит, смени её в подключениях'
+    };
+  }
+  switch (kind) {
+    case 'server':
+      return {
+        feed: `Модель ${model} не отвечает (ошибка сервера). ${SETTINGS_HINT}`,
+        say: 'Модель не отвечает, смени её в подключениях'
+      };
+    case 'network':
+      return { feed: GATEWAY_DOWN, say: 'Шлюз недоступен, проверь настройки' };
+    case 'auth':
+      return {
+        feed: 'Ключ шлюза моделей не подошёл, проверь настройки',
+        say: 'Ключ шлюза не подошёл, проверь настройки'
+      };
+    case 'limit':
+      return {
+        feed: 'Шлюз моделей просит подождать, попробуйте позже',
+        say: 'Подожди немного и попробуй снова'
+      };
+    default:
+      return {
+        feed: 'Шлюз моделей ответил что-то непонятное',
+        say: 'Не получилось получить ответ, попробуй ещё раз'
+      };
+  }
+}
 
 function isReplyToolCall(name: string): boolean {
   return name === REPLY_TOOL_NAME;
@@ -167,11 +200,11 @@ export function createAgent(deps: AgentDeps): Agent {
         if (isCancelled(error, signal)) {
           throw error;
         }
-        const phrase =
-          error instanceof LlmError ? ERROR_PHRASES[error.kind] : 'Что-то пошло не так, попробуй ещё раз';
-        const message = error instanceof Error ? error.message : String(error);
-        deps.events.emit({ type: 'error', message });
-        return finish({ say: phrase, mood: 'confused' });
+        const kind = error instanceof LlmError ? error.kind : undefined;
+        const budget = error instanceof LlmError && error.budget;
+        const human = errorToHuman(kind, budget, deps.getModel());
+        deps.events.emit({ type: 'error', message: human.feed });
+        return finish({ say: human.say, mood: 'confused' });
       }
 
       const calls = response.toolCalls;

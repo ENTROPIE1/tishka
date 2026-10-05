@@ -15,6 +15,8 @@ export function defaultConfig(): Config {
       baseUrl: 'https://llm.dks.lanit.ru/v1',
       model: 'DKS-Lynx',
       visionModel: 'DKS-Vision',
+      fallbackModel: '',
+      visionFallbackModel: '',
       api: 'chat'
     },
     voice: {
@@ -193,6 +195,8 @@ export function normalizeConfig(config: Config): Config {
       baseUrl: config.llm.baseUrl.trim(),
       model: config.llm.model.trim(),
       visionModel: config.llm.visionModel.trim(),
+      fallbackModel: config.llm.fallbackModel.trim(),
+      visionFallbackModel: config.llm.visionFallbackModel.trim(),
       api: pickApi(config.llm.api, 'chat')
     }
   };
@@ -218,6 +222,8 @@ export function mergeConfig(value: unknown): Config {
       baseUrl: pickString(llm.baseUrl, defaults.llm.baseUrl),
       model: pickString(llm.model, defaults.llm.model),
       visionModel: pickString(llm.visionModel, defaults.llm.visionModel),
+      fallbackModel: pickString(llm.fallbackModel, defaults.llm.fallbackModel),
+      visionFallbackModel: pickString(llm.visionFallbackModel, defaults.llm.visionFallbackModel),
       api: pickApi(llm.api, defaults.llm.api)
     },
     voice: {

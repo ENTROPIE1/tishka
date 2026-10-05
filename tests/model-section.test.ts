@@ -6,7 +6,14 @@ import { mountModelSection } from '../src/renderer/settings/model-section';
 
 function makeConfig(): Config {
   return {
-    llm: { baseUrl: 'https://llm.example.test/v1', model: 'DKS-Lynx', visionModel: 'DKS-Vision', api: 'chat' },
+    llm: {
+      baseUrl: 'https://llm.example.test/v1',
+      model: 'DKS-Lynx',
+      visionModel: 'DKS-Vision',
+      fallbackModel: '',
+      visionFallbackModel: '',
+      api: 'chat'
+    },
     voice: {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],
@@ -47,6 +54,16 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 5; i += 1) {
     await Promise.resolve();
   }
+}
+
+function inputByLabel(root: HTMLElement, label: string): HTMLInputElement {
+  const fields = [...root.querySelectorAll('label.field')];
+  const field = fields.find((item) => item.querySelector('.field-label')?.textContent === label);
+  const input = field?.querySelector('input');
+  if (input === undefined || input === null) {
+    throw new Error(`поле «${label}» не найдено`);
+  }
+  return input;
 }
 
 function buttonWith(root: HTMLElement, label: string): HTMLButtonElement {
@@ -114,6 +131,41 @@ describe('mountModelSection', () => {
     await flush();
 
     expect(root.querySelector('.message-error')?.textContent).toBe('Ключ шлюза не принят');
+
+    await vi.runAllTimersAsync();
+  });
+
+  it('запасная модель показывается, сохраняется и проверяется вместе с основной', async () => {
+    vi.useFakeTimers();
+    const saved: Config[] = [];
+    let current = makeConfig();
+    install({ ok: true, models: ['DKS-Lynx', 'DKS-Backup'], ms: 10 });
+    (window.tishka.config.get as ReturnType<typeof vi.fn>).mockImplementation(async () => ({
+      config: current,
+      gatewayKeySet: true
+    }));
+    (window.tishka.config.save as ReturnType<typeof vi.fn>).mockImplementation(async (config: Config) => {
+      saved.push(config);
+      current = config;
+    });
+    const root = document.createElement('div');
+    mountModelSection(root);
+    await flush();
+
+    const fallback = inputByLabel(root, 'Запасная модель');
+    expect(fallback.value).toBe('');
+    fallback.value = 'DKS-Backup';
+    fallback.dispatchEvent(new Event('input'));
+    buttonWith(root, 'Сохранить').click();
+    await flush();
+    expect(saved[0]?.llm.fallbackModel).toBe('DKS-Backup');
+
+    buttonWith(root, 'Проверить').click();
+    await flush();
+    expect(checkGateway).toHaveBeenCalledTimes(2);
+    const messages = [...root.querySelectorAll('.message-ok')].map((item) => item.textContent ?? '');
+    expect(messages.some((text) => text.includes('DKS-Lynx'))).toBe(true);
+    expect(messages.some((text) => text.includes('Запасная модель') && text.includes('DKS-Backup'))).toBe(true);
 
     await vi.runAllTimersAsync();
   });

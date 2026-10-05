@@ -7,7 +7,7 @@ type SttMode = Config['voice']['stt']['mode'];
 
 function config(mode: SttMode, exe = '', model = '', sttUrl = 'http://127.0.0.1:8178'): Config {
   return {
-    llm: { baseUrl: '', model: '', visionModel: '', api: 'chat' },
+    llm: { baseUrl: '', model: '', visionModel: '', fallbackModel: '', visionFallbackModel: '', api: 'chat' },
     voice: {
       hotkey: 'Control+Alt+Space',
       wakeWords: ['тишка'],

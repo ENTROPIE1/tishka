@@ -57,6 +57,7 @@ export type TishkaEvent =
   | { type: 'tool.start'; tool: string }
   | { type: 'tool.end'; tool: string; ok: boolean }
   | { type: 'status'; text: string }   // текст в облачке, состояние не меняется
+  | { type: 'note'; text: string }     // приглушённая служебная строка в ленте чата, не вслух
   | { type: 'reply'; reply: Reply }
   | { type: 'screenshot'; title: string; path: string }   // снимок в ленте чата: в облачке и карточке ежа не показывается
   | { type: 'speak.start'; text: string }
@@ -109,7 +110,7 @@ export interface SecretStore {
 }
 
 export interface Config {
-  llm: { baseUrl: string; model: string; visionModel: string; api: 'chat' | 'responses' };   // api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses)
+  llm: { baseUrl: string; model: string; visionModel: string; fallbackModel: string; visionFallbackModel: string; api: 'chat' | 'responses' };   // fallbackModel/visionFallbackModel — запасные модели на случай отказа основных; api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses)
   voice: {
     hotkey: string;
     wakeWords: string[];
