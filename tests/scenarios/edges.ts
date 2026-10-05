@@ -62,24 +62,38 @@ export function createFakeStt(initial: SttStatus): FakeStt {
 export interface FakeTts {
   fetch: typeof fetch;
   mode: TtsMode;
+  delayMs: number;      // сколько служба «синтезирует» один кусок
   requests(): number;
+  texts(): string[];
 }
 
 // Служба синтеза: успех, отказ на тексте (ошибка 500), недоступна (обрыв сети).
 export function createFakeTts(mode: TtsMode): FakeTts {
   const fake: FakeTts = {
     mode,
+    delayMs: 0,
     fetch: () => Promise.reject(new Error('не подключён')),
-    requests: () => requests
+    requests: () => requests,
+    texts: () => texts
   };
   let requests = 0;
-  fake.fetch = (async (url: string | URL, _init?: RequestInit) => {
+  const texts: string[] = [];
+  fake.fetch = (async (url: string | URL, init?: RequestInit) => {
     requests += 1;
     if (String(url).endsWith('/health')) {
       return Response.json({ status: 'ok', engine: 'test', voice: 'test' });
     }
+    const body = init?.body === undefined ? undefined : (JSON.parse(String(init.body)) as { text?: string });
+    if (typeof body?.text === 'string') {
+      texts.push(body.text);
+    }
     if (fake.mode === 'unreachable') {
       throw new Error('ECONNREFUSED');
+    }
+    if (fake.delayMs > 0) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, fake.delayMs);
+      });
     }
     if (fake.mode === 'rejected') {
       return new Response('{}', { status: 500 });

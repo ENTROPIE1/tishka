@@ -18,7 +18,7 @@ function config(mode: SttMode, exe = '', model = '', sttUrl = 'http://127.0.0.1:
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl,
       stt: { exe, model, audioCtx: 768, threads: 4, mode },
-      tts: { enabled: false, url: '', volume: 1 }
+      tts: { enabled: false, url: '', volume: 1, bySentence: true }
     },
     mcpServers: [],
     persona: { fyr: 'sometimes', character: 'hedgehog' },

@@ -89,6 +89,10 @@ interface Reply {
 
 Режим ответа (`voice` — вслух и текстом, `text` — только текстом) хранится в `Config.voice.tts.enabled` и переключается инструментом ядра `speech_mode` без перезапуска. В ядро источник реплики человека (`'voice'` или `'text'`) доводится необязательным параметром `handleUserText(text, source?)`; текущий режим и источник попадают в системную подсказку хода.
 
+## Озвучка реплики
+
+При `Config.voice.tts.bySentence` (по умолчанию включено) подготовленный текст реплики делится на части по границам предложений (`.`, `!`, `?`, `…`, перевод строки); точка внутри числа, сокращения и служебные слова («т. е.», «5.10», «и т. д.») границей не считаются. Предложение длиннее 300 знаков делится по запятой или точке с запятой; предложения короче 25 знаков присоединяются к соседнему, кроме первой части — она может остаться короткой, чтобы звук начался быстрее. Первая часть уходит на синтез сразу и звучит, как только готова; следующая синтезируется, пока звучит предыдущая, с опережением не больше одной части; пауза между частями при воспроизведении 150 мс. Остановка речи, вытеснение новой репликой и страховочный срок действуют на реплику целиком: остановка обрывает звук и отменяет ещё не синтезированные части. Ошибка синтеза одной части не обрывает остальные. Прогрев готовых фраз идёт по одному запросу и приостанавливается на время синтеза живой реплики; сохранение настроек, не менявшее адрес службы синтеза и не включавшее озвучку, прогрев не запускает. При выключенной настройке реплика уходит одним запросом, как раньше.
+
 ## Снимок экрана
 
 `screen_look` сохраняет снимок в каталог `screenshots` с тем же пределом файлов, что и `screen_shot`, и отправляет событие `screenshot` с путём к файлу. Окно чата показывает снимок отдельной строкой ленты перед ответом; в облачке и карточке ежа он не показывается, в контекст основной модели картинка повторно не уходит. История хранит снимок ссылкой на файл; если файл удалён пределом числа снимков, в ленте на его месте приглушённая строка «Снимок экрана удалён».
@@ -172,7 +176,7 @@ interface SecretStore {
 
 interface Config {
   llm: { baseUrl: string; model: string; visionModel: string; fallbackModel: string; visionFallbackModel: string; api: 'chat' | 'responses' };   // fallbackModel/visionFallbackModel — запасные модели на случай отказа основных (пусто — нет запасной); api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses, формат OpenAI Responses)
-  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl
+  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number; bySentence: boolean } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl; bySentence — озвучивать по предложениям, не дожидаясь всего текста (по умолчанию включено)
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; показываемый персонаж: 'hedgehog' (прежний ёж, по умолчанию) или 'tishka' (костная модель)
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края

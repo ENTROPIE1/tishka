@@ -39,6 +39,7 @@ import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hi
 import { createThresholdHint, THRESHOLD_HINT } from '../voice/threshold-hint';
 import { UNHEARD_HINT } from '../voice/unheard';
 import { createStopPhrase, type StopPhrase } from '../voice/stop-phrase';
+import { shouldWarmTts } from '../voice/warm';
 
 const bus = createSourceBus();
 // Журнал времени заводится до всего остального: строка-разделитель с версией
@@ -131,7 +132,9 @@ app.whenReady().then(async () => {
     if (previous.persona.character !== next.persona.character) {
       pet?.refreshLayout();
     }
-    speech?.warm();
+    if (shouldWarmTts(previous.voice.tts, next.voice.tts)) {
+      speech?.warm();
+    }
     petWake?.broadcast();
     chatTalk?.broadcast();
     tray?.refresh();

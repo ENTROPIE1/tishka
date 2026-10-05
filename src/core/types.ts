@@ -121,7 +121,7 @@ export interface Config {
     mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null };   // порог громкости и результат калибровки; threshold null — порог по умолчанию
     sttUrl: string;                      // адрес службы распознавания
     stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' };   // local — запускать службу на этом компьютере; remote — готовая служба по sttUrl; пустой exe — не запускать
-    tts: { enabled: boolean; url: string; volume: number };   // синтез речи: говорить вслух
+    tts: { enabled: boolean; url: string; volume: number; bySentence: boolean };   // синтез речи: говорить вслух; bySentence — начинать по предложениям, не дожидаясь всей реплики
   };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; какой персонаж показывается

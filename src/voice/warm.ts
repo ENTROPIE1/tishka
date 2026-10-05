@@ -1,4 +1,14 @@
+import type { Config } from '../core/types';
+
 export const DEFAULT_WARM_MINUTES = 30;
+
+type TtsConfig = Config['voice']['tts'];
+
+// Прогрев готовых фраз нужен, только когда включили озвучку или сменили адрес
+// службы синтеза. Прочие сохранения настроек службу не занимают.
+export function shouldWarmTts(previous: TtsConfig, next: TtsConfig): boolean {
+  return next.enabled && (next.url !== previous.url || !previous.enabled);
+}
 
 export interface WarmInput {
   ready: boolean;                 // служба распознавания готова
