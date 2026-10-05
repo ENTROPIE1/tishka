@@ -73,4 +73,26 @@ describe('situation', () => {
     expect(line).toContain('Сейчас рабочее время');
     expect(line).toContain('Идёт встреча «Планёрка»');
   });
+
+  it('следующее событие сегодня — только время', () => {
+    const next = event({ title: 'Демо', start: '2026-10-07T14:00:00+03:00', end: '2026-10-07T15:00:00+03:00' });
+    const now = new Date('2026-10-07T10:00:00+03:00');
+    const line = situationLine(situation([next], config, now), now);
+    expect(line).toContain('Следующая — «Демо» в 14:00');
+    expect(line).not.toContain('завтра');
+  });
+
+  it('следующее событие завтра — слово «завтра»', () => {
+    const next = event({ title: 'Демо', start: '2026-10-08T10:00:00+03:00', end: '2026-10-08T11:00:00+03:00' });
+    const now = new Date('2026-10-07T10:00:00+03:00');
+    const line = situationLine(situation([next], config, now), now);
+    expect(line).toContain('Следующая — «Демо» завтра в 10:00');
+  });
+
+  it('следующее событие в другой день — день недели словами', () => {
+    const next = event({ title: 'Демо', start: '2026-10-09T10:00:00+03:00', end: '2026-10-09T11:00:00+03:00' });
+    const now = new Date('2026-10-07T10:00:00+03:00');
+    const line = situationLine(situation([next], config, now), now);
+    expect(line).toContain('Следующая — «Демо» в пятницу в 10:00');
+  });
 });

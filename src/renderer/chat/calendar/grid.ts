@@ -8,6 +8,14 @@ export const HOUR_HEIGHT = 44;
 
 const WEEKDAY_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 
+const KIND_MARK: Record<string, string> = {
+  meeting: '●',
+  focus: '■',
+  personal: '◆',
+  reminder: '○',
+  away: '△'
+};
+
 export interface GridCallbacks {
   onSelectSlot(day: Date, startMin: number): void;
   onSelectEvent(event: CalendarEvent): void;
@@ -34,11 +42,25 @@ function timeLabel(iso: string): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function sourceLabel(event: CalendarEvent): string | null {
+  if (event.source === 'schedule') {
+    return 'расписание';
+  }
+  return event.source.startsWith('exchange:') ? 'почта' : null;
+}
+
 function eventBlock(event: CalendarEvent, callbacks: GridCallbacks, position?: { top: number; height: number; column: number; columns: number }): HTMLElement {
   const block = el('button', `calendar-event kind-${event.kind}`);
   block.type = 'button';
   block.dataset['eventId'] = event.id;
-  block.append(el('span', 'calendar-event-time', timeLabel(event.start)));
+  const head = el('span', 'calendar-event-head');
+  head.append(el('span', 'calendar-event-icon', KIND_MARK[event.kind] ?? '●'));
+  head.append(el('span', 'calendar-event-time', timeLabel(event.start)));
+  const source = sourceLabel(event);
+  if (source !== null) {
+    head.append(el('span', 'calendar-event-source', source));
+  }
+  block.append(head);
   block.append(el('span', 'calendar-event-title', event.title));
   if (position !== undefined) {
     block.style.top = `${position.top}px`;

@@ -68,7 +68,7 @@ export function openEventForm(container: HTMLElement, options: EventFormOptions)
   }
   form.append(field('Название', title));
   form.append(field('Вид', kind));
-  if (existing === undefined) {
+  if (editable) {
     form.append(field('Дата', date));
     form.append(field('Начало', start));
     form.append(field('Конец', end));

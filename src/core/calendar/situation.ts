@@ -1,5 +1,5 @@
-import { atTime, parseMinutes, startOfDay, toLocalIso, weekdayOf } from './time';
-import type { CalendarConfig, CalendarDayHours, CalendarEvent, CalendarKind } from './types';
+import { addDays, atTime, parseMinutes, startOfDay, toLocalIso, weekdayOf } from './time';
+import type { CalendarConfig, CalendarDayHours, CalendarEvent, CalendarKind, CalendarWeekday } from './types';
 
 export interface CalendarSituation {
   workTime: boolean;
@@ -137,6 +137,32 @@ function humanMinutes(total: number): string {
   return hours > 0 ? `${hours} ч` : `${minutes} мин`;
 }
 
+const WEEKDAY_WORD: Record<CalendarWeekday, string> = {
+  mon: 'в понедельник',
+  tue: 'во вторник',
+  wed: 'в среду',
+  thu: 'в четверг',
+  fri: 'в пятницу',
+  sat: 'в субботу',
+  sun: 'в воскресенье'
+};
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+// Когда следующее событие: сегодня называем только время, иначе — дату словами.
+function whenLabel(start: Date, now: Date): string {
+  const time = clock(start);
+  if (sameDay(start, now)) {
+    return `в ${time}`;
+  }
+  if (sameDay(start, addDays(startOfDay(now), 1))) {
+    return `завтра в ${time}`;
+  }
+  return `${WEEKDAY_WORD[weekdayOf(start)]} в ${time}`;
+}
+
 // Одна-две строки обстановки для системной подсказки хода.
 export function situationLine(state: CalendarSituation, now: Date): string {
   const parts: string[] = [];
@@ -154,7 +180,7 @@ export function situationLine(state: CalendarSituation, now: Date): string {
     parts.push(`Идёт ${KIND_LABEL[state.current.kind]} «${state.current.title}» до ${clock(new Date(state.current.end))}.`);
   }
   if (state.next !== undefined) {
-    parts.push(`Следующая — «${state.next.title}» в ${clock(new Date(state.next.start))}.`);
+    parts.push(`Следующая — «${state.next.title}» ${whenLabel(new Date(state.next.start), now)}.`);
   }
   return parts.join(' ');
 }

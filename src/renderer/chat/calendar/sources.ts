@@ -40,7 +40,7 @@ export function renderSources(container: HTMLElement, deps: SourcesDeps): void {
     info.append(el('span', 'field-hint', connection.address));
     const state = deps.state?.[connection.name];
     info.append(el('span', 'field-hint', describeState(state)));
-    row.append(toggle, info);
+    row.append(toggle, el('span', 'calendar-source-toggle', 'Загружать встречи'), info);
     details.append(row);
   }
 
