@@ -80,6 +80,10 @@ export interface Scenario {
   pressPetSend(text?: string): void;      // кнопка отправки строки ежа: занятому Тишке — остановка
   pressPetEscape(): void;                 // Escape в строке ежа: занятому Тишке — остановка
   coreLooksAtScreen(): void;              // ядро начало просмотр экрана: событие инструмента
+  coreThinking(): void;                   // ядро начало обдумывать (think.start)
+  coreIdle(): void;                       // ядро закончило ход (idle)
+  coreSpeaking(): void;                   // Тишка заговорил (speak.start)
+  coreSpeechEnd(): void;                  // речь Тишки кончилась (speak.end)
   voiceReady(): void;                     // служба распознавания стала готова
   voiceFailed(message?: string): void;    // служба не поднялась
   wait(ms: number): Promise<void>;        // ход времени

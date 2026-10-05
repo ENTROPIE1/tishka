@@ -1,4 +1,5 @@
 import type { TimingMark } from '../main/timing-log';
+import { createBusyIntervals, type BusyIntervals } from './busy-intervals';
 
 // Почему фраза не стала репликой разговора:
 // before-conversation — началась до готовности слушать (появление, приветствие,
@@ -11,6 +12,7 @@ export type PhraseDecision = { kind: 'reply' } | { kind: 'drop'; reason: PhraseD
 export interface PhraseClockOptions {
   mark?: TimingMark;
   now?: () => number;
+  busy?: BusyIntervals;   // отрезки занятости; без него часы ведут свои
 }
 
 export interface PhraseClock {
@@ -33,11 +35,9 @@ export interface PhraseClock {
 // отбрасывается. Всё, что началось до включения разговора, репликой не является.
 export function createPhraseClock(options: PhraseClockOptions = {}): PhraseClock {
   const now = options.now ?? ((): number => Date.now());
+  const busy = options.busy ?? createBusyIntervals({ now });
   let conversation = false;
   let conversationSince = Number.POSITIVE_INFINITY;
-  let busy = false;
-  let busySince = Number.POSITIVE_INFINITY;
-  let busyUntil = Number.POSITIVE_INFINITY;
 
   return {
     conversationEnabled(at = now()): void {
@@ -49,22 +49,18 @@ export function createPhraseClock(options: PhraseClockOptions = {}): PhraseClock
       conversationSince = Number.POSITIVE_INFINITY;
     },
     busyChanged(next: boolean, at = now()): void {
-      if (next === busy) {
-        return;
-      }
-      busy = next;
       if (next) {
-        busySince = at;
-        busyUntil = Number.POSITIVE_INFINITY;
+        busy.begin('work', at);
       } else {
-        busyUntil = at;
+        busy.finish(at);
       }
     },
     decide(startedAt: number): PhraseDecision {
       if (conversation && startedAt >= conversationSince) {
         // Фраза началась, пока Тишка отвечал: это его собственная речь или
-        // человек говорил поверх ответа — репликой она не становится.
-        if (startedAt >= busySince && startedAt < busyUntil) {
+        // человек говорил поверх ответа — репликой она не становится. Отрезки
+        // занятости помнят и обдумывание, и речь по отдельности.
+        if (busy.intersects(startedAt)) {
           return { kind: 'drop', reason: 'during-answer' };
         }
         return { kind: 'reply' };

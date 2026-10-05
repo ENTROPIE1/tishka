@@ -349,6 +349,18 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     coreLooksAtScreen(): void {
       bus.emit({ type: 'tool.start', tool: 'screen_look' });
     },
+    coreThinking(): void {
+      bus.emit({ type: 'think.start' });
+    },
+    coreIdle(): void {
+      bus.emit({ type: 'idle' });
+    },
+    coreSpeaking(): void {
+      bus.emit({ type: 'speak.start', text: 'работаю' });
+    },
+    coreSpeechEnd(): void {
+      bus.emit({ type: 'speak.end' });
+    },
     voiceReady(): void {
       stt.setStatus('ready');
       flow.noteReady();
