@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { createAgent, type Agent } from './agent/agent';
+import { connectionSignature } from './connection-signature';
 import { defaultConfig, loadConfig, saveConfig as persistConfig } from './config';
 import { createConversationClock } from './conversation';
 import { createCalendarReminders, createFocusGate } from './calendar/reminders';
@@ -219,9 +220,10 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     }
   }
 
-  // Подпись подключения: подготовленная конфигурация плюс раскрытые секреты.
-  // Если она не изменилась, сервер не трогаем — перезапуск нужен только при
-  // смене адреса, команды, аргументов, окружения или самого секрета.
+  // Подпись подключения: хеш SHA-256 от подготовленной конфигурации и раскрытых
+  // секретов. Если она не изменилась, сервер не трогаем — перезапуск нужен только
+  // при смене адреса, команды, аргументов, окружения или самого секрета. В памяти
+  // и журналах остаётся только хеш, текст секрета не сохраняется.
   async function mcpSignature(server: McpServerConfig): Promise<string> {
     const prepared = prepareMcpServer(server, deps.appRoot);
     const raw = prepared.transport === 'http' ? prepared.headers : prepared.env;
@@ -233,7 +235,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
         resolved = raw;
       }
     }
-    return JSON.stringify({ prepared, resolved });
+    return connectionSignature(prepared, resolved);
   }
 
   async function applyMcpServers(servers: McpServerConfig[]): Promise<void> {

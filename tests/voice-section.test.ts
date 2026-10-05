@@ -137,6 +137,32 @@ describe('mountVoiceSection', () => {
     expect(second.querySelector<HTMLElement>('.detector-state')?.textContent).toBe('файл модели не найден');
   });
 
+  it('подсказка о медленном распознавании показывается и ведёт к полю адреса', async () => {
+    install({ state: 'ready', slow: true });
+    const root = document.createElement('div');
+    mountVoiceSection(root);
+    await flush();
+
+    const hint = root.querySelector<HTMLElement>('.slow-stt-hint');
+    expect(hint?.hidden).toBe(false);
+    expect(hint?.textContent).toContain('Подключите готовую службу распознавания');
+
+    const link = [...(hint?.querySelectorAll('button') ?? [])].find(
+      (item) => item.textContent === 'Указать адрес'
+    );
+    link?.click();
+    expect(root.querySelector<HTMLSelectElement>('select.stt-mode')?.value).toBe('remote');
+  });
+
+  it('без медленного распознавания подсказка скрыта', async () => {
+    install({ state: 'ready', slow: false });
+    const root = document.createElement('div');
+    mountVoiceSection(root);
+    await flush();
+
+    expect(root.querySelector<HTMLElement>('.slow-stt-hint')?.hidden).toBe(true);
+  });
+
   it('«Перезапустить службу» вызывает проверку службы', async () => {
     vi.useFakeTimers();
     install({ state: 'ready' });

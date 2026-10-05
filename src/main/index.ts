@@ -38,6 +38,7 @@ import { createWakeFlow } from '../voice/wake-flow';
 import { checkSttUrl } from '../voice/stt-http';
 import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
 import { createThresholdHint, THRESHOLD_HINT } from '../voice/threshold-hint';
+import { createSlowSttHint, SLOW_STT_HINT } from '../voice/slow-stt-hint';
 import { UNHEARD_HINT } from '../voice/unheard';
 import { createStopPhrase, type StopPhrase } from '../voice/stop-phrase';
 import { shouldWarmTts } from '../voice/warm';
@@ -235,6 +236,12 @@ app.whenReady().then(async () => {
     report: () => bus.emit({ type: 'status', text: THRESHOLD_HINT })
   });
 
+  // Три медленных распознавания подряд: местная служба не успевает за речью.
+  // Подсказку в настройках экран «Голос» показывает по признаку active().
+  const slowSttHint = createSlowSttHint({
+    report: () => bus.emit({ type: 'status', text: SLOW_STT_HINT })
+  });
+
   const listen = createPetListen({
     bus,
     core: { handleUserText: (text) => bus.run('pet', () => tishka.handleUserText(text, 'voice')) },
@@ -282,6 +289,8 @@ app.whenReady().then(async () => {
     onUnheardHint: () => bus.emit({ type: 'status', text: UNHEARD_HINT }),
     onWakeLimit: () => thresholdHint.limit(),
     onWakePhraseEnd: () => thresholdHint.ended(),
+    onSlowStt: () => slowSttHint.slow(),
+    onFastStt: () => slowSttHint.fast(),
     onBusyPhrase: (text) => stopPhrase.phrase(text),
     sendCommand: (command) => {
       if (command === 'listen') {
@@ -359,7 +368,8 @@ app.whenReady().then(async () => {
     setCalibration: (active) => {
       petWake?.setPaused(active);
       chatTalk?.setPaused(active);
-    }
+    },
+    slowStt: () => slowSttHint.active()
   });
 
   app.setLoginItemSettings(loginItemSettings(tishka.config().app.autostart));

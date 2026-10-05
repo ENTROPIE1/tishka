@@ -1,4 +1,5 @@
 import type { EventBus } from '../core/types';
+import type { TimingMark } from '../main/timing-log';
 import type { TranscribeResult } from './stt-service';
 import { matchWake } from './wake';
 import { wavDurationSec } from './wav';
@@ -28,6 +29,8 @@ export interface PhraseQueueDeps {
   // startedAt — время начала фразы для правила времени; speechMs — длительность
   // звука фразы (для отличия настоящего промаха от короткого шума).
   onResult(result: TranscribeResult, stale: boolean, startedAt: number, speechMs: number): void;
+  // Журнал времени: пока идёт распознавание, прежний ожидающий отрезок отброшен.
+  mark?: TimingMark;
 }
 
 export interface PhraseQueue {
@@ -40,7 +43,8 @@ export interface PhraseQueue {
   dropPending(): void;
 }
 
-// Очередь распознавания: одна фраза в работе, следующая ждёт своей очереди.
+// Очередь распознавания: одна фраза в работе, из ожидающих хранится только самый
+// свежий — прежний отбрасывается, чтобы при медленной службе не копился хвост.
 // Фраза запоминает эпоху разговора на момент, когда её услышали, поэтому её
 // текст помечается устаревшим, если за время распознавания разговор переключили.
 export function createPhraseQueue(deps: PhraseQueueDeps): PhraseQueue {
@@ -73,6 +77,10 @@ export function createPhraseQueue(deps: PhraseQueueDeps): PhraseQueue {
         return;
       }
       if (recognizing) {
+        // Очередь не копится: свежий отрезок вытесняет прежний ожидающий.
+        if (pending !== undefined) {
+          deps.mark?.('stt.drop', { reason: 'busy' });
+        }
         pending = { wav, epoch: epoch.now(), startedAt };
         return;
       }

@@ -25,6 +25,8 @@ export interface WakeFlowDeps {
   onMissedSpeech?(): void;             // «Не расслышал» — повод для подсказки о калибровке
   onUnheard?(text: string): void;      // тихая фраза отброшена по уверенности: подпись «не разобрал»
   onUnheardHint?(): void;              // три такие фразы подряд: подсказка про порог и микрофон
+  onSlowStt?(): void;                  // распознавание длилось дольше отрезка
+  onFastStt?(): void;                  // распознавание уложилось в отрезок
   onWakeLimit?(): void;                // отрезок упёрся в предел длины при прослушивании имени
   onWakePhraseEnd?(): void;            // фраза закончилась сама: серия отрезков прервана
   onBusyPhrase?(text: string): boolean;   // Тишка занят: «стоп» останавливает работу, фраза в ядро не уходит
@@ -109,6 +111,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     onMissedSpeech: () => deps.onMissedSpeech?.(),
     onUnheard: (text) => deps.onUnheard?.(text),
     onUnheardHint: () => deps.onUnheardHint?.(),
+    onSlowStt: () => deps.onSlowStt?.(),
+    onFastStt: () => deps.onFastStt?.(),
     reportError
   });
 

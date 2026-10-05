@@ -7,6 +7,7 @@ export interface VoiceStateView {
   state: SttStatus;
   error?: string;
   detector?: SttDetector;   // встроенный детектор речи запущенной приложением службы
+  slow?: boolean;           // распознавание идёт медленнее речи: совет подключить готовую службу
 }
 
 export type { SttCheckView };

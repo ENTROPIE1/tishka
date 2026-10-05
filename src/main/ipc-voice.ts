@@ -15,6 +15,7 @@ export interface VoiceIpcDeps {
   probe(url: string): Promise<SttCheckView>;
   reloadHotkey(hotkey: string): void;
   setCalibration(active: boolean): void;
+  slowStt?(): boolean;   // признак медленного распознавания для подсказки в настройках
 }
 
 function toBytes(value: unknown): Uint8Array | undefined {
@@ -30,7 +31,11 @@ function toBytes(value: unknown): Uint8Array | undefined {
 export function registerVoiceIpc(deps: VoiceIpcDeps): void {
   ipcMain.handle(
     VOICE_STATUS_CHANNEL,
-    (): VoiceStateView => ({ state: deps.stt.status(), detector: deps.stt.detector?.() })
+    (): VoiceStateView => ({
+      state: deps.stt.status(),
+      detector: deps.stt.detector?.(),
+      slow: deps.slowStt?.()
+    })
   );
 
   // Диктовка в окнах: возвращает распознанный текст и не запускает агента.
@@ -54,7 +59,11 @@ export function registerVoiceIpc(deps: VoiceIpcDeps): void {
     if (result.error === START_CANCELLED && mine !== generation && current !== undefined) {
       return current;
     }
-    const view: VoiceStateView = { state: deps.stt.status(), detector: deps.stt.detector?.() };
+    const view: VoiceStateView = {
+      state: deps.stt.status(),
+      detector: deps.stt.detector?.(),
+      slow: deps.slowStt?.()
+    };
     if (result.error !== undefined) {
       view.error = result.error;
     }

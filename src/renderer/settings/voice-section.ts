@@ -15,6 +15,7 @@ import {
 } from './dom';
 import { createMicrophoneGroup } from './microphone-group';
 import { saveVoice } from './voice-save';
+import { SLOW_STT_HINT } from '../../voice/slow-stt-hint';
 
 const STATE_LABELS: Record<VoiceStateView['state'], string> = {
   off: 'не настроена',
@@ -93,9 +94,21 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   remoteActions.append(checkUrl);
   remoteFields.append(remoteActions);
 
+  // Подсказка о медленном распознавании: ссылка ведёт к полю адреса готовой службы.
+  const slowHint = el('div', 'field-hint slow-stt-hint');
+  const slowLink = button('Указать адрес', 'button button-secondary');
+  slowHint.append(document.createTextNode(`${SLOW_STT_HINT} `), slowLink);
+  slowHint.hidden = true;
+  slowLink.addEventListener('click', () => {
+    mode.value = 'remote';
+    applyMode();
+    sttUrl.focus();
+  });
+
   const service = group(
     'Служба распознавания',
     field('Где запускать', mode),
+    slowHint,
     localFields,
     remoteFields,
     field('Состояние службы', state),
@@ -160,6 +173,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     state.className = `state state-${view.state}`;
     state.textContent = STATE_LABELS[view.state];
     detector.textContent = DETECTOR_LABELS[view.detector ?? 'off'];
+    slowHint.hidden = view.slow !== true;
     check.disabled = view.state === 'starting';
     if (view.error !== undefined) {
       show(view.error);

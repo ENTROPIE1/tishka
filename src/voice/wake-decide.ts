@@ -7,6 +7,7 @@ import { createPhraseClock } from './phrase-time';
 import { createPhraseQueue, routeStaleText, type StaleTextDeps } from './stale-phrase';
 import { createUnheardFlow } from './unheard';
 import { isMissedSpeech } from './missed-speech';
+import { wavDurationSec } from './wav';
 import type { WakeStateMachine } from './wake-state';
 import type { WakeTalk } from './wake-talk';
 
@@ -24,7 +25,15 @@ export interface DecisionDeps {
   onMissedSpeech?(): void;
   onUnheard?(text: string): void;
   onUnheardHint?(): void;
+  onSlowStt?(): void;   // распознавание длилось дольше отрезка
+  onFastStt?(): void;   // распознавание уложилось в отрезок
   reportError(message: string): void;
+}
+
+// Отрезок без опознанного заголовка считается слишком коротким, чтобы судить
+// о скорости: медленным признаётся только распознавание длиннее самого звука.
+function isSlowTranscribe(elapsedMs: number, speechMs: number): boolean {
+  return speechMs > 0 && elapsedMs > speechMs;
 }
 
 export interface WakeDecision {
@@ -162,7 +171,18 @@ export function createWakeDecision(deps: DecisionDeps): WakeDecision {
 
   function transcribe(wav: Uint8Array): Promise<TranscribeResult> {
     deps.talk.silencePause();
-    return deps.stt.transcribe(wav, wakePrompt(deps.getVoice().wakeWords, deps.memoryName?.()));
+    const startedAt = Date.now();
+    return deps.stt
+      .transcribe(wav, wakePrompt(deps.getVoice().wakeWords, deps.memoryName?.()))
+      .then((result) => {
+        // Скорость службы важна для подсказки: медленнее звука — копится задержка.
+        if (isSlowTranscribe(Date.now() - startedAt, wavDurationSec(wav) * 1000)) {
+          deps.onSlowStt?.();
+        } else {
+          deps.onFastStt?.();
+        }
+        return result;
+      });
   }
 
   function startListenFromStale(): void {
@@ -177,7 +197,7 @@ export function createWakeDecision(deps: DecisionDeps): WakeDecision {
     startListen: startListenFromStale
   };
 
-  const queue = createPhraseQueue({ accept: acceptPhrase, transcribe, onResult });
+  const queue = createPhraseQueue({ accept: acceptPhrase, transcribe, onResult, mark: deps.mark });
 
   return {
     add: (wav, startedAt) => queue.add(wav, startedAt),
