@@ -1,4 +1,5 @@
 import { MEMORY_RULES } from '../memory/prompt';
+import type { InputSource, SpeechMode } from '../types';
 import type { FyrLevel } from './persona';
 import { personaPrompt } from './persona';
 
@@ -19,6 +20,23 @@ const WEB_RULE = [
   'Внутренние страницы компании (вики, почта) читаются через их подключения, а не через web_read.'
 ].join('\n');
 
+const SPEECH_MODE_RULE = [
+  'Режим ответа переключается инструментом speech_mode по явной просьбе: «говори голосом», «отвечай вслух», «озвучивай» — mode=voice; «пиши текстом», «не говори вслух», «помолчи», «без звука» — mode=text.',
+  'На вопрос «ты сейчас говоришь или пишешь?» отвечай по текущему режиму ответа и по тому, как пришла реплика человека.'
+].join('\n');
+
+export interface PromptContext {
+  speechMode: SpeechMode;    // как Тишка отвечает сейчас
+  userSource: InputSource;   // как пришла реплика человека
+}
+
+function modeLine(context: PromptContext): string {
+  const answer =
+    context.speechMode === 'voice' ? 'Ты отвечаешь вслух и текстом.' : 'Ты отвечаешь только текстом, вслух не говоришь.';
+  const source = context.userSource === 'voice' ? 'Реплика человека пришла голосом.' : 'Реплика человека пришла текстом.';
+  return `${answer} ${source}`;
+}
+
 const WEEKDAY = new Intl.DateTimeFormat('ru-RU', { weekday: 'long' });
 const DATE = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 const TIME = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' });
@@ -27,16 +45,19 @@ export function buildSystemPrompt(
   now: Date,
   fyr: FyrLevel = 'sometimes',
   skillGuideSection?: string,
-  memorySection?: string
+  memorySection?: string,
+  context?: PromptContext
 ): string {
   const date = DATE.format(now);
   const weekday = WEEKDAY.format(now);
   const time = TIME.format(now);
+  const mode = context === undefined ? [] : [modeLine(context), '', SPEECH_MODE_RULE, ''];
 
   const sections = [
     [
       personaPrompt(fyr),
       '',
+      ...mode,
       'Любой ответ пользователю, включая уточняющий вопрос, отдавай вызовом инструмента reply — обычным текстом не отвечай:',
       '- mood — настроение ответа: neutral, happy или confused.',
       '- show — подробности в карточке: то, что человеку нужно прочитать или скопировать;',

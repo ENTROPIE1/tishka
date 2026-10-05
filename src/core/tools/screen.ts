@@ -87,6 +87,41 @@ const screenShot: ToolDef = {
 
 export const SCREEN_TOOL_NAMES = [screenLook.name, screenShot.name] as const;
 
+function pngOf(data: unknown): Uint8Array | undefined {
+  if (typeof data !== 'object' || data === null) {
+    return undefined;
+  }
+  const value = (data as Record<string, unknown>)['png'];
+  return value instanceof Uint8Array ? value : undefined;
+}
+
+// Снимок ложится в каталог снимков тем же порядком, что и у screen_shot:
+// старые сверх предела удаляются.
+async function saveShot(deps: ScreenToolsDeps, png: Uint8Array): Promise<string | undefined> {
+  try {
+    await mkdir(deps.screenshotsDir, { recursive: true });
+    const path = join(deps.screenshotsDir, shotFileName(deps.now()));
+    await writeFile(path, png);
+    await pruneShots(deps.screenshotsDir);
+    return path;
+  } catch {
+    return undefined;
+  }
+}
+
+// Успешный разбор экрана оставляет снимок в ленте отдельной строкой: в облачке
+// и карточке ежа он не показывается, поэтому идёт событием, а не панелью ответа.
+async function attachShot(deps: ScreenToolsDeps, result: ToolResult): Promise<void> {
+  const png = pngOf(result.data);
+  if (png === undefined) {
+    return;
+  }
+  const path = await saveShot(deps, png);
+  if (path !== undefined) {
+    deps.events?.emit({ type: 'screenshot', title: 'Снимок экрана', path });
+  }
+}
+
 export function registerScreenTools(registry: ToolRegistry, deps: ScreenToolsDeps, enabled: boolean): void {
   if (!enabled) {
     return;
@@ -94,9 +129,11 @@ export function registerScreenTools(registry: ToolRegistry, deps: ScreenToolsDep
 
   registry.register(screenLook, async (args) => {
     deps.events?.emit({ type: 'status', text: 'Смотрю на экран…' });
-    return deps.look(readQuestion(args.question), readTarget(args.target), {
+    const result = await deps.look(readQuestion(args.question), readTarget(args.target), {
       answerDirectly: readAnswerDirectly(args.answer_directly)
     });
+    await attachShot(deps, result);
+    return result;
   });
 
   registry.register(screenShot, async (args) => {
@@ -105,19 +142,15 @@ export function registerScreenTools(registry: ToolRegistry, deps: ScreenToolsDep
     if (!shot.ok) {
       return { ok: false, content: '', error: shot.error };
     }
-    try {
-      await mkdir(deps.screenshotsDir, { recursive: true });
-      const path = join(deps.screenshotsDir, shotFileName(deps.now()));
-      await writeFile(path, shot.png);
-      await pruneShots(deps.screenshotsDir);
-      const panel: Panel = { kind: 'image', title: 'Снимок экрана', path };
-      return {
-        ok: true,
-        content: `Снимок сохранён: ${path}. Покажи человеку карточку с картинкой (show вида image с этим путём).`,
-        data: { path, panel }
-      };
-    } catch {
+    const path = await saveShot(deps, shot.png);
+    if (path === undefined) {
       return { ok: false, content: '', error: 'Не получилось сохранить снимок' };
     }
+    const panel: Panel = { kind: 'image', title: 'Снимок экрана', path };
+    return {
+      ok: true,
+      content: `Снимок сохранён: ${path}. Покажи человеку карточку с картинкой (show вида image с этим путём).`,
+      data: { path, panel }
+    };
   });
 }

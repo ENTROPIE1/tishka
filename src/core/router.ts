@@ -1,10 +1,10 @@
-import type { EventBus, Reply, Skill, ToolRegistry } from './types';
+import type { EventBus, InputSource, Reply, Skill, ToolRegistry } from './types';
 import { syncSkillTools, type SkillToolRunner } from './skills/as-tools';
 import { matchSkill } from './skills/match';
 import type { RunResult } from './skills/runner';
 
 export interface RouterDeps {
-  agent: { handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply> };
+  agent: { handle(userText: string, opts?: { signal?: AbortSignal; source?: InputSource }): Promise<Reply> };
   skills: { list(): Promise<Skill[]> };
   runner: SkillToolRunner;
   registry: ToolRegistry;
@@ -12,7 +12,7 @@ export interface RouterDeps {
 }
 
 export interface Router {
-  handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply>;
+  handle(userText: string, opts?: { signal?: AbortSignal; source?: InputSource }): Promise<Reply>;
   refreshSkills(): Promise<void>;
 }
 

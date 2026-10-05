@@ -112,6 +112,13 @@ function panelBody(panel: Panel, actions: PanelActions): HTMLElement {
     image.className = 'card-image';
     image.src = fileUrl(panel.path);
     image.alt = panel.title;
+    // Файл мог быть удалён пределом числа снимков: вместо битой картинки — тихая строка.
+    image.addEventListener('error', () => {
+      const missing = document.createElement('div');
+      missing.className = 'card-image-missing';
+      missing.textContent = 'Снимок экрана удалён';
+      body.replaceChildren(missing);
+    });
     if (actions.onOpenImage !== undefined) {
       const open = actions.onOpenImage;
       image.classList.add('card-image-open');

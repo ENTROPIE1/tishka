@@ -76,6 +76,15 @@ describe('createVisionLook', () => {
     expect(parts.image.startsWith('data:image/jpeg;base64,')).toBe(true);
   });
 
+  it('успешный разбор несёт снимок в data для ленты', async () => {
+    const { chat } = makeChat();
+    const look = createVisionLook({ capture: async () => okCapture(), chat, visionModel: VISION_MODEL });
+
+    const result = await look.look(undefined, 'screen');
+
+    expect((result.data as { png?: Uint8Array }).png).toBe(PNG);
+  });
+
   it('при answer_directly ответ приходит человеку как готовый Reply', async () => {
     const { chat } = makeChat('Слева редактор, справа терминал. Ошибок нет.');
     const look = createVisionLook({

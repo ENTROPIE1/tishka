@@ -282,6 +282,12 @@ body {
   cursor: pointer;
 }
 
+.card-image-missing {
+  padding: 8px;
+  color: var(--muted, #888);
+  font-style: italic;
+}
+
 .card-actions {
   flex: none;
   display: flex;

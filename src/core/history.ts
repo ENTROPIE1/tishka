@@ -20,7 +20,16 @@ export interface HistoryDivider {
   at: string;
 }
 
-export type HistoryEntry = HistoryMessage | HistoryDivider;
+// Снимок экрана в ленте чата: хранится ссылкой на файл, картинка не в истории.
+export interface HistoryScreenshot {
+  kind: 'screenshot';
+  id: string;
+  at: string;
+  title: string;
+  path: string;
+}
+
+export type HistoryEntry = HistoryMessage | HistoryDivider | HistoryScreenshot;
 
 export interface History {
   start(): Promise<void>;           // читает файл, подписывается на события
@@ -52,6 +61,22 @@ function parseEntry(line: string): HistoryEntry | undefined {
       return undefined;
     }
     return { kind: 'divider', id: record['id'], at: record['at'] };
+  }
+  if (record['kind'] === 'screenshot') {
+    if (
+      typeof record['id'] !== 'string' ||
+      typeof record['at'] !== 'string' ||
+      typeof record['path'] !== 'string'
+    ) {
+      return undefined;
+    }
+    return {
+      kind: 'screenshot',
+      id: record['id'],
+      at: record['at'],
+      title: typeof record['title'] === 'string' ? record['title'] : 'Снимок экрана',
+      path: record['path']
+    };
   }
   const from = record['from'];
   if (
@@ -120,9 +145,17 @@ export function createHistory(filePath: string, events: EventBus, now: () => Dat
   let entries: HistoryEntry[] = [];
   let unsubscribe: (() => void) | undefined;
 
-  function toEntry(event: TishkaEvent): HistoryMessage | undefined {
+  function toEntry(event: TishkaEvent): HistoryEntry | undefined {
     const base = { kind: 'message', id: randomUUID(), at: now().toISOString() } as const;
     switch (event.type) {
+      case 'screenshot':
+        return {
+          kind: 'screenshot',
+          id: randomUUID(),
+          at: now().toISOString(),
+          title: event.title,
+          path: event.path
+        };
       case 'listen.end':
         return { ...base, from: 'user', text: event.text };
       case 'reply':

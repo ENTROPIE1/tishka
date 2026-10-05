@@ -142,7 +142,9 @@ export function createVisionLook(deps: VisionLookDeps): VisionLook {
         if (answer === '') {
           return { ok: false, content: '', error: 'Модель не разобрала снимок' };
         }
-        const result: ToolResult = { ok: true, content: answer, data: { source: shot.source } };
+        // png остаётся в data: инструмент экрана сохраняет снимок в файл и кладёт
+        // его в ленту, а основной модели уходит только текст разбора.
+        const result: ToolResult = { ok: true, content: answer, data: { source: shot.source, png: shot.png } };
         // Готовый ответ человеку прикладывается только по явной просьбе
         // отвечать напрямую: иначе разбор уходит основной модели, и она
         // достраивает составную просьбу или шаг навыка.

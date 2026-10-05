@@ -26,8 +26,9 @@ import { registerBuiltinTools } from './tools/builtin';
 import { createToolGroup, type ToolGroup } from './tools/group';
 import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
+import { registerSpeechModeTool } from './tools/speech-mode';
 import { registerWebTools } from './tools/web';
-import type { Config, EventBus, McpServerConfig, Panel, Reply, SecretStore, Skill } from './types';
+import type { Config, EventBus, InputSource, McpServerConfig, Panel, Reply, SecretStore, Skill } from './types';
 import { isCancelled } from './cancel';
 import { CANCELLED_REPLY, createTurnQueue } from './turn-queue';
 import { STOPPED_TITLE } from './stopped';
@@ -48,6 +49,9 @@ export interface CoreDeps {
   fetch?: typeof fetch;            // для тестов
   captureScreen?(target: ScreenTarget): Promise<CaptureResult>;   // снимок экрана из главного процесса
   readWeb?: WebReader;             // чтение страниц из скрытого окна Electron
+  stopSpeaking?(): void;           // остановить звучащую речь (инструмент speech_mode)
+  voiceAvailable?(): Promise<boolean>;   // доступна ли служба синтеза
+  onConfigChanged?(previous: Config, next: Config): void;   // настройки сохранены ядром
 }
 
 export type SaveSkillResult = { ok: true } | { ok: false; errors: string[] };
@@ -68,7 +72,7 @@ export interface SkillService {
 export interface TishkaCore {
   start(): Promise<void>;
   stop(): Promise<void>;
-  handleUserText(text: string): Promise<Reply>;
+  handleUserText(text: string, source?: InputSource): Promise<Reply>;
   cancel(source?: StopSource): void;   // прервать текущую работу и очистить очередь
   hasGatewayKey(): Promise<boolean>;
   checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult>;
@@ -147,7 +151,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
   const conversation = createConversationClock();
   const turns = createTurnQueue({
-    run: (text, signal) => processUserText(text, signal),
+    run: (text, signal, source) => processUserText(text, signal, source),
     reset: () => agent?.reset()
   });
 
@@ -244,7 +248,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     deps.events.emit({ type: 'notify', title: STOPPED_TITLE });
   }
 
-  async function processUserText(text: string, signal: AbortSignal): Promise<Reply> {
+  async function processUserText(text: string, signal: AbortSignal, source: InputSource): Promise<Reply> {
     const now = deps.now();
     if (conversation.userTurn(now)) {
       openConversation(now);
@@ -257,7 +261,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       } else if ((await gatewayKey()) === undefined) {
         reply = NO_KEY;
       } else {
-        reply = await router.handle(text, { signal });
+        reply = await router.handle(text, { signal, source });
       }
     } catch (error) {
       if (isCancelled(error, signal)) {
@@ -274,11 +278,11 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     return reply;
   }
 
-  function handleUserText(text: string): Promise<Reply> {
+  function handleUserText(text: string, source: InputSource = 'text'): Promise<Reply> {
     if (!started) {
       return Promise.resolve(NOT_READY);
     }
-    return turns.push(text);
+    return turns.push(text, source);
   }
 
   // Остановка текущей работы: ход прерывается сигналом в запросах, очередь
@@ -342,6 +346,13 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       now: deps.now
     });
     registerHistoryTools(registry, historyStore);
+    registerSpeechModeTool(registry, {
+      setEnabled: async (enabled) => {
+        await saveConfig({ ...config, voice: { ...config.voice, tts: { ...config.voice.tts, enabled } } });
+      },
+      stopSpeaking: deps.stopSpeaking ?? (() => undefined),
+      voiceAvailable: deps.voiceAvailable ?? (async () => true)
+    });
     const webGroup = createToolGroup(registry, (target) =>
       registerWebTools(target, { read: deps.readWeb, fetch: deps.fetch }, true)
     );
@@ -417,6 +428,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       events: deps.events,
       getModel: () => config.llm.model,
       getPersona: () => config.persona,
+      getSpeechMode: () => (config.voice.tts.enabled ? 'voice' : 'text'),
       memory: { search: (query, limit) => memoryStore.search(query, limit) },
       now: deps.now,
       mark: deps.mark
@@ -464,8 +476,10 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   }
 
   async function saveConfig(next: Config): Promise<void> {
+    const previous = config;
     await persistConfig(deps.dataDir, next);
     await reloadConfig();
+    deps.onConfigChanged?.(previous, config);
   }
 
   async function reconnect(name: string): Promise<McpStatus | undefined> {

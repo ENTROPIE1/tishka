@@ -90,6 +90,9 @@ export interface CoreSetupOptions {
   now?: () => Date;
   captureScreen?: CoreDeps['captureScreen'];
   readWeb?: CoreDeps['readWeb'];
+  stopSpeaking?: CoreDeps['stopSpeaking'];
+  voiceAvailable?: CoreDeps['voiceAvailable'];
+  onConfigChanged?: CoreDeps['onConfigChanged'];
 }
 
 export interface CoreHandle {
@@ -122,7 +125,10 @@ export async function setupCore(options: CoreSetupOptions = {}): Promise<CoreHan
     now: options.now ?? (() => FIXED_NOW),
     fetch: options.fetch,
     captureScreen: options.captureScreen,
-    readWeb: options.readWeb
+    readWeb: options.readWeb,
+    stopSpeaking: options.stopSpeaking,
+    voiceAvailable: options.voiceAvailable,
+    onConfigChanged: options.onConfigChanged
   });
   cores.push(core);
   await core.start();
