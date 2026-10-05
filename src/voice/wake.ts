@@ -17,7 +17,6 @@ export interface WakeState {
   conversation: boolean;
   soon: boolean;
   waiting?: boolean;   // служба распознавания ещё поднимается: микрофон ждёт
-  sensitivity?: 'low' | 'normal' | 'high';
   threshold?: number | null;
 }
 
@@ -26,7 +25,6 @@ export interface ChatTalkState {
   active: boolean;
   conversation: boolean;
   soon: boolean;
-  sensitivity: 'low' | 'normal' | 'high';
   threshold?: number | null;
 }
 

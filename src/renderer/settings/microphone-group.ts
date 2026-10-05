@@ -1,18 +1,9 @@
 import type { Config } from '../../core/types';
 import type { TranscribeResult } from '../../voice/stt-service';
-import type { VadSensitivity } from '../../voice/vad';
 import { createCalibrationPanel } from './calibration-panel';
 import { createMicTestPanel } from './mic-test-panel';
-import { el, field, selectInput, type SettingsSection } from './dom';
-
-const SENSITIVITY_OPTIONS = [
-  { value: 'low', label: 'Низкая — только громкая речь' },
-  { value: 'normal', label: 'Обычная' },
-  { value: 'high', label: 'Высокая — тихая речь' }
-];
-
-const SENSITIVITY_HINT = 'Насколько тихую речь слышать; если Тишка отвечает «Не расслышал», поднимите';
-const CALIBRATED_HINT = 'Используется калибровка; уровень применяется, если её сбросить';
+import { createThresholdControl } from './threshold-control';
+import { el, type SettingsSection } from './dom';
 
 export interface MicrophoneGroupDeps {
   getMic(): Config['voice']['mic'];
@@ -25,15 +16,15 @@ export interface MicrophoneGroupDeps {
 
 export interface MicrophoneGroup extends SettingsSection {
   element: HTMLElement;
-  sensitivity: HTMLSelectElement;
 }
 
-// Группа «Микрофон»: ручной уровень, мастер калибровки и проверка микрофона.
+// Группа «Микрофон»: порог громкости, мастер калибровки и проверка микрофона.
 export function createMicrophoneGroup(deps: MicrophoneGroupDeps): MicrophoneGroup {
-  const sensitivity = selectInput(SENSITIVITY_OPTIONS, 'normal');
-  const sensitivityHint = el('span', 'field-hint', SENSITIVITY_HINT);
-  const sensitivityField = field('Чувствительность микрофона', sensitivity);
-  sensitivityField.append(sensitivityHint);
+  const threshold = createThresholdControl({
+    getMic: deps.getMic,
+    saveMic: deps.saveMic,
+    onChanged: deps.onChanged
+  });
 
   const calibration = createCalibrationPanel({
     getMic: deps.getMic,
@@ -44,7 +35,6 @@ export function createMicrophoneGroup(deps: MicrophoneGroupDeps): MicrophoneGrou
   });
 
   const micTest = createMicTestPanel({
-    sensitivity: () => sensitivity.value as VadSensitivity,
     threshold: () => deps.getMic().threshold,
     dictate: deps.dictate,
     showError: deps.showError
@@ -53,7 +43,7 @@ export function createMicrophoneGroup(deps: MicrophoneGroupDeps): MicrophoneGrou
   const box = el('div', 'voice-group');
   box.append(
     el('h3', 'group-title', 'Микрофон'),
-    sensitivityField,
+    threshold.element,
     calibration.controls,
     calibration.box,
     micTest.controls,
@@ -61,10 +51,9 @@ export function createMicrophoneGroup(deps: MicrophoneGroupDeps): MicrophoneGrou
   );
 
   function refresh(): void {
-    const calibrated = deps.getMic().calibratedAt !== null;
-    sensitivityHint.textContent = calibrated ? CALIBRATED_HINT : SENSITIVITY_HINT;
+    threshold.refresh();
     calibration.refresh();
   }
 
-  return { element: box, sensitivity, refresh };
+  return { element: box, refresh };
 }

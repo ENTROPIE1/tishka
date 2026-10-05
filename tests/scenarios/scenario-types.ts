@@ -51,6 +51,8 @@ export interface Scenario {
   trayCall(): void;                       // щелчок по значку
   micClick(): void;                       // щелчок по микрофону
   say(text?: string): boolean;            // произнесённая фраза, текст даёт распознавание
+  hear(text: string): void;               // что распознавание услышит в следующей фразе
+  feedMic(value: number, ms: number): void;  // звук в микрофон: уровень и длительность
   noise(): boolean;                       // шум: пустое распознавание
   typeKey(): void;                        // печать в строке ежа
   pressPet(): void;                       // нажатие ежа мышью

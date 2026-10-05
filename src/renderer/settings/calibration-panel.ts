@@ -24,7 +24,7 @@ export interface CalibrationPanel {
   refresh(): void;
 }
 
-const EMPTY_STATUS = 'Не откалиброван — работает общий уровень чувствительности';
+const EMPTY_STATUS = 'Не откалиброван — работает порог по умолчанию';
 const RESET_MIC: Config['voice']['mic'] = { threshold: null, noise: null, speech: null, calibratedAt: null };
 
 function two(value: number): string {

@@ -16,10 +16,35 @@ import { createFakeCore, createFakeStt, createFakeTts } from './edges';
 import { createWindowEdge, WORK_AREA } from './window-edge';
 import { createPetFacade } from './pet-facade';
 import { buildConfig, type Scenario, type ScenarioObservations, type ScenarioOptions } from './scenario-types';
+import { createPhraseListener } from '../../src/renderer/shared/phrase-listener';
+import type { MicCapture } from '../../src/renderer/shared/mic-capture';
 
 // registerPetWake ставит обработчики ipcMain: в стенде каналы не используются,
 // сообщения человека идут напрямую в модули.
 vi.mock('electron', () => ({ ipcMain: { on: vi.fn() } }));
+
+const MIC_RATE = 16000;
+const MIC_FRAME_SAMPLES = 320;   // 20 мс при 16 000 Гц
+
+// Микрофон стенда: кадры идут в слушатель, только когда сценарий их подаёт.
+function fakeMic(): MicCapture & { feed(value: number, ms: number): void } {
+  let handler: ((frame: Float32Array, rate: number) => void) | undefined;
+  return {
+    async start(onFrame): Promise<boolean> {
+      handler = onFrame;
+      return true;
+    },
+    stop(): void {
+      handler = undefined;
+    },
+    feed(value, ms): void {
+      const frame = new Float32Array(MIC_FRAME_SAMPLES).fill(value);
+      for (let left = Math.round(ms / 20); left > 0; left -= 1) {
+        handler?.(frame, MIC_RATE);
+      }
+    }
+  };
+}
 
 // Стенд сценариев: настоящие модель состояний, жизненный цикл окна, разговор
 // и речь на общей шине. Подставные только края: окно, службы, ядро, часы.
@@ -112,6 +137,19 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   });
   recognize = (wav) => flow.handlePhrase(wav);
 
+  // Звуковая дорожка окна-питомца: настоящий слушатель фраз с отрезками
+  // прослушивания имени, микрофон подставной — звук подаёт feedMic.
+  const mic = fakeMic();
+  const audio = createPhraseListener({
+    threshold: config.voice.mic.threshold ?? undefined,
+    chunkMs: 4000,
+    chunkOverlapMs: 500,
+    inConversation: () => flow.isConversation(),
+    capture: mic,
+    onPhrase: (wav, limitHit) => flow.handlePhrase(wav, limitHit)
+  });
+  void audio.start();
+
   const speakPlay = createPetSpeakPlay({
     speak: (message) => pet.speak(message),
     stopSpeaking: () => pet.stopSpeaking()
@@ -172,6 +210,12 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       }
       return page.say();
     },
+    hear(text: string): void {
+      stt.willHear(text);
+    },
+    feedMic(value: number, ms: number): void {
+      mic.feed(value, ms);
+    },
     noise: () => page.say(),
     typeKey: () => page.typeKey(),
     pressPet: () => page.press(),
@@ -215,6 +259,7 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       }
     },
     dispose(): void {
+      audio.stop();
       petWake?.dispose();
       speech.dispose();
       flow.stop();

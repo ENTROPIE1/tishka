@@ -1,5 +1,4 @@
 import type { TranscribeResult } from '../../voice/stt-service';
-import type { VadSensitivity } from '../../voice/vad';
 import { createMicCheck } from '../shared/mic-check';
 import { button, el } from './dom';
 
@@ -9,7 +8,6 @@ export interface MicTestPanel {
 }
 
 export interface MicTestDeps {
-  sensitivity(): VadSensitivity;
   threshold?(): number | null;
   dictate(wav: Uint8Array): Promise<TranscribeResult>;
   showError(message: string): void;
@@ -63,7 +61,7 @@ export function createMicTestPanel(deps: MicTestDeps): MicTestPanel {
             });
         }
       },
-      { durationMs: deps.durationMs ?? 5000, sensitivity: deps.sensitivity(), threshold: deps.threshold?.() ?? undefined }
+      { durationMs: deps.durationMs ?? 5000, threshold: deps.threshold?.() ?? undefined }
     );
     run.start();
   });

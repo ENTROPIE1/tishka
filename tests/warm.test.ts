@@ -82,7 +82,7 @@ describe('тёплое состояние окна-питомца', () => {
 
   it('два появления подряд открывают микрофон один раз', () => {
     const mounted = mount();
-    const active: WakeState = { active: true, conversation: true, soon: false, sensitivity: 'normal' };
+    const active: WakeState = { active: true, conversation: true, soon: false };
     mounted.state(active);
     mounted.state(active);
     mounted.state(active);
@@ -93,8 +93,8 @@ describe('тёплое состояние окна-питомца', () => {
 
   it('после долгого простоя микрофон закрывается', () => {
     const mounted = mount();
-    mounted.state({ active: true, conversation: true, soon: false, sensitivity: 'normal' });
-    mounted.state({ active: false, conversation: false, soon: false, sensitivity: 'normal' });
+    mounted.state({ active: true, conversation: true, soon: false });
+    mounted.state({ active: false, conversation: false, soon: false });
 
     expect(mounted.stops.length).toBeGreaterThan(0);
   });

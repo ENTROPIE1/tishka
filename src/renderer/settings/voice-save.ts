@@ -1,5 +1,4 @@
 import type { Config } from '../../core/types';
-import type { VadSensitivity } from '../../voice/vad';
 
 export interface VoiceControls {
   hotkey: HTMLInputElement;
@@ -7,7 +6,6 @@ export interface VoiceControls {
   talkByDefault: HTMLInputElement;
   wakeWords: HTMLInputElement;
   talkTimeout: HTMLInputElement;
-  sensitivity: HTMLSelectElement;
   mode: HTMLSelectElement;
   sttUrl: HTMLInputElement;
   exe: HTMLInputElement;
@@ -28,6 +26,7 @@ export function parseTimeout(value: string, fallback: number): number {
 }
 
 // Сохраняет все три группы настроек голоса и применяет горячую клавишу.
+// Чувствительность в настройках остаётся как есть: на порог она не влияет.
 export async function saveVoice(controls: VoiceControls): Promise<void> {
   const view = await window.tishka.config.get();
   const next: Config = {
@@ -39,7 +38,6 @@ export async function saveVoice(controls: VoiceControls): Promise<void> {
       talkByDefault: controls.talkByDefault.checked,
       wakeWords: parseWords(controls.wakeWords.value, view.config.voice.wakeWords),
       talkTimeoutSec: parseTimeout(controls.talkTimeout.value, view.config.voice.talkTimeoutSec),
-      sensitivity: controls.sensitivity.value as VadSensitivity,
       sttUrl: controls.sttUrl.value.trim(),
       stt: {
         ...view.config.voice.stt,

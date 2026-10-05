@@ -35,6 +35,7 @@ import { restartVoiceIfNeeded } from './voice-restart';
 import { createWakeFlow } from '../voice/wake-flow';
 import { checkSttUrl } from '../voice/stt-http';
 import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
+import { createThresholdHint, THRESHOLD_HINT } from '../voice/threshold-hint';
 
 const bus = createSourceBus();
 // Журнал времени заводится до всего остального: строка-разделитель с версией
@@ -196,6 +197,11 @@ app.whenReady().then(async () => {
     report: () => bus.emit({ type: 'status', text: CALIBRATION_HINT })
   });
 
+  // Три отрезка подряд без тишины — звук выше порога не даёт фразе закончиться.
+  const thresholdHint = createThresholdHint({
+    report: () => bus.emit({ type: 'status', text: THRESHOLD_HINT })
+  });
+
   const listen = createPetListen({
     bus,
     core: { handleUserText: (text) => bus.run('pet', () => tishka.handleUserText(text)) },
@@ -224,6 +230,8 @@ app.whenReady().then(async () => {
       chatTalk?.broadcast();
     },
     onMissedSpeech: () => calibrationHint.missed(),
+    onWakeLimit: () => thresholdHint.limit(),
+    onWakePhraseEnd: () => thresholdHint.ended(),
     sendCommand: (command) => {
       if (command === 'listen') {
         pet?.listenCommand('start');

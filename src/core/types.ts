@@ -109,8 +109,8 @@ export interface Config {
     wakeEnabled: boolean;                // откликаться на имя
     talkByDefault: boolean;              // включать разговор при появлении по обращению
     talkTimeoutSec: number;              // уход по тишине в режиме разговора
-    sensitivity: 'low' | 'normal' | 'high';   // порог слышимости микрофона
-    mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null };   // результат калибровки; threshold null — работает sensitivity
+    sensitivity: 'low' | 'normal' | 'high';   // осталось для совместимости, на порог не влияет
+    mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null };   // порог громкости и результат калибровки; threshold null — порог по умолчанию
     sttUrl: string;                      // адрес службы распознавания
     stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' };   // local — запускать службу на этом компьютере; remote — готовая служба по sttUrl; пустой exe — не запускать
     tts: { enabled: boolean; url: string; volume: number };   // синтез речи: говорить вслух

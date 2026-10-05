@@ -1,9 +1,12 @@
 import { createPhraseListener, type PhraseListener, type PhraseListenerOptions } from '../shared/phrase-listener';
 import { createListenPause, DRAG_RESUME_MS, TYPING_RESUME_MS } from '../shared/listen-pause';
-import type { VadSensitivity } from '../../voice/vad';
 
 const MIC_RETRY_MS = 30000;
 const MIC_ERROR = 'Не слышу микрофон';
+// Отрезок прослушивания имени: длинный звук уходит на распознавание кусками
+// по 4 секунды с перекрытием 0,5 секунды, чтобы имя на стыке не потерялось.
+const WAKE_CHUNK_MS = 4000;
+const WAKE_CHUNK_OVERLAP_MS = 500;
 
 export interface WakeListenerDeps {
   onConversation?(on: boolean): void;
@@ -30,7 +33,6 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   let conversation = false;
   let waiting = false;
   let soon = false;
-  let sensitivity: VadSensitivity = 'normal';
   let threshold: number | undefined;
   let listener: PhraseListener | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -70,9 +72,11 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       return;
     }
     const options: PhraseListenerOptions = {
-      sensitivity,
       threshold,
-      onPhrase: (wav) => window.tishka.pet.wakePhrase(wav),
+      chunkMs: WAKE_CHUNK_MS,
+      chunkOverlapMs: WAKE_CHUNK_OVERLAP_MS,
+      inConversation: () => conversation,
+      onPhrase: (wav, limitHit) => window.tishka.pet.wakePhrase(wav, limitHit),
       onLevel: (value) => {
         if (levelFill !== null && conversation) {
           levelFill.style.width = `${Math.round(value * 100)}%`;
@@ -123,9 +127,6 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
     const wasActive = active;
     active = state.active;
     soon = state.soon;
-    const nextSensitivity = state.sensitivity ?? sensitivity;
-    const sensitivityChanged = nextSensitivity !== sensitivity;
-    sensitivity = nextSensitivity;
     const nextThreshold = state.threshold ?? undefined;
     const thresholdChanged = nextThreshold !== threshold;
     threshold = nextThreshold;
@@ -138,7 +139,7 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       waiting = nextWaiting;
       deps.onWaiting?.(waiting);
     }
-    if (active && (!wasActive || sensitivityChanged || thresholdChanged) && listener !== undefined) {
+    if (active && (!wasActive || thresholdChanged) && listener !== undefined) {
       stopListener();
     }
     applyActive();

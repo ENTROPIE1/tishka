@@ -1,4 +1,4 @@
-import { createVad, type VadSensitivity } from '../../voice/vad';
+import { createVad } from '../../voice/vad';
 import { createRecorder } from './recorder';
 
 export interface MicCheckResult {
@@ -14,7 +14,6 @@ export interface MicCheckHandles {
 
 export interface MicCheckOptions {
   durationMs?: number;
-  sensitivity?: VadSensitivity;
   threshold?: number;
 }
 
@@ -30,11 +29,9 @@ const SPEECH_LEVEL = 0.5;
 // возвращает WAV, чтобы вызывающий показал распознанный текст.
 export function createMicCheck(handles: MicCheckHandles, options: MicCheckOptions = {}): MicCheck {
   const durationMs = options.durationMs ?? DEFAULT_DURATION_MS;
-  const sensitivity = options.sensitivity ?? 'normal';
   let heard = false;
 
   const recorder = createRecorder({
-    sensitivity,
     threshold: options.threshold,
     onLevel(level): void {
       if (level >= SPEECH_LEVEL) {
@@ -53,7 +50,6 @@ export function createMicCheck(handles: MicCheckHandles, options: MicCheckOption
     },
     makeVad: () =>
       createVad({
-        sensitivity,
         threshold: options.threshold,
         maxMs: durationMs,
         noSpeechMs: 0,

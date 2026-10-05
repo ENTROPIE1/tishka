@@ -66,7 +66,6 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
       conversation: mine,
       soon: mine && deps.flow.isLeavingSoon(),
       waiting: deps.flow.isWaiting?.() ?? false,
-      sensitivity: voice.sensitivity,
       threshold: voice.mic.threshold
     });
   }
@@ -93,11 +92,11 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
   // приходит заново, иначе значок остаётся серым при уже идущей записи.
   deps.pet.onPageLoaded(() => broadcast());
 
-  ipcMain.on(PET_WAKE_PHRASE_CHANNEL, (_event, value: unknown) => {
+  ipcMain.on(PET_WAKE_PHRASE_CHANNEL, (_event, value: unknown, limitHit: unknown) => {
     if (value instanceof Uint8Array) {
-      deps.flow.handlePhrase(value);
+      deps.flow.handlePhrase(value, limitHit === true);
     } else if (value instanceof ArrayBuffer) {
-      deps.flow.handlePhrase(new Uint8Array(value));
+      deps.flow.handlePhrase(new Uint8Array(value), limitHit === true);
     }
   });
 

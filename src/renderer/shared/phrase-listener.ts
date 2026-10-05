@@ -1,4 +1,4 @@
-import { createVad, type Vad, type VadSensitivity } from '../../voice/vad';
+import { createVad, type Vad } from '../../voice/vad';
 import { encodeWav, normalizePeak, resample } from '../../voice/wav';
 import { createMicCapture, type MicCapture } from './mic-capture';
 import { timingMark } from './timing';
@@ -11,13 +11,17 @@ const SETTLE_MS = 300;
 const MIN_PHRASE_MS = 400;
 
 export interface PhraseListenerOptions {
-  onPhrase(wav: Uint8Array): void;
+  onPhrase(wav: Uint8Array, limitHit: boolean): void;
   onLevel?(level: number): void;
   onError?(message: string): void;
-  sensitivity?: VadSensitivity;
   threshold?: number;
   silenceMs?: number;
   maxPhraseMs?: number;
+  // Прослушивание имени режет длинный звук на отрезки: предел отрезка и
+  // перекрытие на стыке, чтобы имя на границе не потерялось.
+  chunkMs?: number;
+  chunkOverlapMs?: number;
+  inConversation?: () => boolean;   // разговор включён: предел реплики прежний
   capture?: MicCapture;
 }
 
@@ -27,18 +31,20 @@ export interface PhraseListener {
   stop(): void;
 }
 
-interface PreRollFrame {
+interface CapturedFrame {
   data: Float32Array;
   startMs: number;
   ms: number;
 }
 
-// Постоянное прослушивание для режима разговора: микрофон открыт, речь режется
-// на фразы. Пока речь не началась, звук не копится — держим только скользящий
-// запас последних 500 мс, чтобы не обрезать первое слово.
+// Постоянное прослушивание: микрофон открыт, речь режется на фразы. Пока речь
+// не началась, звук не копится — держим только скользящий запас последних 500 мс,
+// чтобы не обрезать первое слово.
 export function createPhraseListener(options: PhraseListenerOptions): PhraseListener {
   const silenceMs = options.silenceMs ?? DEFAULT_SILENCE_MS;
   const maxPhraseMs = options.maxPhraseMs ?? DEFAULT_MAX_PHRASE_MS;
+  const chunkMs = options.chunkMs;
+  const chunkOverlapMs = options.chunkOverlapMs ?? PRE_ROLL_MS;
   const capture = options.capture ?? createMicCapture();
 
   let active = false;
@@ -47,56 +53,83 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
   let vad: Vad | undefined;
   let sourceRate = TARGET_RATE;
   let nowMs = 0;
-  let preRoll: PreRollFrame[] = [];
+  let preRoll: CapturedFrame[] = [];
   let preRollMs = 0;
   let capturing = false;
-  let phraseFrames: Float32Array[] = [];
+  let phraseFrames: CapturedFrame[] = [];
   let phraseStartMs = 0;
 
   function makeVad(): Vad {
     return createVad({
       silenceMs,
-      maxMs: maxPhraseMs,
+      // Предел реплики в отрезках считает сам слушатель: детектор не должен
+      // обрывать отрезок собственным тайм-аутом.
+      maxMs: chunkMs !== undefined ? Number.MAX_SAFE_INTEGER : maxPhraseMs,
       noSpeechMs: 0,
-      sensitivity: options.sensitivity,
       threshold: options.threshold,
       continuous: true,
       settleMs: SETTLE_MS
     });
   }
 
-  function emitPhrase(activeVad: Vad): void {
+  function merged(frames: CapturedFrame[]): Float32Array {
+    let total = 0;
+    for (const part of frames) {
+      total += part.data.length;
+    }
+    const buffer = new Float32Array(total);
+    let offset = 0;
+    for (const part of frames) {
+      buffer.set(part.data, offset);
+      offset += part.data.length;
+    }
+    return buffer;
+  }
+
+  // Хвост записи, с которого начнётся следующий отрезок: перекрытие на стыке.
+  function overlapTail(frames: CapturedFrame[]): CapturedFrame[] {
+    const tail: CapturedFrame[] = [];
+    let total = 0;
+    for (let i = frames.length - 1; i >= 0; i -= 1) {
+      const item = frames[i];
+      if (tail.length > 0 && total + item.ms > chunkOverlapMs) {
+        break;
+      }
+      total += item.ms;
+      tail.unshift(item);
+    }
+    return tail;
+  }
+
+  function emit(activeVad: Vad, wake: boolean): void {
     const collected = phraseFrames;
     const startMs = phraseStartMs;
-    phraseFrames = [];
-    capturing = false;
-    if (collected.length === 0) {
+    const tail = wake ? overlapTail(collected) : [];
+    phraseFrames = tail;
+    if (wake && tail.length > 0) {
+      // Следующий отрезок считается от начала перекрытия, иначе он уйдёт
+      // на распознавание сразу же, кадр за кадром.
+      phraseStartMs = tail[0].startMs;
+    } else {
+      capturing = false;
+    }
+    if (collected.length === 0 || !activeVad.heardSpeech()) {
       return;
     }
-    let total = 0;
-    for (const part of collected) {
-      total += part.length;
-    }
-    if (total === 0) {
-      return;
-    }
-    const merged = new Float32Array(total);
-    let offset = 0;
-    for (const part of collected) {
-      merged.set(part, offset);
-      offset += part.length;
-    }
-    if (!activeVad.heardSpeech()) {
-      return;
-    }
-    const trimmed = activeVad.result(merged, sourceRate, startMs);
+    const buffer = merged(collected);
+    const trimmed = activeVad.result(buffer, sourceRate, startMs);
     if (trimmed.length === 0 || (trimmed.length / sourceRate) * 1000 < MIN_PHRASE_MS) {
       return;
     }
     const normalized = normalizePeak(trimmed);
     const wav = encodeWav(resample(normalized, sourceRate, TARGET_RATE), TARGET_RATE);
     timingMark('phrase.end', { ms: Math.round((trimmed.length / sourceRate) * 1000), bytes: wav.length });
-    options.onPhrase(wav);
+    options.onPhrase(wav, wake);
+  }
+
+  function spanMs(): number {
+    const last = phraseFrames[phraseFrames.length - 1];
+    return last === undefined ? 0 : last.startMs + last.ms - phraseStartMs;
   }
 
   function handleFrame(frame: Float32Array, sampleRate: number): void {
@@ -122,18 +155,31 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
         capturing = true;
         timingMark('speech.detected');
         timingMark('phrase.start');
-        phraseFrames = preRoll.map((item) => item.data);
+        phraseFrames = preRoll;
         phraseStartMs = preRoll.length > 0 ? preRoll[0].startMs : frameStartMs;
         preRoll = [];
         preRollMs = 0;
       }
     } else {
-      phraseFrames.push(frame);
+      phraseFrames.push({ data: frame, startMs: frameStartMs, ms: frameMs });
     }
     nowMs += frameMs;
 
-    if (capturing && (verdict === 'end' || verdict === 'timeout')) {
-      emitPhrase(vad);
+    if (!capturing || phraseFrames.length === 0) {
+      return;
+    }
+    if (verdict === 'end' || verdict === 'timeout') {
+      emit(vad, false);
+      return;
+    }
+    if (chunkMs !== undefined && options.inConversation?.() !== true) {
+      // Отрезок прослушивания имени: длинный звук уходит на распознавание,
+      // запись продолжается следующим отрезком с перекрытием.
+      if (spanMs() >= chunkMs) {
+        emit(vad, true);
+      }
+    } else if (spanMs() >= maxPhraseMs + PRE_ROLL_MS) {
+      emit(vad, false);
     }
   }
 

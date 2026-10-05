@@ -74,8 +74,6 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     showError: (message) => show(message),
     onChanged: () => void refresh()
   });
-  const sensitivity = micGroup.sensitivity;
-
   const localFields = el('div', 'voice-group-fields local-fields');
   localFields.append(
     field('Программа распознавания', exe, 'Путь к whisper-server без кириллицы; пусто — служба не запускается'),
@@ -194,7 +192,6 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     talkByDefault.checked = view.config.voice.talkByDefault;
     wakeWords.value = view.config.voice.wakeWords.join(', ');
     talkTimeout.value = String(view.config.voice.talkTimeoutSec);
-    sensitivity.value = view.config.voice.sensitivity;
     mic = view.config.voice.mic;
     mode.value = view.config.voice.stt.mode;
     exe.value = view.config.voice.stt.exe;
@@ -214,7 +211,6 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
           talkByDefault,
           wakeWords,
           talkTimeout,
-          sensitivity,
           mode,
           sttUrl,
           exe,

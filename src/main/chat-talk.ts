@@ -49,7 +49,6 @@ export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
       active: !paused && !busy && deps.isReady() && mine,
       conversation: mine,
       soon: mine && deps.flow.isLeavingSoon(),
-      sensitivity: voice.sensitivity,
       threshold: voice.mic.threshold
     };
   }

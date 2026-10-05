@@ -22,7 +22,7 @@ function elements(): TalkModeElements {
 }
 
 function talkState(conversation: boolean): ChatTalkState {
-  return { active: true, conversation, soon: false, sensitivity: 'normal' };
+  return { active: true, conversation, soon: false };
 }
 
 function setReadyVoice(): void {

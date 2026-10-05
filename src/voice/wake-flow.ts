@@ -23,10 +23,12 @@ export interface WakeFlowDeps {
   onWaitingChange?(): void;            // изменилось ожидание готовности службы
   memoryName?(): string | undefined;   // имя человека из памяти для подсказки
   onMissedSpeech?(): void;             // «Не расслышал» — повод для подсказки о калибровке
+  onWakeLimit?(): void;                // отрезок упёрся в предел длины при прослушивании имени
+  onWakePhraseEnd?(): void;            // фраза закончилась сама: серия отрезков прервана
 }
 
 export interface WakeFlow {
-  handlePhrase(wav: Uint8Array): void;
+  handlePhrase(wav: Uint8Array, limitHit?: boolean): void;
   toggleConversation(by?: TalkSurface): void;
   enableConversation(by?: TalkSurface): void;
   disableConversation(hide: boolean, by?: TalkSurface): void;
@@ -300,7 +302,15 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   });
 
   return {
-    handlePhrase: (wav) => queue.add(wav),
+    // limitHit — отрезок упёрся в предел длины при прослушивании имени.
+    handlePhrase: (wav, limitHit = false) => {
+      if (limitHit) {
+        deps.onWakeLimit?.();
+      } else {
+        deps.onWakePhraseEnd?.();
+      }
+      queue.add(wav);
+    },
     isConversation: () => conversation,
     conversationOwner: () => owner,
     isLeavingSoon: () => soon,

@@ -1,4 +1,3 @@
-import type { VadSensitivity } from '../../voice/vad';
 import type { ChatTalkState } from '../../voice/wake';
 import { MIC_SVG } from '../shared/mic-button';
 import { createPhraseListener, type PhraseListener, type PhraseListenerOptions } from '../shared/phrase-listener';
@@ -43,7 +42,6 @@ export function createTalkMode(
   let listener: PhraseListener | undefined;
   let conversation = false;
   let active = false;
-  let sensitivity: VadSensitivity = 'normal';
   let threshold: number | undefined;
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   const pause = createListenPause((value) => listener?.pause(value));
@@ -85,7 +83,6 @@ export function createTalkMode(
     }
     clearRetry();
     const options: PhraseListenerOptions = {
-      sensitivity,
       threshold,
       onPhrase: (wav) => window.tishka.chatTalk.phrase(wav),
       onLevel: (level) => {
@@ -111,11 +108,16 @@ export function createTalkMode(
       elements.levelFill.style.width = '0%';
     }
     elements.label.textContent = state.conversation ? LISTEN_LABEL : '';
-    sensitivity = state.sensitivity;
-    threshold = state.threshold ?? undefined;
+    const nextThreshold = state.threshold ?? undefined;
+    const thresholdChanged = nextThreshold !== threshold;
+    threshold = nextThreshold;
     conversation = state.conversation;
     active = state.active;
     if (conversation && active) {
+      // Новый порог применяется к идущей записи сразу: слушатель пересоздаётся.
+      if (thresholdChanged && listener !== undefined) {
+        stopListener();
+      }
       startListener();
     } else {
       stopListener();

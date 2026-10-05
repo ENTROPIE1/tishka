@@ -334,8 +334,8 @@ const api = {
     listenResult(result: ListenResult): void {
       ipcRenderer.send(PET_LISTEN_RESULT_CHANNEL, result);
     },
-    wakePhrase(wav: Uint8Array): void {
-      ipcRenderer.send(PET_WAKE_PHRASE_CHANNEL, wav);
+    wakePhrase(wav: Uint8Array, limitHit?: boolean): void {
+      ipcRenderer.send(PET_WAKE_PHRASE_CHANNEL, wav, limitHit === true);
     },
     conversationToggle(): void {
       ipcRenderer.send(PET_CONVERSATION_TOGGLE_CHANNEL);

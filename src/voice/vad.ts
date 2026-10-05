@@ -2,51 +2,37 @@ import { createSpeechStart } from './speech-start';
 
 export type VadVerdict = 'continue' | 'end' | 'timeout' | 'nospeech';
 
-export type VadSensitivity = 'low' | 'normal' | 'high';
-
 export interface VadOptions {
   silenceMs?: number;      // тишина после речи, завершающая фразу
   maxMs?: number;          // максимальная длительность записи
   minSpeechMs?: number;    // сколько громких кадров в окне нужно для начала речи
   noSpeechMs?: number;     // предел ожидания речи; <= 0 — не ограничивать
-  sensitivity?: VadSensitivity;
   leadMs?: number;         // запас до начала речи в результате
   tailMs?: number;         // запас после конца речи в результате
-  continuous?: boolean;    // фраза за фразой без пересоздания, шум не сбрасывается
-  settleMs?: number;       // первые кадры только в оценку шума (щелчок включения)
-  threshold?: number;      // калиброванный порог речи; с ним sensitivity не применяется
+  continuous?: boolean;    // фраза за фразой без пересоздания
+  settleMs?: number;       // первые кадры не считаются речью (щелчок включения)
+  threshold?: number;      // порог речи; не задан — значение по умолчанию
 }
 
 export interface Vad {
   push(frame: Float32Array, frameMs: number): VadVerdict;
   level(): number;         // 0..1 относительно порога (порог — 0.5)
   heardSpeech(): boolean;
-  reset(): void;           // сброс текущей фразы, оценка шума сохраняется
+  reset(): void;           // сброс текущей фразы
   // bufferStartMs — время начала переданного буфера на общей шкале VAD;
   // нужно, когда буфер собран заново и его края не совпадают с началом записи.
   result(samples: Float32Array, sampleRate: number, bufferStartMs?: number): Float32Array;
 }
 
-const NOISE_WINDOW_MS = 2000;
-const NOISE_PERCENTILE = 0.1;
-const NOISE_MIN_FRAMES = 5;
-const INITIAL_NOISE = 0.002;
+// Порог для тихой комнаты, пока калибровка и ручная настройка не заданы.
+export const DEFAULT_MIC_THRESHOLD = 0.004;
+
 const DEFAULT_MIN_SPEECH_MS = 200;
 const DEFAULT_LEAD_MS = 300;
 const DEFAULT_TAIL_MS = 200;
 const NOSPEECH_MS = 5000;
 const LEVEL_EPSILON = 1e-6;
 
-interface SensitivityConfig {
-  k: number;
-  floor: number;
-}
-
-const SENSITIVITY: Record<VadSensitivity, SensitivityConfig> = {
-  low: { k: 3.5, floor: 0.008 },
-  normal: { k: 2.5, floor: 0.004 },
-  high: { k: 1.8, floor: 0.002 }
-};
 function rms(frame: Float32Array): number {
   if (frame.length === 0) {
     return 0;
@@ -82,7 +68,8 @@ export function createVad(options: VadOptions = {}): Vad {
   const tailMs = options.tailMs ?? DEFAULT_TAIL_MS;
   const continuous = options.continuous ?? false;
   const settleMs = options.settleMs ?? 0;
-  const limits = SENSITIVITY[options.sensitivity ?? 'normal'];
+  // Порог фиксированный: звук тише порога — тишина, громче — речь.
+  const threshold = options.threshold ?? DEFAULT_MIC_THRESHOLD;
 
   let elapsed = 0;
   let lastLevel = 0;
@@ -92,27 +79,7 @@ export function createVad(options: VadOptions = {}): Vad {
   let silenceRun = 0;
   let done = false;
   const speech = createSpeechStart(minSpeechMs);
-  const levels: Array<{ at: number; value: number }> = [];
 
-  function noise(): number {
-    if (levels.length < NOISE_MIN_FRAMES) {
-      return INITIAL_NOISE;
-    }
-    const sorted = levels.map((item) => item.value).sort((a, b) => a - b);
-    const index = Math.min(sorted.length - 1, Math.floor(sorted.length * NOISE_PERCENTILE));
-    return sorted[index];
-  }
-
-  // Калиброванный порог не опускается ниже текущего шума с запасом.
-  function threshold(): number {
-    if (options.threshold !== undefined) {
-      return Math.max(options.threshold, noise() * 1.5);
-    }
-    return Math.max(noise() * limits.k, limits.floor);
-  }
-
-  // Новая фраза: оценка шума (levels) сохраняется — иначе первые кадры фразы
-  // снова окажутся без данных о шуме.
   function resetPhrase(): void {
     speechStarted = false;
     speechStartMs = 0;
@@ -131,14 +98,10 @@ export function createVad(options: VadOptions = {}): Vad {
     }
     const value = rms(frame);
     lastLevel = value;
-    levels.push({ at: elapsed, value });
-    while (levels.length > 0 && elapsed - levels[0].at > NOISE_WINDOW_MS) {
-      levels.shift();
-    }
 
     // Кадры после включения микрофона идут только в оценку шума.
     const settling = elapsed < settleMs;
-    const loud = !settling && value - threshold() > LEVEL_EPSILON;
+    const loud = !settling && value - threshold > LEVEL_EPSILON;
     if (loud) {
       lastLoudMs = elapsed + frameMs;
     }
@@ -180,7 +143,7 @@ export function createVad(options: VadOptions = {}): Vad {
     heardSpeech: () => speechStarted,
     reset: resetPhrase,
     level(): number {
-      return Math.max(0, Math.min(1, lastLevel / (2 * threshold())));
+      return Math.max(0, Math.min(1, lastLevel / (2 * threshold)));
     },
     result(samples: Float32Array, sampleRate: number, bufferStartMs = 0): Float32Array {
       if (!speechStarted) {

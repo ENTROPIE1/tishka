@@ -47,18 +47,17 @@ describe('measureNoise и computeThreshold', () => {  it('шум 0,002 (пики
   });
 });
 
-describe('createVad: калиброванный порог', () => {  it('порог 0,006 делает речь 0,008 речью при любой sensitivity', () => {
-    for (const sensitivity of ['low', 'high'] as const) {
-      const vad = createVad({ threshold: 0.006, sensitivity });
-      feed(vad, 0.002, 15);
-      feed(vad, 0.008, 20);
-      expect(vad.heardSpeech()).toBe(true);
-    }
+describe('createVad: калиброванный порог', () => {
+  it('порог 0,006 делает речь 0,008 речью', () => {
+    const vad = createVad({ threshold: 0.006 });
+    feed(vad, 0.002, 15);
+    feed(vad, 0.008, 20);
+    expect(vad.heardSpeech()).toBe(true);
   });
-  it('выросший фон 0,01 не считается речью: порог поднимается над ним', () => {
+  it('выросший фон не поднимает порог: звук громче порога считается речью', () => {
     const vad = createVad({ threshold: 0.006 });
     feed(vad, 0.01, 80);
-    expect(vad.heardSpeech()).toBe(false);
+    expect(vad.heardSpeech()).toBe(true);
   });
 });
 

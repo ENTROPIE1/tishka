@@ -13,7 +13,7 @@ function elements(): TalkModeElements {
 }
 
 function state(active: boolean, conversation: boolean): ChatTalkState {
-  return { active, conversation, soon: false, sensitivity: 'normal' };
+  return { active, conversation, soon: false };
 }
 
 let mode: TalkMode | undefined;
