@@ -211,6 +211,7 @@ function stubRegistry(): ToolRegistry {
   const handlers: Record<string, ToolHandler> = {
     open_urls: async () => ({ ok: true, content: 'открыл' }),
     exchange__list_meetings: async () => ({ ok: true, content: '{}', data: { meetings: [] } }),
+    exchange__mail_search: async () => ({ ok: true, content: '{}', data: { mails: [] } }),
     exchange__mail_draft_link: async () => ({ ok: true, content: '{}', data: { url: 'https://example.org/mail', hint: '' } }),
     exchange__meeting_draft_link: async () => ({ ok: true, content: '{}', data: { url: 'https://example.org/meet' } }),
     confluence__get_page_version: async () => ({ ok: true, content: '{}', data: { version: '5', url: 'https://example.org/page' } }),

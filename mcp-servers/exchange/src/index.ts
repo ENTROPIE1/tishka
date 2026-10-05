@@ -1,5 +1,6 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { createExchangeClient } from './client.js';
+import { createMailClient } from './mail.js';
 import { createExchangeServer } from './server.js';
 
 async function main(): Promise<void> {
@@ -8,15 +9,17 @@ async function main(): Promise<void> {
   const password = optionalEnv('EXCHANGE_PASSWORD');
   const owaUrl = optionalEnv('EXCHANGE_OWA_URL');
 
-  const calendar =
+  const credentials =
     ewsUrl !== undefined && user !== undefined && password !== undefined
-      ? createExchangeClient({ ewsUrl, user, password })
+      ? { ewsUrl, user, password }
       : undefined;
+  const calendar = credentials === undefined ? undefined : createExchangeClient(credentials);
+  const mail = credentials === undefined ? undefined : createMailClient(credentials);
 
-  if (calendar === undefined) {
+  if (credentials === undefined) {
     process.stderr.write(
       'Exchange MCP-сервер: не заданы EXCHANGE_EWS_URL, EXCHANGE_USER или EXCHANGE_PASSWORD, ' +
-        'инструменты календаря вернут ошибку\n'
+        'инструменты календаря и почты вернут ошибку\n'
     );
   }
   if (owaUrl === undefined) {
@@ -25,7 +28,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const server = createExchangeServer({ calendar, owaUrl });
+  const server = createExchangeServer({ calendar, mail, owaUrl });
   await server.connect(new StdioServerTransport());
 }
 

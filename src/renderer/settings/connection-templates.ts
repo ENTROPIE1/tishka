@@ -31,7 +31,9 @@ export const TEMPLATES: Record<ConnectionTemplate, TemplateSpec> = {
   },
   exchange: {
     label: 'Exchange',
-    description: 'Тишка сможет смотреть встречи в календаре и готовить черновики писем и встреч',
+    description:
+      'Тишка сможет читать календарь и почту, готовить черновики писем и встреч. ' +
+      'Новые инструменты почты появляются у уже добавленных подключений после переподключения.',
     fields: [
       {
         key: 'ewsUrl',

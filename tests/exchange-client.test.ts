@@ -402,13 +402,17 @@ function textOf(result: CallToolResult): string {
 }
 
 describe('createExchangeServer', () => {
-  it('объявляет четыре инструмента с readOnlyHint', async () => {
+  it('объявляет восемь инструментов с readOnlyHint', async () => {
     const session = await connect(createExchangeServer({ calendar: emptyCalendar() }));
     try {
       const { tools } = await session.client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual([
         'list_meetings',
         'mail_draft_link',
+        'mail_read',
+        'mail_search',
+        'mail_thread',
+        'mail_unread',
         'meeting_draft_link',
         'next_meeting'
       ]);
