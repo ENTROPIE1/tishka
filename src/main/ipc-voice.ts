@@ -28,7 +28,10 @@ function toBytes(value: unknown): Uint8Array | undefined {
 }
 
 export function registerVoiceIpc(deps: VoiceIpcDeps): void {
-  ipcMain.handle(VOICE_STATUS_CHANNEL, (): VoiceStateView => ({ state: deps.stt.status() }));
+  ipcMain.handle(
+    VOICE_STATUS_CHANNEL,
+    (): VoiceStateView => ({ state: deps.stt.status(), detector: deps.stt.detector?.() })
+  );
 
   // Диктовка в окнах: возвращает распознанный текст и не запускает агента.
   ipcMain.handle(VOICE_DICTATE_CHANNEL, (_event, value: unknown): Promise<TranscribeResult> => {
@@ -51,7 +54,7 @@ export function registerVoiceIpc(deps: VoiceIpcDeps): void {
     if (result.error === START_CANCELLED && mine !== generation && current !== undefined) {
       return current;
     }
-    const view: VoiceStateView = { state: deps.stt.status() };
+    const view: VoiceStateView = { state: deps.stt.status(), detector: deps.stt.detector?.() };
     if (result.error !== undefined) {
       view.error = result.error;
     }

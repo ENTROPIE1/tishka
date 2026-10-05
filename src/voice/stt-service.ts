@@ -1,10 +1,18 @@
-import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Config } from '../core/types';
 import type { TimingMark } from '../main/timing-log';
 import { waitSttReady } from './stt-ready';
 import { reasonFromExit, RunController, type RunToken } from './stt-run';
+import {
+  buildServiceArgs,
+  detectorState,
+  findVadModel,
+  parseHelpCaps,
+  type HelpCaps,
+  type SttDetector
+} from './stt-flags';
 import {
   hasForeignChars,
   probe,
@@ -15,12 +23,15 @@ import {
 
 export type SttStatus = 'off' | 'starting' | 'ready' | 'error';
 export type { SttCheckView, TranscribeResult } from './stt-http';
+export type { SttDetector } from './stt-flags';
 
 export interface SttServiceOptions {
   getConfig: () => Config['voice'];
   spawn?: typeof import('node:child_process').spawn;
   fetch?: typeof fetch;
   fileExists?: (path: string) => boolean;
+  readHelp?: (exe: string) => string;             // справка программы для выбора ключей запуска
+  listDir?: (dir: string) => string[];            // соседние с моделью файлы: поиск модели детектора
   mark?: TimingMark;
   onStatusChange?: (status: SttStatus) => void;   // переход состояния готовой службы по адресу
   remotePollMs?: { down?: number; up?: number };  // период повторной проверки адреса
@@ -31,6 +42,7 @@ export interface SttService {
   stop(): void;
   transcribe(wav: Uint8Array, prompt?: string): Promise<TranscribeResult>;
   status(): SttStatus;
+  detector(): SttDetector;
   pid(): number | undefined;
 }
 
@@ -43,14 +55,37 @@ export const REMOTE_UNREACHABLE = 'Служба распознавания не 
 // после запуска) или пропасть. Пока не отвечает — проверяем чаще.
 const REMOTE_POLL_DOWN_MS = 5000;
 const REMOTE_POLL_UP_MS = 30000;
+const HELP_TIMEOUT_MS = 5000;
+
+// Справка программы: -sns и --vad есть не во всех сборках. Незнакомая или
+// недоступная программа даёт пустую справку — запуск как раньше.
+function defaultReadHelp(exe: string): string {
+  try {
+    const result = spawnSync(exe, ['--help'], {
+      encoding: 'utf8',
+      timeout: HELP_TIMEOUT_MS,
+      windowsHide: true
+    });
+    return `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  } catch {
+    return '';
+  }
+}
+
+function defaultListDir(dir: string): string[] {
+  return readdirSync(dir);
+}
 
 export function createSttService(options: SttServiceOptions): SttService {
   const spawnFn = options.spawn ?? spawn;
   const fetchFn = options.fetch ?? fetch;
   const fileExists = options.fileExists ?? existsSync;
+  const readHelp = options.readHelp ?? defaultReadHelp;
+  const listDir = options.listDir ?? defaultListDir;
   const mark = options.mark;
   const runs = new RunController();
   let state: SttStatus = 'off';
+  let detector: SttDetector = 'off';
   let child: ChildProcess | undefined;
   let childRunId = 0;
   let pollTimer: ReturnType<typeof setTimeout> | undefined;
@@ -119,9 +154,9 @@ export function createSttService(options: SttServiceOptions): SttService {
       }
     }
   }
-  function spawnProcess(run: RunToken, exe: string, model: string, url: string): void {
+  function spawnProcess(run: RunToken, exe: string, model: string, url: string, caps: HelpCaps, vadModel: string | undefined): void {
     const config = options.getConfig();
-    const args = [
+    const base = [
       '-m', model,
       '-l', 'ru',
       '-t', String(config.stt.threads),
@@ -129,6 +164,7 @@ export function createSttService(options: SttServiceOptions): SttService {
       '--host', '127.0.0.1',
       '--port', String(servicePort(url))
     ];
+    const args = buildServiceArgs(base, caps, vadModel);
     const spawned = spawnFn(exe, args, {
       cwd: dirname(exe),
       windowsHide: true,
@@ -162,6 +198,8 @@ export function createSttService(options: SttServiceOptions): SttService {
     const exe = config.stt.exe.trim();
     const model = config.stt.model.trim();
     const run = runs.begin();
+    // Ключи запуска известны только для своей службы; чужая — без детектора.
+    detector = 'off';
 
     // Готовая служба по адресу: состояние определяет проверка, чужой процесс
     // не запускаем и не останавливаем.
@@ -213,9 +251,18 @@ export function createSttService(options: SttServiceOptions): SttService {
     }
 
     state = 'starting';
+    let help = '';
     try {
-      spawnProcess(run, exe, model, config.sttUrl);
-      mark?.('stt.launch', { port: servicePort(config.sttUrl) });
+      help = readHelp(exe);
+    } catch {
+      help = '';
+    }
+    const caps = parseHelpCaps(help);
+    const vadModel = caps.vad ? findVadModel(model, listDir) : undefined;
+    detector = detectorState(caps, vadModel);
+    try {
+      spawnProcess(run, exe, model, config.sttUrl, caps, vadModel);
+      mark?.('stt.launch', { port: servicePort(config.sttUrl), detector });
     } catch {
       state = 'error';
       return { ok: false, error: 'Служба распознавания не запустилась: файл не найден' };
@@ -245,6 +292,7 @@ export function createSttService(options: SttServiceOptions): SttService {
     stopPolling();
     killOwnProcess(childRunId);
     state = 'off';
+    detector = 'off';
   }
 
   return {
@@ -252,6 +300,7 @@ export function createSttService(options: SttServiceOptions): SttService {
     stop,
     transcribe: (wav, prompt) => transcribeHttp(fetchFn, options.getConfig().sttUrl, wav, prompt, mark),
     status: () => state,
+    detector: () => detector,
     pid: () => {
       const config = options.getConfig();
       return config.stt.exe.trim() === '' || config.stt.model.trim() === '' ? undefined : child?.pid;

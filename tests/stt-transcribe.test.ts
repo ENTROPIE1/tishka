@@ -151,4 +151,39 @@ describe('createSttService.transcribe', () => {
       error: 'Не удалось обратиться к службе распознавания'
     });
   });
+
+  it('подсказка с именем уходит в запросе', async () => {
+    const fetchMock = vi.fn(async () => okResponse({ text: 'привет' }));
+    const stt = service(fetchMock);
+
+    await stt.transcribe(new Uint8Array([1, 2]), 'Тишка,');
+
+    const form = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData;
+    expect(form.get('prompt')).toBe('Тишка,');
+  });
+
+  it('известная выдумка отбрасывается и пишется в журнал времени', async () => {
+    const marks: { event: string; details?: Record<string, unknown> }[] = [];
+    const fetchMock = vi.fn(async () => okResponse({ text: 'Субтитры создавал DimaTorzok' }));
+    const stt = createSttService({
+      getConfig: () => voice(),
+      fetch: fetchMock as unknown as typeof fetch,
+      mark: (event, details) => marks.push({ event, details })
+    });
+
+    await expect(stt.transcribe(new Uint8Array([1, 2]))).resolves.toEqual({
+      ok: false,
+      error: 'Не расслышал',
+      empty: true
+    });
+    const end = marks.find((item) => item.event === 'stt.request.end');
+    expect(end?.details).toMatchObject({ ok: false, reason: 'hallucination' });
+  });
+
+  it('выдумка рядом с настоящими словами вырезается, фраза проходит', async () => {
+    const fetchMock = vi.fn(async () => okResponse({ text: 'Субтитры создавал DimaTorzok включи музыку' }));
+    const stt = service(fetchMock);
+
+    await expect(stt.transcribe(new Uint8Array([1, 2]))).resolves.toEqual({ ok: true, text: 'включи музыку' });
+  });
 });
