@@ -37,6 +37,7 @@ import { createWakeFlow } from '../voice/wake-flow';
 import { checkSttUrl } from '../voice/stt-http';
 import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
 import { createThresholdHint, THRESHOLD_HINT } from '../voice/threshold-hint';
+import { UNHEARD_HINT } from '../voice/unheard';
 
 const bus = createSourceBus();
 // Журнал времени заводится до всего остального: строка-разделитель с версией
@@ -240,6 +241,10 @@ app.whenReady().then(async () => {
       chatTalk?.broadcast();
     },
     onMissedSpeech: () => calibrationHint.missed(),
+    // Тихая фраза отброшена по уверенности: подпись «не разобрал» под ежом,
+    // три подряд — подсказка про порог и микрофон.
+    onUnheard: (text) => pet?.caption(text),
+    onUnheardHint: () => bus.emit({ type: 'status', text: UNHEARD_HINT }),
     onWakeLimit: () => thresholdHint.limit(),
     onWakePhraseEnd: () => thresholdHint.ended(),
     sendCommand: (command) => {

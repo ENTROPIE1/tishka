@@ -81,3 +81,33 @@ describe('Сценарий 7. Печать в строке при включён
     expect(h.observations.sttRequests()).toBe(1);
   });
 });
+
+// Сценарий 17 (задача 88): запуск прослушивания при действующей паузе
+// сохраняет паузу — печать не уходит на распознавание.
+describe('Сценарий 17. Запуск прослушивания при действующей паузе', () => {
+  it('перезапуск сохраняет паузу, звук под паузой не распознаётся', async () => {
+    scenario = createScenario({ sttStatus: 'ready' });
+    const h = scenario;
+    h.startApp();
+    await h.wait(1000);
+    expect(h.observations.recording()).toBe(true);
+
+    h.typeKey();
+    expect(h.observations.recording()).toBe(false);
+
+    h.restartListen();
+    await h.flush();
+    h.feedMic(0.02, 1200);
+    h.feedMic(0.001, 900);
+    await h.flush();
+    expect(h.observations.sttRequests()).toBe(0);
+    expect(h.observations.errors()).toEqual([]);
+
+    await h.wait(2000);
+    expect(h.observations.recording()).toBe(true);
+    h.feedMic(0.02, 600);
+    h.feedMic(0.001, 900);
+    await h.flush();
+    expect(h.observations.sttRequests()).toBe(1);
+  });
+});

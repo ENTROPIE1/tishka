@@ -1,6 +1,7 @@
 import type { EventBus } from '../../src/core/types';
 import type { PetLayout } from '../../src/pet/layout';
 import {
+  PET_CAPTION_CHANNEL,
   PET_LISTEN_COMMAND_CHANNEL,
   PET_SPEAK_CHANNEL,
   PET_SPEAK_STOP_CHANNEL,
@@ -58,6 +59,9 @@ export function createPetFacade(deps: PetFacadeDeps): PetWindow {
     },
     wakeState(state): void {
       browserWindow.webContents.send(PET_WAKE_STATE_CHANNEL, state);
+    },
+    caption(text): void {
+      browserWindow.webContents.send(PET_CAPTION_CHANNEL, text);
     },
     speak(message): void {
       browserWindow.webContents.send(PET_SPEAK_CHANNEL, message);

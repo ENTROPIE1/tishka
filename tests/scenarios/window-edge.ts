@@ -6,6 +6,7 @@ import type { WakeState } from '../../src/voice/wake';
 import type { SpeakMessage } from '../../src/voice/speech-queue';
 import {
   EVENT_CHANNEL,
+  PET_CAPTION_CHANNEL,
   PET_FOCUS_INPUT_CHANNEL,
   PET_LISTEN_COMMAND_CHANNEL,
   PET_MODEL_CHANNEL,
@@ -45,6 +46,8 @@ export function createWindowEdge(deps: PageDeps): WindowEdge {
       page.model(payload as PetModel);
     } else if (channel === PET_WAKE_STATE_CHANNEL) {
       page.wakeState(payload as WakeState);
+    } else if (channel === PET_CAPTION_CHANNEL) {
+      page.caption(String(payload));
     } else if (channel === PET_LISTEN_COMMAND_CHANNEL) {
       page.listenCommand(payload as ListenCommand);
     } else if (channel === PET_SPEAK_CHANNEL) {

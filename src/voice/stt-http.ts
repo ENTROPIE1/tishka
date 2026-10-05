@@ -2,7 +2,7 @@ import type { TimingMark } from '../main/timing-log';
 
 export type TranscribeResult =
   | { ok: true; text: string }
-  | { ok: false; error: string; empty?: boolean };
+  | { ok: false; error: string; empty?: boolean; unreliable?: boolean };
 
 const REQUEST_TIMEOUT_MS = 30000;
 export const PROBE_TIMEOUT_MS = 3000;
@@ -140,33 +140,59 @@ function readNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+interface SegmentMarks {
+  noSpeech: number[];
+  logProbs: number[];
+}
+
 // Подробный ответ службы (verbose_json) несёт сегменты с вероятностью отсутствия
-// речи и средней логарифмической вероятностью. Если этих полей нет, доверяем
-// результату как раньше: отсеивать нечего.
-export function isUnreliable(data: Record<string, unknown>): boolean {
+// речи и средней логарифмической вероятностью. Если этих полей нет, отсеивать
+// нечего: результат принимается как есть.
+function readMarks(data: Record<string, unknown>): SegmentMarks {
   const segments = Array.isArray(data.segments) ? data.segments : [];
-  const noSpeech: number[] = [];
-  const logProbs: number[] = [];
+  const marks: SegmentMarks = { noSpeech: [], logProbs: [] };
   for (const segment of segments) {
     if (!isRecord(segment)) {
       continue;
     }
     const probability = readNumber(segment.no_speech_prob);
     if (probability !== undefined) {
-      noSpeech.push(probability);
+      marks.noSpeech.push(probability);
     }
     const logProb = readNumber(segment.avg_logprob);
     if (logProb !== undefined) {
-      logProbs.push(logProb);
+      marks.logProbs.push(logProb);
     }
   }
-  if (noSpeech.length === 0 && logProbs.length === 0) {
+  return marks;
+}
+
+function hasMarks(marks: SegmentMarks): boolean {
+  return marks.noSpeech.length > 0 || marks.logProbs.length > 0;
+}
+
+// Вероятность отсутствия речи в сегменте выше порога — фраза шумная.
+export function isNoisyTranscribe(data: Record<string, unknown>): boolean {
+  const marks = readMarks(data);
+  if (!hasMarks(marks)) {
     return false;
   }
-  const maxNoSpeech = noSpeech.length > 0 ? Math.max(...noSpeech) : 0;
-  const confidence =
-    logProbs.length > 0 ? Math.exp(logProbs.reduce((sum, value) => sum + value, 0) / logProbs.length) : 1;
-  return maxNoSpeech >= NO_SPEECH_MAX || confidence < MIN_CONFIDENCE;
+  const maxNoSpeech = marks.noSpeech.length > 0 ? Math.max(...marks.noSpeech) : 0;
+  return maxNoSpeech >= NO_SPEECH_MAX;
+}
+
+// Средняя уверенность сегментов (exp(avg_logprob)) ниже порога — речь была,
+// но результат ненадёжен: человек сказал слишком тихо.
+export function isLowConfidence(data: Record<string, unknown>): boolean {
+  const marks = readMarks(data);
+  if (!hasMarks(marks)) {
+    return false;
+  }
+  if (marks.logProbs.length === 0) {
+    return false;
+  }
+  const confidence = Math.exp(marks.logProbs.reduce((sum, value) => sum + value, 0) / marks.logProbs.length);
+  return confidence < MIN_CONFIDENCE;
 }
 
 type SendOutcome =
@@ -235,11 +261,23 @@ export async function transcribeHttp(
     const data = outcome.data;
     const raw = isRecord(data) && typeof data.text === 'string' ? data.text : '';
     const text = cleanTranscript(raw);
-    // Пустой текст, одни пометки или ненадёжные подробности — не речь человека:
-    // возвращаем пустой результат, человеку он не показывается.
-    if (text === '' || isNoiseTranscript(text) || (isRecord(data) && isUnreliable(data))) {
+    // Пустой текст или одни пометки — не речь человека: пустой результат,
+    // человеку он не показывается.
+    if (text === '' || isNoiseTranscript(text)) {
       mark?.('stt.request.end', { ok: false, bytes: size, chars: 0, ms: Date.now() - startedAt });
       return { ok: false, error: 'Не расслышал', empty: true };
+    }
+    if (isRecord(data)) {
+      // Шумовой сегмент: речи не было, реакция такая же, как на пустоту.
+      if (isNoisyTranscribe(data)) {
+        mark?.('stt.request.end', { ok: false, bytes: size, chars: 0, ms: Date.now() - startedAt });
+        return { ok: false, error: 'Не расслышал', empty: true };
+      }
+      // Речь была, но уверенность ниже порога: человек сказал тихо.
+      if (isLowConfidence(data)) {
+        mark?.('stt.request.end', { ok: false, bytes: size, chars: 0, ms: Date.now() - startedAt });
+        return { ok: false, error: 'Не расслышал', unreliable: true };
+      }
     }
     mark?.('stt.request.end', { ok: true, bytes: size, chars: text.length, ms: Date.now() - startedAt });
     return { ok: true, text };

@@ -1,6 +1,6 @@
 import type { Config, Reply } from '../../src/core/types';
 import { defaultConfig } from '../../src/core/config';
-import type { SttStatus } from '../../src/voice/stt-service';
+import type { SttStatus, TranscribeResult } from '../../src/voice/stt-service';
 import type { PetState } from '../../src/pet/state';
 import type { FakeTts, TtsMode } from './edges';
 import type { WindowRect } from './window-edge';
@@ -37,6 +37,7 @@ export interface ScenarioObservations {
   bounds(): WindowRect;           // положение окна
   spoken(): string[];             // что произнесено
   errors(): string[];             // показанные сообщения об ошибках
+  statuses(): string[];           // события статуса (подсказки в облачке)
   commands(): string[];           // команды разговора: listen, conversation-on/off
   coreCalls(): string[];          // что дошло до ядра
   sttRequests(): number;          // что ушло на распознавание
@@ -51,7 +52,10 @@ export interface Scenario {
   trayCall(): void;                       // щелчок по значку
   micClick(): void;                       // щелчок по микрофону
   say(text?: string): boolean;            // произнесённая фраза, текст даёт распознавание
-  hear(text: string): void;               // что распознавание услышит в следующей фразе
+  hear(result: string | TranscribeResult, holdMs?: number): void;
+                                          // что распознавание услышит в следующей фразе;
+                                          // holdMs — сколько служба «думает» до ответа
+  restartListen(): void;                  // прослушивание запускается заново при действующей паузе
   feedMic(value: number, ms: number): void;  // звук в микрофон: уровень и длительность
   noise(): boolean;                       // шум: пустое распознавание
   typeKey(): void;                        // печать в строке ежа

@@ -72,6 +72,8 @@ function mount(inConversation: () => boolean): {
   mic: FakeMic;
   emitted: Emission[];
   start(): Promise<boolean>;
+  pause(value: boolean): void;
+  stop(): void;
 } {
   const captured = fakeMic();
   const emitted: Emission[] = [];
@@ -85,7 +87,13 @@ function mount(inConversation: () => boolean): {
       emitted.push({ wav, limitHit });
     }
   });
-  return { mic: captured, emitted, start: () => instance.start() };
+  return {
+    mic: captured,
+    emitted,
+    start: () => instance.start(),
+    pause: (value) => instance.pause(value),
+    stop: () => instance.stop()
+  };
 }
 
 describe('phrase-listener: отрезки прослушивания имени', () => {
@@ -134,5 +142,21 @@ describe('phrase-listener: отрезки прослушивания имени'
     expect(mounted.emitted[0].limitHit).toBe(false);
     expect(wavDurationSec(mounted.emitted[0].wav)).toBeGreaterThan(11);
     expect(wavDurationSec(mounted.emitted[0].wav)).toBeLessThan(14);
+  });
+});
+
+describe('phrase-listener: запуск при действующей паузе', () => {
+  it('запуск сохраняет паузу: звук под паузой не уходит на распознавание', async () => {
+    const mounted = mount(() => false);
+    mounted.pause(true);
+    await mounted.start();
+    mounted.mic.feed(0.02, 800);
+    mounted.mic.feed(0.001, 900);
+    expect(mounted.emitted).toHaveLength(0);
+
+    mounted.pause(false);
+    mounted.mic.feed(0.02, 600);
+    mounted.mic.feed(0.001, 900);
+    expect(mounted.emitted).toHaveLength(1);
   });
 });

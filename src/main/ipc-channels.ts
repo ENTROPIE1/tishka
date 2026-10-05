@@ -60,6 +60,7 @@ export const PET_CONVERSATION_TOGGLE_CHANNEL = 'tishka:pet:conversation-toggle';
 export const PET_WAKE_ESCAPE_CHANNEL = 'tishka:pet:wake-escape';
 export const PET_WAKE_ERROR_CHANNEL = 'tishka:pet:wake-error';
 export const PET_WAKE_STATE_CHANNEL = 'tishka:pet:wake-state';
+export const PET_CAPTION_CHANNEL = 'tishka:pet:caption';
 export const PET_SPEAK_CHANNEL = 'tishka:pet:speak';
 export const PET_SPEAK_STOP_CHANNEL = 'tishka:pet:speak-stop';
 export const PET_SPEAK_DONE_CHANNEL = 'tishka:pet:speak-done';

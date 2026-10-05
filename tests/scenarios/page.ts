@@ -5,6 +5,7 @@ import type { SpeakMessage } from '../../src/voice/speech-queue';
 import type { TishkaEvent } from '../../src/core/types';
 import { nextScreenLooking } from '../../src/core/screen-look';
 import { bubbleSay } from '../../src/renderer/pet/listen-ui';
+import { createStateCaption } from '../../src/renderer/pet/state-caption';
 import { stateLabel } from '../../src/renderer/pet/state-label';
 import { composerBusy, composerCollapsed } from '../../src/renderer/pet/composer-state';
 import { screenLookAction, type ScreenLookAction } from '../../src/renderer/shared/screen-look-request';
@@ -46,6 +47,8 @@ export interface Page {
   pointer(): void;
   setError(message: string): void;
   pressEye(question?: string): ScreenLookAction;
+  // Действующая пауза прослушивания: связка страницы с настоящим слушателем.
+  listenPaused(): boolean;
 }
 
 export interface PageDeps {
@@ -54,6 +57,8 @@ export interface PageDeps {
   onScreenLookSend(text: string): void;
   onScreenLookStop(): void;
   screenLookAvailable(): boolean;
+  // Пауза прослушивания изменилась: та же связка, что у слушателя окна ежа.
+  onListenPause?(paused: boolean): void;
 }
 
 export type PageControl = Page & {
@@ -64,12 +69,16 @@ export type PageControl = Page & {
   stopSpeak(): void;
   setVisible(value: boolean): void;
   event(event: TishkaEvent): void;
+  // Разовая подпись под ежом (например, «не разобрал»).
+  caption(text: string): void;
+  listenPaused(): boolean;
 };
 
 // Страница окна-питомца: то, что человек видит. Настоящие правила облачка,
 // подписи состояния и пауз записаны в продукте; здесь только их связка.
 export function createPage(deps: PageDeps): PageControl {
-  const pause: ListenPause = createListenPause(() => undefined);
+  const pause: ListenPause = createListenPause((value) => deps.onListenPause?.(value));
+  const stateCaption = createStateCaption(() => undefined);
   let model: PetModel = { state: 'hidden', since: 0, queue: [] };
   let wake: WakeState | undefined;
   let listening = false;
@@ -86,7 +95,7 @@ export function createPage(deps: PageDeps): PageControl {
 
   const observations: PageObservations = {
     state: () => model.state,
-    label: () => stateLabel(model.state, wake?.waiting === true, model.greeting === true),
+    label: () => stateCaption.current() ?? stateLabel(model.state, wake?.waiting === true, model.greeting === true),
     bubble: () =>
       bubbleSay({
         modelSay: model.say,
@@ -193,6 +202,10 @@ export function createPage(deps: PageDeps): PageControl {
         deps.onScreenLookStop();
       }
       return action;
-    }
+    },
+    caption(text: string): void {
+      stateCaption.show(text);
+    },
+    listenPaused: () => pause.isPaused()
   };
 }
