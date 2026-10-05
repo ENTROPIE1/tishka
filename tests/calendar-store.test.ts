@@ -98,6 +98,22 @@ describe('createCalendarStore', () => {
     await expect(store.remove(loaded.id)).resolves.toBe(false);
   });
 
+  it('событие расписания не правится и не удаляется', async () => {
+    const store = makeStore();
+    await store.load();
+    const added = await store.add({
+      title: 'Позвонить',
+      start: '2026-10-07T16:00:00+03:00',
+      end: '2026-10-07T16:15:00+03:00',
+      source: 'schedule',
+      kind: 'reminder'
+    });
+
+    await expect(store.update(added.id, { title: 'Другое' })).resolves.toBeUndefined();
+    await expect(store.remove(added.id)).resolves.toBe(false);
+    expect(store.all()).toHaveLength(1);
+  });
+
   it('replacestSource убирает исчезнувшие загруженные события', async () => {
     const store = makeStore();
     await store.load();

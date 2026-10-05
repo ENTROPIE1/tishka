@@ -1,11 +1,9 @@
-import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
 import type { TimingMark } from '../../main/timing-log';
+import { buildEvent, overlapsRange, pickRemind } from './event-codec';
+import { readEvents, writeEvents } from './store-file';
 import {
   type AddEventInput,
   type CalendarEvent,
-  type CalendarKind,
   type CalendarRange,
   type CalendarSource,
   type UpdateEventPatch
@@ -23,79 +21,8 @@ export interface CalendarStore {
   replaceSource(source: CalendarSource, events: AddEventInput[]): Promise<void>;
 }
 
-const KINDS: CalendarKind[] = ['meeting', 'focus', 'personal', 'reminder', 'away'];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function pickString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() !== '' ? value : undefined;
-}
-
-function pickKind(value: unknown): CalendarKind {
-  return typeof value === 'string' && (KINDS as string[]).includes(value) ? (value as CalendarKind) : 'meeting';
-}
-
-function pickSource(value: unknown): CalendarSource {
-  if (typeof value === 'string' && (value === 'local' || value === 'schedule' || value.startsWith('exchange:'))) {
-    return value as CalendarSource;
-  }
-  return 'local';
-}
-
-function pickRemind(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value) : null;
-}
-
-function parseEvent(value: unknown): CalendarEvent | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const id = pickString(value.id);
-  const title = pickString(value.title);
-  const start = pickString(value.start);
-  const end = pickString(value.end);
-  if (id === undefined || title === undefined || start === undefined || end === undefined) {
-    return undefined;
-  }
-  const event: CalendarEvent = {
-    id,
-    title,
-    start,
-    end,
-    allDay: value.allDay === true,
-    kind: pickKind(value.kind),
-    source: pickSource(value.source),
-    remindMinutes: pickRemind(value.remindMinutes),
-    updatedAt: pickString(value.updatedAt) ?? start
-  };
-  if (typeof value.externalId === 'string') {
-    event.externalId = value.externalId;
-  }
-  if (typeof value.location === 'string') {
-    event.location = value.location;
-  }
-  if (typeof value.link === 'string') {
-    event.link = value.link;
-  }
-  if (typeof value.note === 'string') {
-    event.note = value.note;
-  }
-  return event;
-}
-
 function isLocal(source: CalendarSource): boolean {
   return source === 'local';
-}
-
-function overlapsRange(event: CalendarEvent, startMs: number, endMs: number): boolean {
-  const eventStart = Date.parse(event.start);
-  const eventEnd = Date.parse(event.end);
-  if (Number.isNaN(eventStart) || Number.isNaN(eventEnd)) {
-    return false;
-  }
-  return eventStart < endMs && eventEnd > startMs;
 }
 
 export interface CalendarStoreOptions {
@@ -115,36 +42,17 @@ export function createCalendarStore(options: CalendarStoreOptions): CalendarStor
     return result;
   }
 
-  async function readFromDisk(): Promise<void> {
-    let raw: string;
-    try {
-      raw = await readFile(options.filePath, 'utf8');
-    } catch {
-      return;
-    }
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      const list = isRecord(parsed) && Array.isArray(parsed.events) ? parsed.events : [];
-      events = list.map(parseEvent).filter((event): event is CalendarEvent => event !== undefined);
-    } catch {
-      // Повреждённый файл не роняет ядро: пустой календарь и строка в журнале.
-      events = [];
-      options.mark?.('calendar.corrupt', { file: options.filePath });
-    }
-  }
-
-  async function save(): Promise<void> {
-    await mkdir(dirname(options.filePath), { recursive: true });
-    const temporary = `${options.filePath}.tmp`;
-    await writeFile(temporary, JSON.stringify({ events }, null, 2), 'utf8');
-    await rename(temporary, options.filePath);
-  }
-
-  function load(): Promise<void> {
+  async function load(): Promise<void> {
     if (loadPromise === undefined) {
-      loadPromise = readFromDisk();
+      loadPromise = readEvents(options.filePath, options.mark).then((list) => {
+        events = list;
+      });
     }
     return loadPromise;
+  }
+
+  function save(): Promise<void> {
+    return writeEvents(options.filePath, events);
   }
 
   function sorted(range?: CalendarRange): CalendarEvent[] {
@@ -160,41 +68,13 @@ export function createCalendarStore(options: CalendarStoreOptions): CalendarStor
       .sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
   }
 
-  function build(input: AddEventInput): CalendarEvent {
-    const now = options.now().toISOString();
-    const event: CalendarEvent = {
-      id: randomUUID(),
-      title: input.title.trim(),
-      start: input.start,
-      end: input.end,
-      allDay: input.allDay === true,
-      kind: input.kind ?? 'meeting',
-      source: input.source ?? 'local',
-      remindMinutes: pickRemind(input.remindMinutes),
-      updatedAt: now
-    };
-    if (input.externalId !== undefined) {
-      event.externalId = input.externalId;
-    }
-    if (input.location !== undefined) {
-      event.location = input.location;
-    }
-    if (input.link !== undefined) {
-      event.link = input.link;
-    }
-    if (input.note !== undefined) {
-      event.note = input.note;
-    }
-    return event;
-  }
-
   return {
     load,
 
     add(input: AddEventInput): Promise<CalendarEvent> {
       return exclusive(async () => {
         await load();
-        const event = build(input);
+        const event = buildEvent(input, options.now());
         events.push(event);
         await save();
         return event;
@@ -294,7 +174,7 @@ export function createCalendarStore(options: CalendarStoreOptions): CalendarStor
         await load();
         events = events.filter((event) => event.source !== source);
         for (const input of incoming) {
-          events.push(build({ ...input, source }));
+          events.push(buildEvent({ ...input, source }, options.now()));
         }
         await save();
       });

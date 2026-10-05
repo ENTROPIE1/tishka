@@ -63,6 +63,24 @@ describe('createCalendarReminders', () => {
     expect(events.filter((item) => item.type === 'notify')).toHaveLength(0);
   });
 
+  it('включает ссылку на подключение, если она есть', async () => {
+    const events: TishkaEvent[] = [];
+    const { bus } = collect(events);
+    const now = new Date('2026-10-07T10:00:00');
+    const meeting = event({
+      title: 'Демо',
+      start: toLocalIso(new Date(now.getTime() + 10 * 60_000)),
+      end: toLocalIso(new Date(now.getTime() + 40 * 60_000)),
+      remindMinutes: 10,
+      link: 'https://meet.example/abc'
+    });
+    const reminders = createCalendarReminders({ events: () => [meeting], now: () => now, bus, config: () => defaultCalendarConfig() });
+
+    await reminders.tick();
+    const notify = events.find((item) => item.type === 'notify');
+    expect(notify !== undefined && notify.type === 'notify' && notify.title).toContain('https://meet.example/abc');
+  });
+
   it('вне рабочего времени не шлёт вслух о рабочей встрече', async () => {
     const events: TishkaEvent[] = [];
     const { bus } = collect(events);

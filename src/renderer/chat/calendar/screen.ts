@@ -1,35 +1,22 @@
-import { eventSubtitle, eventTimeLabel } from '../../../core/calendar/format';
-import { atTime, weekdayOf } from '../../../core/calendar/time';
+import { weekdayOf } from '../../../core/calendar/time';
 import type { CalendarConfig, CalendarEvent, CalendarRange } from '../../../core/calendar/types';
 import type { Config, TishkaEvent } from '../../../core/types';
 import type { ConnectionView } from '../../../main/ipc-settings';
-import { button, clear, el } from '../../settings/dom';
-import type { CalendarApi, CalendarConfigApi, CalendarScreenDeps } from './deps';
+import type { CalendarConfigApi, CalendarScreenDeps } from './deps';
 import { openEventForm } from './event-form';
 import { renderGrid, weekDays } from './grid';
-import { addDays, isSameDay, startOfWeek } from './layout';
+import { addDays, startOfWeek } from './layout';
+import { buildCalendarChrome, wireCalendarControls, type CalendarView } from './screen-chrome';
+import { addQuickFocus, dayRange, defaultApi, DEFAULT_CONFIG } from './screen-support';
+import { renderSettingsPanel, syncResultState } from './settings-panel';
 import { situationText } from './situation-bar';
-import { renderSources, type SourceState } from './sources';
-import { renderWorkHours, type WorkHoursChange } from './work-hours';
+import type { SourceState } from './sources';
+import { renderEmptyHint, renderTodayList } from './today-list';
+import type { WorkHoursChange } from './work-hours';
 
 export interface CalendarScreen {
   refresh(): Promise<void>;
 }
-
-type View = 'day' | 'week';
-
-function dayRange(day: Date): CalendarRange {
-  const from = new Date(day);
-  from.setHours(0, 0, 0, 0);
-  const to = addDays(from, 1);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
-
-function defaultApi(): CalendarApi {
-  return window.tishka.calendar;
-}
-
-const DEFAULT_CONFIG: CalendarConfig = { workHours: { days: {} }, defaultRemindMinutes: 10, quietOutsideWork: false };
 
 export function mountCalendarScreen(root: HTMLElement, deps: CalendarScreenDeps = {}): CalendarScreen {
   const api = deps.api ?? defaultApi();
@@ -38,31 +25,10 @@ export function mountCalendarScreen(root: HTMLElement, deps: CalendarScreenDeps 
   const subscribe = deps.onEvent ?? ((listener: (event: TishkaEvent) => void) => window.tishka.onEvent(listener));
   const now = deps.now ?? (() => new Date());
 
-  clear(root);
-  const header = el('header', 'calendar-header');
-  header.append(el('h1', 'automations-title', 'Календарь'));
-  const toolbar = el('div', 'calendar-toolbar');
-  const dayButton = button('День', 'automations-tab');
-  const weekButton = button('Неделя', 'automations-tab');
-  const today = button('Сегодня', 'ghost-button');
-  const prev = button('‹', 'icon-button');
-  const next = button('›', 'icon-button');
-  const addButton = button('Событие', 'button primary');
-  toolbar.append(dayButton, weekButton, el('span', 'calendar-toolbar-gap'), today, prev, next, addButton);
-  const bar = el('div', 'calendar-bar');
-  const actions = el('div', 'calendar-quick');
-  const busyHour = button('Занят час', 'ghost-button');
-  const busyDay = button('Занят до конца дня', 'ghost-button');
-  actions.append(busyHour, busyDay);
-  header.append(toolbar, bar, actions);
+  const chrome = buildCalendarChrome(root);
+  const { bar, gridBox, listBox, settingsBox, editorBox, dayButton, weekButton } = chrome;
 
-  const gridBox = el('div', 'calendar-grid-box');
-  const listBox = el('div', 'calendar-today');
-  const settingsBox = el('div', 'calendar-settings');
-  const editorBox = el('div', 'calendar-editor-slot');
-  root.append(header, gridBox, listBox, settingsBox, editorBox);
-
-  let view: View = 'day';
+  let view: CalendarView = 'day';
   let anchor = now();
   let events: CalendarEvent[] = [];
   let config: CalendarConfig = DEFAULT_CONFIG;
@@ -127,64 +93,25 @@ export function mountCalendarScreen(root: HTMLElement, deps: CalendarScreenDeps 
         onSelectAllDay: (day) => openEventForm(editorBox, { day, startMin: 0, api, onSaved: () => void refresh() })
       }
     );
-    renderToday();
+    renderTodayList(listBox, events, now(), (event) =>
+      openEventForm(editorBox, { event, day: new Date(event.start), startMin: 0, api, onSaved: () => void refresh() })
+    );
     renderSettings();
-    renderEmptyHint();
-  }
-
-  function renderToday(): void {
-    clear(listBox);
-    listBox.append(el('h2', 'section-title', 'Сегодня'));
-    const todayList = events
-      .filter((event) => isSameDay(new Date(event.start), now()))
-      .sort((a, b) => a.start.localeCompare(b.start));
-    if (todayList.length === 0) {
-      listBox.append(el('p', 'field-hint', 'На сегодня событий нет.'));
-      return;
-    }
-    for (const event of todayList) {
-      const row = el('div', 'calendar-today-row');
-      row.append(el('span', 'calendar-today-time', eventTimeLabel(event)));
-      const info = el('div', 'calendar-today-info');
-      info.append(el('span', 'calendar-today-title', event.title));
-      info.append(el('span', 'field-hint', eventSubtitle(event)));
-      row.append(info);
-      if (event.link !== undefined && event.link !== '') {
-        const link = button('Подключиться', 'ghost-button');
-        link.addEventListener('click', () => void window.tishka.openExternal(event.link ?? ''));
-        row.append(link);
-      }
-      row.addEventListener('click', () =>
-        openEventForm(editorBox, { event, day: new Date(event.start), startMin: 0, api, onSaved: () => void refresh() })
-      );
-      listBox.append(row);
-    }
+    renderEmptyHint(root, events.length > 0);
   }
 
   function renderSettings(): void {
-    clear(settingsBox);
-    renderWorkHours(settingsBox, config, (change) => void saveWorkHours(change));
-    renderSources(settingsBox, {
-      connections,
+    renderSettingsPanel({
+      box: settingsBox,
+      config,
       sources: fullConfig?.calendar.sources ?? {},
+      connections,
       state: sourceState,
       syncEnabled: typeof api.sync === 'function',
-      onToggle: (name, enabled) => void saveSources(name, enabled),
+      onWorkHours: saveWorkHours,
+      onToggle: saveSources,
       onSync: () => void runSync()
     });
-  }
-
-  function renderEmptyHint(): void {
-    const existing = root.querySelector('.calendar-empty');
-    if (events.length > 0) {
-      existing?.remove();
-      return;
-    }
-    if (existing !== null) {
-      return;
-    }
-    const hint = el('p', 'calendar-empty field-hint', 'Скажите Тишке: «поставь в календарь встречу завтра в 15» или нажмите «Событие».');
-    root.append(hint);
   }
 
   async function saveConfig(patch: Partial<Config['calendar']>): Promise<void> {
@@ -214,71 +141,48 @@ export function mountCalendarScreen(root: HTMLElement, deps: CalendarScreenDeps 
     }
     try {
       const result = await api.sync();
-      sourceState = { ...sourceState, ...describeResult(result) };
+      sourceState = { ...sourceState, ...syncResultState(connections, result) };
     } catch {
       /* ошибку покажет refresh по событию */
     }
     await refresh();
   }
 
-  function describeResult(result: { added: number; updated: number; removed: number; error?: string }): Record<string, SourceState> {
-    const state: SourceState = { loadedAt: new Date().toISOString(), added: result.added, updated: result.updated, removed: result.removed };
-    if (result.error !== undefined) {
-      state.error = result.error;
-    }
-    const next: Record<string, SourceState> = {};
-    for (const connection of connections) {
-      next[connection.name] = state;
-    }
-    return next;
-  }
-
   function addQuick(startMin: number, durationMin: number): void {
-    const day = now();
-    void api
-      .add({
-        title: 'Занят',
-        start: atTime(day, startMin).toISOString(),
-        end: atTime(day, startMin + durationMin).toISOString(),
-        kind: 'focus',
-        remindMinutes: null
-      })
-      .then(() => refresh());
+    addQuickFocus(api, now(), startMin, durationMin, () => void refresh());
   }
 
-  dayButton.addEventListener('click', () => {
-    view = 'day';
-    void refresh();
-  });
-  weekButton.addEventListener('click', () => {
-    view = 'week';
-    void refresh();
-  });
-  today.addEventListener('click', () => {
-    anchor = now();
-    void refresh();
-  });
-  prev.addEventListener('click', () => {
-    anchor = addDays(anchor, view === 'week' ? -7 : -1);
-    void refresh();
-  });
-  next.addEventListener('click', () => {
-    anchor = addDays(anchor, view === 'week' ? 7 : 1);
-    void refresh();
-  });
-  addButton.addEventListener('click', () => {
-    openEventForm(editorBox, { day: anchor, startMin: now().getHours() * 60, api, onSaved: () => void refresh() });
-  });
-  busyHour.addEventListener('click', () => {
-    const nowDate = now();
-    addQuick(nowDate.getHours() * 60 + nowDate.getMinutes(), 60);
-  });
-  busyDay.addEventListener('click', () => {
-    const nowDate = now();
-    const work = config.workHours.days[weekdayOf(nowDate)] ?? null;
-    const endHour = work !== null ? Number(work.end.split(':')[0]) : 18;
-    const startMin = nowDate.getHours() * 60 + nowDate.getMinutes();
-    addQuick(startMin, Math.max(30, endHour * 60 - startMin));
+  wireCalendarControls(chrome, {
+    selectView: (next) => {
+      view = next;
+      void refresh();
+    },
+    prev: () => {
+      anchor = addDays(anchor, view === 'week' ? -7 : -1);
+      void refresh();
+    },
+    next: () => {
+      anchor = addDays(anchor, view === 'week' ? 7 : 1);
+      void refresh();
+    },
+    today: () => {
+      anchor = now();
+      void refresh();
+    },
+    add: () => {
+      openEventForm(editorBox, { day: anchor, startMin: now().getHours() * 60, api, onSaved: () => void refresh() });
+    },
+    busyHour: () => {
+      const day = now();
+      addQuick(day.getHours() * 60 + day.getMinutes(), 60);
+    },
+    busyDay: () => {
+      const day = now();
+      const work = config.workHours.days[weekdayOf(day)] ?? null;
+      const endHour = work !== null ? Number(work.end.split(':')[0]) : 18;
+      const startMin = day.getHours() * 60 + day.getMinutes();
+      addQuick(startMin, Math.max(30, endHour * 60 - startMin));
+    }
   });
 
   subscribe((event) => {

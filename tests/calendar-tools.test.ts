@@ -64,6 +64,11 @@ describe('registerCalendarTools', () => {
     expect((tomorrow.data as CalendarEvent[])[0].title).toBe('Демо');
   });
 
+  it('calendar_add ставит напоминание по умолчанию из настроек', async () => {
+    await call('calendar_add', { title: 'Демо', when: 'завтра в 15' });
+    expect(store.all()[0].remindMinutes).toBe(defaultCalendarConfig().defaultRemindMinutes);
+  });
+
   it('calendar_add сообщает о пересечении, но создаёт событие', async () => {
     await call('calendar_add', { title: 'Планёрка', start: '2026-10-07T11:00:00', end: '2026-10-07T12:00:00' });
     const second = await call('calendar_add', { title: 'Другой звонок', start: '2026-10-07T11:30:00', durationMinutes: 30 });

@@ -1,24 +1,13 @@
-import type {
-  ToolRegistry
-} from '../types';
+import type { ToolRegistry } from '../types';
 import type { TimingMark } from '../../main/timing-log';
-import { describeConnection } from '../connections';
 import type { McpServerConfig } from '../types';
 import { isWorkTime } from './situation';
 import type { CalendarStore } from './store';
+import { dateArg, exchangeServers, externalIdOf, listSignature, toInput, type SyncMeeting } from './sync-meetings';
 import { toLocalIso } from './time';
-import type { AddEventInput, CalendarConfig, CalendarEvent, CalendarSource } from './types';
+import type { CalendarConfig, CalendarSource } from './types';
 
-export interface SyncMeeting {
-  subject: string;
-  start: string;
-  end: string;
-  location?: string;
-  joinUrl?: string;
-  id?: string;
-  allDay?: boolean;
-  cancelled?: boolean;
-}
+export type { SyncMeeting } from './sync-meetings';
 
 export interface CalendarSyncResult {
   ok: boolean;
@@ -52,52 +41,6 @@ export interface CalendarSync {
 const SYNC_DAYS = 14;
 const WORK_INTERVAL_MS = 10 * 60_000;
 const REST_INTERVAL_MS = 30 * 60_000;
-
-function dateArg(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function exchangeServers(servers: McpServerConfig[]): McpServerConfig[] {
-  return servers.filter((server) => describeConnection(server).template === 'exchange');
-}
-
-function externalIdOf(server: string, meeting: SyncMeeting): string {
-  return meeting.id !== undefined && meeting.id !== ''
-    ? meeting.id
-    : `${server}:${meeting.start}:${meeting.subject}`;
-}
-
-function toInput(server: string, meeting: SyncMeeting, existing?: CalendarEvent): AddEventInput {
-  const source: CalendarSource = `exchange:${server}`;
-  const input: AddEventInput = {
-    title: meeting.subject.trim() === '' ? 'Встреча' : meeting.subject,
-    start: meeting.start,
-    end: meeting.end,
-    allDay: meeting.allDay === true,
-    kind: 'meeting',
-    source,
-    externalId: externalIdOf(server, meeting)
-  };
-  if (meeting.location !== undefined && meeting.location !== '') {
-    input.location = meeting.location;
-  }
-  if (meeting.joinUrl !== undefined && meeting.joinUrl !== '') {
-    input.link = meeting.joinUrl;
-  }
-  if (existing !== undefined) {
-    input.note = existing.note;
-    input.remindMinutes = existing.remindMinutes;
-  }
-  return input;
-}
-
-function signature(input: AddEventInput): string {
-  return JSON.stringify([input.externalId, input.title, input.start, input.end, input.allDay, input.location ?? '', input.link ?? '']);
-}
-
-function listSignature(inputs: AddEventInput[]): string {
-  return inputs.map(signature).sort().join('|');
-}
 
 export function createCalendarSync(deps: CalendarSyncDeps): CalendarSync {
   const states: Record<string, SourceState> = {};

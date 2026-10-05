@@ -14,9 +14,6 @@ const NOW = new Date('2026-10-07T10:00:00');
 function localEvent(partial: { title: string; start: string; end: string } & Partial<CalendarEvent>): CalendarEvent {
   return {
     id: partial.id ?? partial.title,
-    title: partial.title,
-    start: partial.start,
-    end: partial.end,
     allDay: false,
     kind: partial.kind ?? 'meeting',
     source: partial.source ?? 'local',
