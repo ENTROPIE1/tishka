@@ -18,6 +18,7 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
+    publicDir: resolve(__dirname, 'assets/tishka'),
     build: {
       rollupOptions: {
         input: {
