@@ -20,7 +20,7 @@ import { registerTimingIpc } from './ipc-timing';
 import { registerVoiceIpc } from './ipc-voice';
 import { createHotkeyRegistrar, type HotkeyRegistrar } from './pet-hotkey';
 import { registerPetIpc } from './pet-ipc';
-import { createPetListen } from './pet-listen';
+import { createPetListen, type PetListen } from './pet-listen';
 import { createSpeechOutput, type SpeechOutput } from './pet-speak';
 import { createPetSpeakPlay, type PetSpeakPlay } from './pet-speak-play';
 import { createPetTray, type PetTray } from './pet-tray';
@@ -61,6 +61,7 @@ let petWake: PetWake | undefined;
 let speech: SpeechOutput | undefined;
 let speakPlay: PetSpeakPlay | undefined;
 let chatTalk: ChatTalk | undefined;
+let petListen: PetListen | undefined;
 let webReader: WebReaderHandle | undefined;
 let memoryWatch: MemoryWatch | undefined;
 let processing = false;
@@ -139,7 +140,7 @@ app.whenReady().then(async () => {
   });
   core = tishka;
 
-  registerIpc(bus, tishka, secrets);
+  registerIpc(bus, tishka, secrets, () => petListen?.cancel());
   registerTimingIpc({ logPath: timingLogPath, openPath: (path) => shell.openPath(path) });
   registerAutomationIpc(tishka);
   registerSettingsIpc(tishka, secrets);
@@ -219,6 +220,7 @@ app.whenReady().then(async () => {
     sendCommand: (command) => pet?.listenCommand(command),
     onMissedSpeech: () => calibrationHint.missed()
   });
+  petListen = listen;
   registerPetIpc(pet, listen);
 
   // Слова остановки голосом: пока Тишка думает, работает или говорит, «стоп»

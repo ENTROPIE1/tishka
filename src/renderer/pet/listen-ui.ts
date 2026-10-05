@@ -19,6 +19,9 @@ export function bubbleSay(input: BubbleSay): string {
 export interface ListenUi {
   isListening(): boolean;
   escape(): void;
+  // Начало печати отменяет идущую разовую запись молча: она не должна
+  // завершиться пустой и сообщить «Не расслышал» поверх ответа.
+  cancel(): void;
   setError(message: string): void;
   say(modelSay: string | undefined, state: string): string;
 }
@@ -80,6 +83,9 @@ export function createListenUi(
   return {
     isListening: () => listening,
     escape(): void {
+      recorder.cancel();
+    },
+    cancel(): void {
       recorder.cancel();
     },
     setError(message: string): void {

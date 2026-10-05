@@ -47,7 +47,12 @@ function isWebUrl(value: string): boolean {
   }
 }
 
-export function registerIpc(bus: SourceBus, core: TishkaCore, secrets: SecretStore): void {
+export function registerIpc(
+  bus: SourceBus,
+  core: TishkaCore,
+  secrets: SecretStore,
+  onUserText?: () => void
+): void {
   bus.on(broadcastEvent);
 
   ipcMain.on(USER_TEXT_CHANNEL, (event, text: unknown) => {
@@ -58,6 +63,9 @@ export function registerIpc(bus: SourceBus, core: TishkaCore, secrets: SecretSto
     if (trimmed === '') {
       return;
     }
+    // Набранный текст отменяет идущую разовую запись: она завершилась бы
+    // пустой и сообщила «Не расслышал» посреди ответа.
+    onUserText?.();
     // Реплика из чата, пока окно в фокусе, не будит ежа: ответ виден в чате.
     const window = BrowserWindow.fromWebContents(event.sender);
     const source = window !== null && isMainWindow(window) && window.isFocused() ? 'chat' : 'pet';

@@ -86,6 +86,9 @@ const wake = createWakeListener({
 const listen = createListenUi((value) => wake.setRecorderListening(value), micThreshold);
 composer.input.addEventListener('keydown', () => {
   wake.keyboard();
+  // Печать отменяет идущую разовую запись: её пустой итог не должен
+  // показаться сообщением «Не расслышал».
+  listen.cancel();
 });
 
 function isOnScreen(state: PetState): boolean {

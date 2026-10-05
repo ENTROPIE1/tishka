@@ -2,7 +2,7 @@ import type { Config, EventBus } from '../core/types';
 import type { TimingMark } from '../main/timing-log';
 import type { SttStatus, TranscribeResult } from './stt-service';
 import { NOT_READY_MESSAGE, planToggle } from './talk-toggle';
-import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
+import { DISMISS_REPLY, SUMMON_REPLY, isDismiss, isSummonOnly, matchWake, stripSummon, wakePrompt } from './wake';
 import { createPhraseClock } from './phrase-time';
 import { createPhraseQueue, routeStaleText, type StaleTextDeps } from './stale-phrase';
 import { createSilenceTimer } from './silence-timer';
@@ -188,11 +188,12 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   function routeConversation(text: string): void {
     // Во время работы слушаем ради остановки: «стоп» останавливает, остальные
     // фразы в ядро не уходят.
-    if ((deps.onBusyPhrase?.(text) ?? false)) {
-      return;
-    }
-    if (isDismiss(text, deps.getVoice().wakeWords)) {
-      dismiss();
+    if (deps.onBusyPhrase?.(text) ?? false) return;
+    if (isDismiss(text, deps.getVoice().wakeWords)) { dismiss(); return; }
+    // Вызов без просьбы при уже видимом еже: готовый ответ, модель не нужна.
+    if (isSummonOnly(text, deps.getVoice().wakeWords)) {
+      deps.bus.emit({ type: 'reply', reply: { say: SUMMON_REPLY } });
+      silence.clear();
       return;
     }
     silence.clear();
@@ -213,28 +214,23 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     if (!match.matched) {
       return false;
     }
+    // Слова вызова («приходи», «иди сюда») — обращение, а не просьба: они
+    // срезаются, в ядро уходит только настоящая просьба после них.
+    const summon = stripSummon(match.rest);
+    const request = summon.summoned ? summon.request : match.rest;
     // Просьба с именем при занятом Тишке: остановка или молчаливое отбрасывание.
-    if (match.rest !== '' && (deps.onBusyPhrase?.(match.rest) ?? false)) {
-      return true;
-    }
+    if (request !== '' && (deps.onBusyPhrase?.(request) ?? false)) return true;
     deps.bus.emit({ type: 'wake', source: 'name' });
-    if (match.rest === '') {
-      if (!conversation) {
-        startListen();
-      }
+    if (request === '') {
+      if (!conversation) startListen();
       return true;
     }
-    if (isDismiss(match.rest, deps.getVoice().wakeWords)) {
-      dismiss();
-      return true;
-    }
-    startListen();
+    if (isDismiss(request, deps.getVoice().wakeWords)) { dismiss(); return true; }
+    // При просьбе отдельная запись не запускается: включается разговор.
     answering = true;
-    if (!conversation && !suppressed) {
-      enableConversation();
-    }
+    if (!conversation && !suppressed) enableConversation();
     void deps.core
-      .handleUserText(match.rest)
+      .handleUserText(request)
       .catch(() => undefined)
       .finally(() => {
         answering = false;
