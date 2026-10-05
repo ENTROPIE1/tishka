@@ -5,11 +5,15 @@ export type TurnRunner = (text: string, signal: AbortSignal, source: InputSource
 export interface TurnQueueDeps {
   run: TurnRunner;
   reset(): void;   // очистка контекста агента между ходами
+  onReplaced?(): void;   // ждущая реплика вытеснена новой
 }
 
 // Реплика заменена ждущей в очереди: вызов завершается без ответа по существу.
 export const REPLACED_REPLY: Reply = { say: 'Отвечу на новый вопрос' };
 export const CANCELLED_REPLY: Reply = { say: 'Остановлено' };
+// Служебная строка о вытесненной реплике: в ленте чата приглушённо, ёж её не
+// озвучивает, в историю как ответ она не пишется.
+export const REPLACED_NOTE = 'Не отвечал: пришёл новый вопрос';
 
 interface Running {
   text: string;
@@ -80,6 +84,7 @@ export function createTurnQueue(deps: TurnQueueDeps): TurnQueue {
     }
     if (waiting !== undefined) {
       waiting.resolve(REPLACED_REPLY);
+      deps.onReplaced?.();
     }
     let resolve!: (reply: Reply) => void;
     const promise = new Promise<Reply>((res) => {

@@ -330,4 +330,30 @@ describe('createSttService в режиме remote: повторная прове
     expect(fetchMock).toHaveBeenCalledTimes(calls);
     expect(stt.status()).toBe('off');
   });
+
+  it('явный запуск готовой службы объявляет переход состояния сразу', async () => {
+    const fetchMock = vi.fn(async () => okResponse());
+    const changes: SttStatus[] = [];
+    const stt = remoteService(fetchMock, (status) => changes.push(status));
+
+    await expect(stt.start()).resolves.toEqual({ ok: true });
+
+    expect(stt.status()).toBe('ready');
+    expect(changes).toEqual(['ready']);
+    stt.stop();
+  });
+
+  it('явный запуск при недоступной службе состояние не объявляет', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('connection refused');
+    });
+    const changes: SttStatus[] = [];
+    const stt = remoteService(fetchMock, (status) => changes.push(status));
+
+    await expect(stt.start()).resolves.toEqual({ ok: false, error: REMOTE_UNREACHABLE });
+
+    expect(stt.status()).toBe('off');
+    expect(changes).toEqual([]);
+    stt.stop();
+  });
 });

@@ -3,6 +3,7 @@ import { clipForState, type Character } from './character';
 import { loadCharacter } from './character-factory';
 import { createComposer } from './composer';
 import { composerBusy, composerCollapsed } from './composer-state';
+import { createDrag } from './drag';
 import { applyPetLayout } from './layout-view';
 import { createListenUi } from './listen-ui';
 import { createInteractivity, hitTestRegions } from './interactivity';
@@ -32,8 +33,6 @@ let currentState: PetState = 'hidden';
 let greeting = false;
 let waiting = false;
 let dragging = false;
-let dragMoved = false;
-let dragLastX = 0;
 let onScreen = false;
 
 const composer = createComposer({
@@ -217,45 +216,47 @@ async function refreshCharacter(): Promise<void> {
 }
 
 function initCharacter(): void {
-  character.addEventListener('mousedown', (event) => {
+  character.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) {
       return;
     }
-    dragging = true;
-    dragMoved = false;
-    dragLastX = event.screenX;
-    wake.beginDrag();
-    interactivity.set(true);
+    drag.down(event.screenX, event.button);
     event.preventDefault();
   });
 }
 
+// Перетаскивание ежа: указатель нажимают на персонаже, отпускают в любом месте
+// окна или вне его. Конец ловим по отпусканию, отмене указателя, потере фокуса
+// и таймауту без движения — окно не остаётся прилипшим к курсору.
+const drag = createDrag({
+  onBegin: () => {
+    dragging = true;
+    wake.beginDrag();
+    interactivity.set(true);
+  },
+  onMove: (delta) => {
+    window.tishka.pet.dragBy(delta);
+    wake.dragMove();
+  },
+  onEnd: () => {
+    dragging = false;
+    window.tishka.pet.dragEnd();
+    wake.endDrag();
+  },
+  onClick: () => openComposer()
+});
+
 function initPointer(): void {
-  window.addEventListener('mousemove', (event) => {
+  window.addEventListener('pointermove', (event) => {
     if (dragging) {
-      const delta = event.screenX - dragLastX;
-      if (Math.abs(delta) > 3) {
-        dragMoved = true;
-      }
-      dragLastX = event.screenX;
-      if (delta !== 0) {
-        window.tishka.pet.dragBy(delta);
-      }
+      drag.move(event.screenX);
       return;
     }
     interactivity.set(hitTestRegions(regions, event.clientX, event.clientY));
   });
-  window.addEventListener('mouseup', () => {
-    if (!dragging) {
-      return;
-    }
-    dragging = false;
-    window.tishka.pet.dragEnd();
-    wake.endDrag();
-    if (!dragMoved) {
-      openComposer();
-    }
-  });
+  window.addEventListener('pointerup', () => drag.up());
+  window.addEventListener('pointercancel', () => drag.cancel());
+  window.addEventListener('blur', () => drag.cancel());
 }
 
 window.tishka.onPetModel(renderModel);

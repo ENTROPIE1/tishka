@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { REPLACED_NOTE } from '../src/core/turn-queue';
 import type { CaptureResult } from '../src/core/vision/look';
 import {
   cleanupCores,
@@ -86,6 +87,26 @@ describe('очередь ходов и остановка', () => {
     expect(bodies.some((body) => body.includes('третий вопрос'))).toBe(true);
     // заменённая реплика не зависает и не отвечает по существу
     expect((await second).say).not.toBe('второй вопрос');
+  });
+
+  it('вытесненная реплика отмечается служебной строкой, а не ответом', async () => {
+    const { fetch: fetchMock, release } = hangingFetch();
+    const { core, events } = await setupCore({ fetch: fetchMock });
+
+    const first = core.handleUserText('первый вопрос');
+    await waitFor(() => fetchMock.mock.calls.length === 1);
+    const second = core.handleUserText('второй вопрос');
+    const third = core.handleUserText('третий вопрос');
+
+    release();
+    await Promise.all([first, second, third]);
+
+    expect((await second).say).toBe('Отвечу на новый вопрос');
+    expect(events.some((event) => event.type === 'status' && event.text === REPLACED_NOTE)).toBe(true);
+    // Служебная строка — не ответ: в ленту как реплика Тишки она не уходит.
+    expect(
+      events.some((event) => event.type === 'reply' && event.reply.say === 'Отвечу на новый вопрос')
+    ).toBe(false);
   });
 
   it('отмена прерывает идущий запрос к модели, шлёт «Остановлено» и простой без ошибки', async () => {

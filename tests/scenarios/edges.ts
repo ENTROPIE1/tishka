@@ -4,6 +4,7 @@ import { CANCELLED_REPLY } from '../../src/core/turn-queue';
 import { filterHallucinations } from '../../src/voice/stt-hallucination';
 import type { SttStatus, TranscribeResult } from '../../src/voice/stt-service';
 import { encodeWav } from '../../src/voice/wav';
+import type { TalkSource } from '../../src/pet/state';
 
 export type TtsMode = 'ok' | 'rejected' | 'unreachable';
 
@@ -107,6 +108,7 @@ interface ReplyScriptItem {
 // Ядро: заданный ответ; события те же, что у настоящего processUserText.
 // holdMs — сколько ядро занято перед ответом: ход можно остановить отменой.
 export function createFakeCore(bus: EventBus, fallback: Reply): FakeCore {
+  const sourceOf = (): TalkSource => (bus as EventBus & { source?(): TalkSource }).source?.() ?? 'pet';
   const script: ReplyScriptItem[] = [];
   const calls: string[] = [];
   let holding = false;
@@ -130,8 +132,13 @@ export function createFakeCore(bus: EventBus, fallback: Reply): FakeCore {
         });
         holding = false;
         if (aborted) {
-          // Остановка из окна ежа: уведомление и простой, как у настоящего cancel('pet').
-          bus.emit({ type: 'notify', title: STOPPED_TITLE });
+          // Остановка: из окна чата — статус, который ёж не показывает;
+          // из окна ежа — уведомление. Источник — ход, в котором шла работа.
+          if (sourceOf() === 'chat') {
+            bus.emit({ type: 'status', text: STOPPED_TITLE });
+          } else {
+            bus.emit({ type: 'notify', title: STOPPED_TITLE });
+          }
           bus.emit({ type: 'idle' });
           return CANCELLED_REPLY;
         }

@@ -131,7 +131,9 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
     case 'tool.end':
       return quiet && isAway(model) ? model : show(endGreeting(model), 'thinking', now);
     case 'status':
-      return { ...endGreeting(model), say: event.text };
+      // Статус из окна чата ежу не показываем: эта строка живёт только в ленте
+      // чата. Статус от самого ежа по-прежнему ложится в облачко.
+      return quiet ? model : { ...endGreeting(model), say: event.text };
     case 'reply': {
       if (quiet) {
         const replies = (model.replies ?? 0) + 1;

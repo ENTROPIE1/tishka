@@ -202,13 +202,14 @@ export function createSttService(options: SttServiceOptions): SttService {
     detector = 'off';
 
     // Готовая служба по адресу: состояние определяет проверка, чужой процесс
-    // не запускаем и не останавливаем.
+    // не запускаем и не останавливаем. Явный запуск тоже объявляет переход,
+    // чтобы окна узнали о нём сразу, а не от следующей фоновой проверки.
     if (config.stt.mode === 'remote') {
       const alive = await probe(fetchFn, config.sttUrl);
       if (run.cancelled) {
         return { ok: false, error: START_CANCELLED };
       }
-      state = alive ? 'ready' : 'off';
+      announce(alive ? 'ready' : 'off');
       mark?.('stt.ready', { ok: alive, probe: true });
       pollRemote(run);
       return alive ? { ok: true } : { ok: false, error: REMOTE_UNREACHABLE };
@@ -219,7 +220,7 @@ export function createSttService(options: SttServiceOptions): SttService {
       if (run.cancelled) {
         return { ok: false, error: START_CANCELLED };
       }
-      state = alive ? 'ready' : 'off';
+      announce(alive ? 'ready' : 'off');
       mark?.('stt.ready', { ok: alive, probe: true });
       return alive ? { ok: true } : { ok: false, error: NOT_CONFIGURED };
     }
@@ -233,7 +234,7 @@ export function createSttService(options: SttServiceOptions): SttService {
       if (run.cancelled) {
         return { ok: false, error: START_CANCELLED };
       }
-      state = 'ready';
+      announce('ready');
       mark?.('stt.ready', { probe: true });
       return { ok: true };
     }
