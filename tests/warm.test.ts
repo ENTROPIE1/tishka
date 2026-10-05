@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { keepMicOpen } from '../src/voice/warm';
+import { keepMicOpen, shouldWarmTts } from '../src/voice/warm';
 import { createWakeListener } from '../src/renderer/pet/wake-listener';
 import type { PhraseListener } from '../src/renderer/shared/phrase-listener';
 import type { WakeState } from '../src/voice/wake';
@@ -45,6 +45,26 @@ describe('keepMicOpen', () => {
         warmMinutes: 30
       })
     ).toBe(false);
+  });
+});
+
+describe('shouldWarmTts', () => {
+  const base = { enabled: true, url: 'http://127.0.0.1:8179', volume: 1, bySentence: true };
+
+  it('включение озвучки запускает прогрев', () => {
+    expect(shouldWarmTts({ ...base, enabled: false }, base)).toBe(true);
+  });
+
+  it('смена адреса службы запускает прогрев', () => {
+    expect(shouldWarmTts(base, { ...base, url: 'http://127.0.0.1:8180' })).toBe(true);
+  });
+
+  it('прочее сохранение настроек прогрев не запускает', () => {
+    expect(shouldWarmTts(base, { ...base, volume: 0.5 })).toBe(false);
+  });
+
+  it('выключение озвучки прогрев не запускает', () => {
+    expect(shouldWarmTts(base, { ...base, enabled: false })).toBe(false);
   });
 });
 

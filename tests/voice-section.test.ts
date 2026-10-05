@@ -18,7 +18,7 @@ function makeConfig(): Config {
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: '',
       stt: { exe: '', model: '', audioCtx: 0, threads: 0, mode: 'remote' },
-      tts: { enabled: false, url: '', volume: 1 }
+      tts: { enabled: false, url: '', volume: 1, bySentence: true }
     },
     mcpServers: [],
     persona: { fyr: 'sometimes', character: 'hedgehog' },

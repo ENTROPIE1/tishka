@@ -12,6 +12,8 @@ export function mountSpeechSection(root: HTMLElement): SettingsSection {
 
   const enabled = el('input', 'checkbox-input');
   enabled.type = 'checkbox';
+  const bySentence = el('input', 'checkbox-input');
+  bySentence.type = 'checkbox';
   const url = textInput();
   const volume = textInput('', 'number');
   volume.min = '0';
@@ -25,6 +27,11 @@ export function mountSpeechSection(root: HTMLElement): SettingsSection {
 
   root.append(
     checkboxField('Говорить вслух', enabled, 'Реплики Тишки произносит служба синтеза; текст карточек остаётся на экране'),
+    checkboxField(
+      'Начинать говорить, не дожидаясь всей реплики',
+      bySentence,
+      'Реплика озвучивается по предложениям: первая часть звучит сразу, остальные синтезируются следом'
+    ),
     field('Адрес службы синтеза', url, 'Например, http://127.0.0.1:8179'),
     field('Громкость', volume, 'От 0 до 1'),
     field('Состояние службы', state)
@@ -69,6 +76,7 @@ export function mountSpeechSection(root: HTMLElement): SettingsSection {
   async function refresh(): Promise<void> {
     const view = await window.tishka.config.get();
     enabled.checked = view.config.voice.tts.enabled;
+    bySentence.checked = view.config.voice.tts.bySentence;
     url.value = view.config.voice.tts.url;
     volume.value = String(view.config.voice.tts.volume);
   }
@@ -84,7 +92,8 @@ export function mountSpeechSection(root: HTMLElement): SettingsSection {
             tts: {
               enabled: enabled.checked,
               url: url.value.trim(),
-              volume: parseVolume(volume.value, view.config.voice.tts.volume)
+              volume: parseVolume(volume.value, view.config.voice.tts.volume),
+              bySentence: bySentence.checked
             }
           }
         };

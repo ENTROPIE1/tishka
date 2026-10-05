@@ -13,7 +13,7 @@ function voice(): Config['voice'] {
     mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
     sttUrl: 'http://127.0.0.1:8178',
     stt: { exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' },
-    tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
+    tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1, bySentence: true }
   };
 }
 

@@ -38,7 +38,7 @@ export function defaultConfig(): Config {
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: 'http://127.0.0.1:8178',
       stt: { exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' },
-      tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
+      tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1, bySentence: true }
     },
     mcpServers: [],
     persona: { fyr: 'sometimes', character: 'hedgehog' },
@@ -324,7 +324,8 @@ export function mergeConfig(value: unknown): Config {
       tts: {
         enabled: pickBoolean(tts.enabled, defaults.voice.tts.enabled),
         url: pickString(tts.url, defaults.voice.tts.url),
-        volume: pickVolume(tts.volume, defaults.voice.tts.volume)
+        volume: pickVolume(tts.volume, defaults.voice.tts.volume),
+        bySentence: pickBoolean(tts.bySentence, defaults.voice.tts.bySentence)
       }
     },
     mcpServers: parseMcpServers(value.mcpServers),
