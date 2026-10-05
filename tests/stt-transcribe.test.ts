@@ -47,7 +47,7 @@ describe('createSttService.transcribe', () => {
     expect(form.get('file')).toBeInstanceOf(Blob);
   });
 
-  it('подробный ответ с высокой вероятностью отсутствия речи — «Не расслышал»', async () => {
+  it('шумовой сегмент с высокой вероятностью отсутствия речи — пустой результат', async () => {
     const fetchMock = vi.fn(async () =>
       okResponse({
         text: 'видишь?',
@@ -63,11 +63,27 @@ describe('createSttService.transcribe', () => {
     });
   });
 
-  it('подробный ответ с низкой средней уверенностью — «Не расслышал»', async () => {
+  it('низкая средняя уверенность — фраза отброшена по уверенности', async () => {
     const fetchMock = vi.fn(async () =>
       okResponse({
         text: 'раз',
         segments: [{ text: 'раз', no_speech_prob: 0.1, avg_logprob: -2.5 }]
+      })
+    );
+    const stt = service(fetchMock);
+
+    await expect(stt.transcribe(new Uint8Array([1, 2]))).resolves.toEqual({
+      ok: false,
+      error: 'Не расслышал',
+      unreliable: true
+    });
+  });
+
+  it('шум и низкая уверенность вместе — шум важнее, пустой результат', async () => {
+    const fetchMock = vi.fn(async () =>
+      okResponse({
+        text: 'раз',
+        segments: [{ text: 'раз', no_speech_prob: 0.9, avg_logprob: -2.5 }]
       })
     );
     const stt = service(fetchMock);

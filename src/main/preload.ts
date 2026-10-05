@@ -72,6 +72,7 @@ import {
   PET_POINTER_CHANNEL,
   PET_FOCUS_INPUT_CHANNEL,
   PET_WAKE_CHANNEL,
+  PET_CAPTION_CHANNEL,
   PET_CONVERSATION_TOGGLE_CHANNEL,
   PET_WAKE_ERROR_CHANNEL,
   PET_WAKE_ESCAPE_CHANNEL,
@@ -374,6 +375,15 @@ const api = {
       ipcRenderer.on(PET_WAKE_STATE_CHANNEL, handler);
       return () => {
         ipcRenderer.removeListener(PET_WAKE_STATE_CHANNEL, handler);
+      };
+    },
+    onCaption(listener: (text: string) => void): () => void {
+      const handler = (_event: Electron.IpcRendererEvent, text: string): void => {
+        listener(text);
+      };
+      ipcRenderer.on(PET_CAPTION_CHANNEL, handler);
+      return () => {
+        ipcRenderer.removeListener(PET_CAPTION_CHANNEL, handler);
       };
     },
     onListenCommand(listener: (command: ListenCommand) => void): () => void {

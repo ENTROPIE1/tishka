@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TranscribeResult } from '../src/voice/stt-service';
 import { flush, makeHarness, wav } from './wake-test-helpers';
 
 beforeEach(() => {
@@ -72,6 +73,59 @@ describe('таймер разговора после ошибок распозн
     gate.resolve();
     await flush();
     await vi.advanceTimersByTimeAsync(30000);
+    expect(h.flow.isConversation()).toBe(false);
+  });
+});
+
+describe('таймер разговора во время распознавания фразы', () => {
+  it('пока фраза распознаётся, таймер стоит; речь заводит его заново', async () => {
+    const h = makeHarness([]);
+    h.flow.enableConversation();
+    await vi.advanceTimersByTimeAsync(20000);
+    let release: ((result: TranscribeResult) => void) | undefined;
+    h.transcribe.mockImplementationOnce(
+      () =>
+        new Promise<TranscribeResult>((resolve) => {
+          release = resolve;
+        })
+    );
+    h.flow.handlePhrase(wav);
+    await flush();
+    await vi.advanceTimersByTimeAsync(15000);
+    // Срок (30 с) прошёл, но распознавание ещё идёт: разговор жив и фраза не пропала.
+    expect(h.flow.isConversation()).toBe(true);
+    release?.({ ok: true, text: 'какие встречи сегодня' });
+    await flush();
+    expect(h.calls).toEqual(['какие встречи сегодня']);
+    // После речи таймер заведён заново на полный срок.
+    await vi.advanceTimersByTimeAsync(29000);
+    expect(h.flow.isConversation()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(h.flow.isConversation()).toBe(false);
+  });
+
+  it('пустой результат не продлевает таймер: отсчёт продолжается с места остановки', async () => {
+    const h = makeHarness([{ error: 'Не расслышал', empty: true }]);
+    h.flow.enableConversation();
+    await vi.advanceTimersByTimeAsync(20000);
+    let release: ((result: TranscribeResult) => void) | undefined;
+    h.transcribe.mockImplementationOnce(
+      () =>
+        new Promise<TranscribeResult>((resolve) => {
+          release = resolve;
+        })
+    );
+    h.flow.handlePhrase(wav);
+    await flush();
+    await vi.advanceTimersByTimeAsync(15000);
+    // Распознавание медленное: на 30-й секунде разговор ещё жив.
+    expect(h.flow.isConversation()).toBe(true);
+    release?.({ ok: false, error: 'Не расслышал', empty: true });
+    await flush();
+    // После пустого результата отсчёт продолжается: оставались 10 секунд.
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(h.flow.isConversation()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
     expect(h.flow.isConversation()).toBe(false);
   });
 });

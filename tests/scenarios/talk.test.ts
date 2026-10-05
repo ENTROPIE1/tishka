@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NOISE } from './edges';
 import { createScenario, type Scenario } from './harness';
 
 let scenario: Scenario | undefined;
@@ -82,6 +83,53 @@ describe('Сценарий 13. Тишина в разговоре дольше �
 
     await h.wait(3500);
     expect(h.observations.visible()).toBe(false);
+    expect(h.observations.conversationOn()).toBe(false);
+  });
+});
+
+// Сценарий 15 (задача 88): медленное распознавание фразы не закрывает разговор.
+describe('Сценарий 15. Медленное распознавание фразы в разговоре', () => {
+  it('пока фраза распознаётся, таймер тишины стоит; речь заводит его заново', async () => {
+    scenario = createScenario({ sttStatus: 'ready', talkTimeoutSec: 10 });
+    const h = scenario;
+    h.startApp();
+    await h.wait(1000);
+    expect(h.observations.conversationOn()).toBe(true);
+
+    // Фраза сказана на 2-й секунде, служба распознаёт её 15 секунд.
+    h.hear('какие встречи сегодня', 15000);
+    expect(h.say('какие встречи сегодня')).toBe(true);
+    await h.wait(12000);
+    // Срок тишины (10 с) прошёл, а фраза ещё распознаётся: разговор жив.
+    expect(h.observations.conversationOn()).toBe(true);
+    await h.wait(3000);
+    await h.flush();
+    expect(h.observations.coreCalls()).toEqual(['какие встречи сегодня']);
+    // После речи разговор жив ещё полный срок.
+    await h.wait(9500);
+    expect(h.observations.conversationOn()).toBe(true);
+    await h.wait(500);
+    expect(h.observations.conversationOn()).toBe(false);
+    expect(h.observations.micOn()).toBe(false);
+  });
+
+  it('пустой результат не продлевает срок: отсчёт продолжается с места остановки', async () => {
+    scenario = createScenario({ sttStatus: 'ready', talkTimeoutSec: 10 });
+    const h = scenario;
+    h.startApp();
+    await h.wait(1000);
+
+    // Шум сказан на 2-й секунде, служба отвечает 8 секунд.
+    h.hear(NOISE, 8000);
+    h.noise();
+    await h.flush();
+    await h.wait(9000);
+    // Распознавание шло 9 секунд, но отсчёт стоял: разговор жив.
+    expect(h.observations.conversationOn()).toBe(true);
+    // После пустого результата продолжаются оставшиеся 9 секунд тишины.
+    await h.wait(7500);
+    expect(h.observations.conversationOn()).toBe(true);
+    await h.wait(1000);
     expect(h.observations.conversationOn()).toBe(false);
   });
 });

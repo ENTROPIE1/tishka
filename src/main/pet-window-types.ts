@@ -21,6 +21,8 @@ export interface PetWindow {
   dragEnd(): void;
   listenCommand(command: ListenCommand): void;
   wakeState(state: WakeState): void;
+  // Разовая подпись под ежом (например, «не разобрал»).
+  caption(text: string): void;
   speak(message: SpeakMessage): void;
   stopSpeaking(): void;
   hide(): void;

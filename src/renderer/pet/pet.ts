@@ -9,6 +9,7 @@ import { createInteractivity, hitTestRegions } from './interactivity';
 import { micThreshold } from '../shared/mic-threshold';
 import { createPetCard } from './pet-card';
 import { createSpeaker } from './speaker';
+import { createStateCaption } from './state-caption';
 import { stateLabel } from './state-label';
 import { createWakeListener } from './wake-listener';
 import { installLinkGuard } from '../shared/links';
@@ -102,8 +103,11 @@ function updateBubble(): void {
 }
 
 function updateStateLabel(): void {
-  stateLabelEl.textContent = stateLabel(currentState, waiting, greeting);
+  // Разовая подпись («не разобрал») главнее подписи состояния.
+  stateLabelEl.textContent = caption.current() ?? stateLabel(currentState, waiting, greeting);
 }
+
+const caption = createStateCaption(updateStateLabel);
 
 function applyComposer(state: PetState, visible: boolean): void {
   composer.element.hidden = !visible;
@@ -197,6 +201,7 @@ function initPointer(): void {
 }
 
 window.tishka.onPetModel(renderModel);
+window.tishka.pet.onCaption((text) => caption.show(text));
 window.tishka.onEvent((event) => {
   if (event.type === 'speak.level') {
     characterModel.setMouth(event.level);

@@ -20,7 +20,7 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
   };
 }
 
-export type PhraseScript = string | { error: string; empty?: boolean };
+export type PhraseScript = string | { error: string; empty?: boolean; unreliable?: boolean };
 
 export interface Harness {
   flow: WakeFlow;
@@ -30,6 +30,9 @@ export interface Harness {
   history: string[];
   commands: string[];
   errors: string[];
+  spoken: string[];
+  captions: string[];
+  hints: () => number;
   prompts: (string | undefined)[];
   soonChanges: boolean[];
   hidden: () => number;
@@ -58,6 +61,9 @@ export function makeHarness(
   const history: string[] = [];
   const commands: string[] = [];
   const errors: string[] = [];
+  const spoken: string[] = [];
+  const captions: string[] = [];
+  let hints = 0;
   const prompts: (string | undefined)[] = [];
   const soonChanges: boolean[] = [];
 
@@ -70,7 +76,7 @@ export function makeHarness(
     }
     return typeof item === 'string'
       ? { ok: true, text: item }
-      : { ok: false, error: item.error, empty: item.empty };
+      : { ok: false, error: item.error, empty: item.empty, unreliable: item.unreliable };
   });
 
   const core = {
@@ -90,6 +96,8 @@ export function makeHarness(
   bus.on((event) => {
     if (event.type === 'error') {
       errors.push(event.message);
+    } else if (event.type === 'speak.start') {
+      spoken.push(event.text);
     }
   });
 
@@ -105,7 +113,11 @@ export function makeHarness(
     onSoonChange: () => soonChanges.push(flow.isLeavingSoon()),
     isReady: () => readyState,
     isVisible: () => visibleState,
-    memoryName: () => memoryName
+    memoryName: () => memoryName,
+    onUnheard: (text) => captions.push(text),
+    onUnheardHint: () => {
+      hints += 1;
+    }
   });
 
   return {
@@ -116,6 +128,9 @@ export function makeHarness(
     history,
     commands,
     errors,
+    spoken,
+    captions,
+    hints: () => hints,
     prompts,
     soonChanges,
     hidden: () => hiddenCount,
