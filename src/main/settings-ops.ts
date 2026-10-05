@@ -36,12 +36,16 @@ function secretRef(name: string): string {
 
 function asDraft(value: unknown): ConnectionDraft {
   const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-  return {
+  const draft: ConnectionDraft = {
     template: record['template'] as ConnectionTemplate,
     name: typeof record['name'] === 'string' ? record['name'] : '',
     fields: (record['fields'] ?? {}) as Record<string, string>,
     secrets: (record['secrets'] ?? {}) as Record<string, string>
   };
+  if (typeof record['confirmChanges'] === 'boolean') {
+    draft.confirmChanges = record['confirmChanges'];
+  }
+  return draft;
 }
 
 async function connectionViews(core: TishkaCore, secrets: SecretStore): Promise<ConnectionView[]> {
@@ -61,7 +65,8 @@ async function connectionViews(core: TishkaCore, secrets: SecretStore): Promise<
       fields: described.fields,
       secrets: secretViews,
       state: status?.state ?? 'disabled',
-      tools: status?.tools ?? 0
+      tools: status?.tools ?? 0,
+      confirmChanges: server.confirmChanges !== false
     };
     if (status?.error !== undefined) view.error = status.error;
     views.push(view);

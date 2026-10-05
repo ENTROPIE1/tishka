@@ -4,9 +4,10 @@ export type ConnectionTemplate = 'confluence' | 'exchange' | 'custom-stdio' | 'c
 
 export interface ConnectionDraft {
   template: ConnectionTemplate;
-  name: string;                               // имя сервера: латиница, цифры, дефис, от 1 до 32 знаков
-  fields: Record<string, string>;             // несекретные поля: адреса, логин, команда
-  secrets: Record<string, string>;            // секретные поля; пустое значение — оставить прежний секрет
+  name: string;                               // имя подключения: латиница, цифры, дефис, от 1 до 32 знаков
+  fields: Record<string, string>;             // несекретные поля: адрес, логин, команда, аргументы
+  secrets: Record<string, string>;            // секретные поля; пустое значение — прежний секрет сохраняется
+  confirmChanges?: boolean;                   // спрашивать перед изменениями; нет поля — да
 }
 
 export interface ConnectionPlan {
@@ -52,12 +53,16 @@ function trimRecord(record: Record<string, string>): Record<string, string> {
 }
 
 function cleanDraft(draft: ConnectionDraft): ConnectionDraft {
-  return {
+  const clean: ConnectionDraft = {
     template: draft.template,
     name: typeof draft.name === 'string' ? draft.name.trim() : draft.name,
     fields: trimRecord(draft.fields),
     secrets: trimRecord(draft.secrets)
   };
+  if (typeof draft.confirmChanges === 'boolean') {
+    clean.confirmChanges = draft.confirmChanges;
+  }
+  return clean;
 }
 
 function addUrlError(errors: string[], value: string, emptyMessage: string): void {
@@ -207,7 +212,9 @@ function buildServer(draft: ConnectionDraft): ConnectionPlan {
       server = buildConfluence(draft, secretsToSet);
       break;
   }
-  return { server, secretsToSet };
+  const withConfirm =
+    draft.confirmChanges === undefined ? server : { ...server, confirmChanges: draft.confirmChanges };
+  return { server: withConfirm, secretsToSet };
 }
 
 export function planConnection(

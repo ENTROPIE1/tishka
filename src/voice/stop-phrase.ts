@@ -7,7 +7,9 @@ export const STOP_CAPTION = 'остановил';
 // Тишка занят: думает, работает или говорит. Речь кончается событием speak.end,
 // работа ходом ядра — простоем.
 const BUSY_START = new Set(['think.start', 'tool.start', 'speak.start']);
-const BUSY_END = new Set(['idle', 'speak.end']);
+// Пока открыт вопрос подтверждения, фразы человека («да»/«нет») не глушатся:
+// их разбирает ядро.
+const BUSY_END = new Set(['idle', 'speak.end', 'confirm.request']);
 
 export interface StopPhraseDeps {
   bus: EventBus;

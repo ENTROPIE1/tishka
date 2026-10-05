@@ -1,4 +1,5 @@
 import type { EventBus, ToolCallOptions, ToolDef, ToolHandler, ToolRegistry, ToolResult } from '../types';
+import { CONFIRM_BACKGROUND_ERROR, CONFIRM_DENIED_ERROR } from './confirm';
 
 function missingRequiredField(schema: object, args: Record<string, unknown>): string | undefined {
   const required = (schema as { required?: unknown }).required;
@@ -20,6 +21,14 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+async function runHandler(handler: ToolHandler, args: Record<string, unknown>): Promise<ToolResult> {
+  try {
+    return await handler(args);
+  } catch (error) {
+    return { ok: false, content: '', error: errorMessage(error) };
+  }
+}
+
 export interface MutableToolRegistry extends ToolRegistry {
   remove(name: string): void;
 }
@@ -29,7 +38,18 @@ export interface ToolRegistryHooks {
   onResult?(name: string, result: ToolResult): void | Promise<void>;
 }
 
-export function createToolRegistry(bus: EventBus, hooks?: ToolRegistryHooks): MutableToolRegistry {
+// Подтверждение человеком меняющих инструментов: политика решает, нужен ли
+// вопрос, а ask ставит его и ждёт ответа.
+export interface ToolConfirmation {
+  required(def: ToolDef): boolean;
+  ask(def: ToolDef, args: Record<string, unknown>): Promise<boolean>;
+}
+
+export function createToolRegistry(
+  bus: EventBus,
+  hooks?: ToolRegistryHooks,
+  confirmation?: ToolConfirmation
+): MutableToolRegistry {
   const tools = new Map<string, { def: ToolDef; handler: ToolHandler }>();
 
   return {
@@ -68,10 +88,21 @@ export function createToolRegistry(bus: EventBus, hooks?: ToolRegistryHooks): Mu
       }
 
       let result: ToolResult;
-      try {
-        result = await entry.handler(args);
-      } catch (error) {
-        result = { ok: false, content: '', error: errorMessage(error) };
+      // Меняющий инструмент с подтверждением: фон не спрашивает, обычный ход ждёт
+      // ответа человека. Отказ возвращает модели понятную ошибку.
+      if (confirmation?.required(entry.def) === true) {
+        if (background) {
+          result = { ok: false, content: '', error: CONFIRM_BACKGROUND_ERROR };
+        } else {
+          const confirmed = await confirmation.ask(entry.def, args);
+          if (!confirmed) {
+            result = { ok: false, content: '', error: CONFIRM_DENIED_ERROR };
+          } else {
+            result = await runHandler(entry.handler, args);
+          }
+        }
+      } else {
+        result = await runHandler(entry.handler, args);
       }
 
       if (!background) {

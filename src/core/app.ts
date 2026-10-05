@@ -34,6 +34,8 @@ import { createTriggerState } from './triggers/state';
 import { registerTriggerTools } from './triggers/tools';
 import { createWatcher, type Watcher } from './triggers/watcher';
 import { registerBuiltinTools } from './tools/builtin';
+import { createConfirmGate, type ConfirmGate } from './tools/confirm';
+import { connectionOf, requiresConfirm as confirmRequired } from './tools/confirm-policy';
 import { createToolGroup, type ToolGroup } from './tools/group';
 import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
@@ -42,7 +44,8 @@ import { registerWebTools } from './tools/web';
 import { createStatsRecorder } from './stats/recorder';
 import { createStatsStore } from './stats/store';
 import { registerStatsTools } from './stats/tool';
-import type { Config, EventBus, InputSource, McpServerConfig, Panel, Reply, SecretStore, Skill, StatsSummary, TishkaEvent } from './types';
+import type { Config, EventBus, InputSource, McpServerConfig, Panel, Reply, SecretStore, Skill, StatsSummary, TishkaEvent, ToolDef } from './types';
+import { parseConfirmAnswer } from '../voice/confirm-answer';
 import { isCancelled } from './cancel';
 import { CANCELLED_REPLY, createTurnQueue, REPLACED_NOTE } from './turn-queue';
 import { STOPPED_TITLE } from './stopped';
@@ -101,6 +104,7 @@ export interface TishkaCore {
   start(): Promise<void>;
   stop(): Promise<void>;
   handleUserText(text: string, source?: InputSource): Promise<Reply>;
+  confirm(id: string, yes: boolean): void;   // ответ человека на вопрос подтверждения
   cancel(source?: StopSource): void;   // прервать текущую работу и очистить очередь
   hasGatewayKey(): Promise<boolean>;
   checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult>;
@@ -133,6 +137,8 @@ const DRIVE_PATTERN = /^[A-Za-z]:/;
 const NOT_READY: Reply = { say: 'Я ещё не проснулся, дай мне мгновение', mood: 'confused' };
 const NO_KEY: Reply = { say: 'Ключ шлюза не задан, добавь его в подключениях', mood: 'confused' };
 const UNEXPECTED: Reply = { say: 'Что-то пошло не так, попробуй ещё раз', mood: 'confused' };
+// Ответ на вопрос подтверждения не реплика: настоящий ответ придёт ходом, что ждёт.
+const CONFIRM_ANSWER_REPLY: Reply = { say: '' };
 
 function isAbsoluteArg(value: string): boolean {
   return value.startsWith('/') || value.startsWith('\\') || DRIVE_PATTERN.test(value);
@@ -182,6 +188,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let calendarEvents: (() => Promise<CalendarEvent[]>) | undefined;
   let calendarSync: CalendarSync | undefined;
   let calendarTimer: ReturnType<typeof setInterval> | undefined;
+  let confirmGate: ConfirmGate | undefined;
   let halted = false;
   let stopSource: StopSource = 'pet';
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
@@ -288,6 +295,12 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     return (await gatewayKey()) !== undefined;
   }
 
+  // Меняющий инструмент чужого сервера MCP спрашивает человека, если настройка
+  // подключения не выключена. Встроенные и обратимые инструменты ядра — нет.
+  function requiresConfirm(def: ToolDef): boolean {
+    return confirmRequired(def, config.mcpServers);
+  }
+
   // Проверка шлюза не сохраняет настройки. Ключ из поля важнее сохранённого.
   async function checkGateway(input: {
     baseUrl: string;
@@ -365,6 +378,16 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     if (!started) {
       return Promise.resolve(NOT_READY);
     }
+    // Пока открыт вопрос подтверждения, «да» и «нет» — ответ на него, а любая
+    // другая реплика снимает вопрос как отказ и идёт новым ходом.
+    if (confirmGate !== undefined && confirmGate.pending()) {
+      const answer = parseConfirmAnswer(text);
+      if (answer !== undefined) {
+        confirmGate.answerPending(answer);
+        return Promise.resolve(CONFIRM_ANSWER_REPLY);
+      }
+      confirmGate.cancelAll();
+    }
     return turns.push(text, source);
   }
 
@@ -373,6 +396,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   // показывают служебную строку.
   function cancel(source?: StopSource): void {
     stopSource = source ?? 'pet';
+    confirmGate?.cancelAll();
     if (!turns.cancel()) {
       deps.events.emit({ type: 'idle' });
       return;
@@ -431,9 +455,16 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       deps.events.emit({ type: 'error', message: `Не удалось загрузить пресеты: ${stepError(error)}` });
     }
 
-    const registry = createToolRegistry(deps.events, {
-      onResult: (name, result) => recorder.fromTool(name, result)
-    });
+    const confirmationGate = createConfirmGate(deps.events);
+    confirmGate = confirmationGate;
+    const registry = createToolRegistry(
+      deps.events,
+      { onResult: (name, result) => recorder.fromTool(name, result) },
+      {
+        required: (def) => requiresConfirm(def),
+        ask: (def, args) => confirmationGate.request({ connection: connectionOf(def), tool: def.name, args })
+      }
+    );
     registerStatsTools(registry, { summary: () => statsStore.summary() });
     registerBuiltinTools(registry, {
       openExternal: deps.openExternal,
@@ -653,6 +684,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
 
   async function stop(): Promise<void> {
     halted = true;
+    confirmGate?.cancelAll();
     historyStore.stop();
     scheduler?.stop();
     watcher?.stop();
@@ -892,6 +924,9 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     start,
     stop,
     handleUserText,
+    confirm: (id: string, yes: boolean) => {
+      confirmGate?.answer(id, yes);
+    },
     cancel,
     hasGatewayKey,
     checkGateway,

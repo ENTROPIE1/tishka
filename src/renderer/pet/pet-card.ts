@@ -1,5 +1,6 @@
 import type { PetModel } from '../../pet/state';
 import { askCardElement } from '../shared/ask-card';
+import { confirmCardElement } from '../shared/confirm-card';
 import { panelElement } from '../shared/panels';
 
 export interface PetCardHost {
@@ -23,13 +24,22 @@ export function createPetCard(host: PetCardHost): PetCard {
   }
 
   function render(model: PetModel): void {
-    const { panel, ask } = model;
-    const key = JSON.stringify({ panel, ask, replies: model.replies ?? 0 });
+    const { panel, ask, confirm } = model;
+    const key = JSON.stringify({ panel, ask, confirm, replies: model.replies ?? 0 });
     if (key !== lastKey) {
       lastKey = key;
       closed = false;
       host.element.replaceChildren();
-      if (ask !== undefined) {
+      if (confirm !== undefined) {
+        host.element.append(
+          confirmCardElement(confirm, {
+            onAnswer: (yes) => {
+              window.tishka.confirm(confirm.id, yes);
+            }
+          })
+        );
+        window.tishka.pet.focus();
+      } else if (ask !== undefined) {
         host.element.append(
           askCardElement(ask, {
             onSend: (text) => {
@@ -56,7 +66,7 @@ export function createPetCard(host: PetCardHost): PetCard {
         );
       }
     }
-    host.element.hidden = (panel === undefined && ask === undefined) || closed;
+    host.element.hidden = (panel === undefined && ask === undefined && confirm === undefined) || closed;
   }
 
   return { render };

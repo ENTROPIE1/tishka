@@ -225,11 +225,18 @@ function parseMcpServer(value: unknown): McpServerConfig | undefined {
     return undefined;
   }
   const name = value.name;
+  // Нет поля confirmChanges — спрашивать человека: старые настройки читаются как true.
+  const confirmChanges = typeof value.confirmChanges === 'boolean' ? value.confirmChanges : undefined;
   if (value.transport === 'http' && typeof value.url === 'string') {
     const headers = optionalStringRecord(value.headers);
-    return headers === undefined
-      ? { name, transport: 'http', url: value.url }
-      : { name, transport: 'http', url: value.url, headers };
+    const server: McpServerConfig = { name, transport: 'http', url: value.url };
+    if (headers !== undefined) {
+      server.headers = headers;
+    }
+    if (confirmChanges !== undefined) {
+      server.confirmChanges = confirmChanges;
+    }
+    return server;
   }
   if (value.transport === 'stdio' && typeof value.command === 'string') {
     const server: McpServerConfig = { name, transport: 'stdio', command: value.command };
@@ -240,6 +247,9 @@ function parseMcpServer(value: unknown): McpServerConfig | undefined {
     }
     if (env !== undefined) {
       server.env = env;
+    }
+    if (confirmChanges !== undefined) {
+      server.confirmChanges = confirmChanges;
     }
     return server;
   }

@@ -38,6 +38,7 @@ import {
   CALENDAR_SYNC_STATE_CHANNEL,
   CALENDAR_UPDATE_CHANNEL,
   CANCEL_CHANNEL,
+  CONFIRM_CHANNEL,
   CHAT_TALK_ESCAPE_CHANNEL,
   CHAT_TALK_KEYBOARD_CHANNEL,
   CHAT_TALK_PHRASE_CHANNEL,
@@ -150,6 +151,9 @@ const api = {
   },
   stop(): void {
     ipcRenderer.send(CANCEL_CHANNEL);
+  },
+  confirm(id: string, yes: boolean): void {
+    ipcRenderer.send(CONFIRM_CHANNEL, id, yes);
   },
   history(limit?: number): Promise<HistoryEntry[]> {
     return ipcRenderer.invoke(HISTORY_CHANNEL, limit);

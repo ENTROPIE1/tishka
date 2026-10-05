@@ -1,5 +1,6 @@
 import type { HistoryEntry } from '../../core/history';
 import { askCardElement, type AskRequest } from '../shared/ask-card';
+import { confirmCardElement, type ConfirmCardRequest } from '../shared/confirm-card';
 import { messageElement } from './feed-message';
 
 const STICK_BOTTOM_GAP = 48;
@@ -8,6 +9,8 @@ const HIGHLIGHT_MS = 2000;
 export interface ChatFeed {
   appendEntry(entry: HistoryEntry): void;
   appendAskCard(ask: AskRequest): void;
+  appendConfirm(confirm: ConfirmCardRequest): void;
+  closeConfirm(id: string): void;
   appendSkillCard(skillId: string): void;
   clear(): void;
   fill(entries: HistoryEntry[]): void;
@@ -57,6 +60,33 @@ export function createChatFeed(element: HTMLElement): ChatFeed {
     }
   }
 
+  // Строка подтверждения в ленте: текст вопроса и две кнопки. После ответа
+  // карточка снимается — настоящий ответ придёт обычной репликой.
+  function appendConfirm(confirm: ConfirmCardRequest): void {
+    const pinned = isPinnedToBottom();
+    const row = document.createElement('div');
+    row.className = 'msg msg-tishka';
+    row.dataset['confirm'] = confirm.id;
+    const content = document.createElement('div');
+    content.className = 'msg-content';
+    content.append(
+      confirmCardElement(confirm, {
+        onAnswer: (yes) => {
+          window.tishka.confirm(confirm.id, yes);
+        }
+      })
+    );
+    row.append(content);
+    element.append(row);
+    if (pinned) {
+      scrollToBottom();
+    }
+  }
+
+  function closeConfirm(id: string): void {
+    element.querySelector<HTMLElement>(`[data-confirm="${id}"]`)?.remove();
+  }
+
   // Карточка о сохранённом навыке: ссылка ведёт на экран автоматизаций и подсвечивает карточку.
   function appendSkillCard(skillId: string): void {
     const pinned = isPinnedToBottom();
@@ -101,7 +131,11 @@ export function createChatFeed(element: HTMLElement): ChatFeed {
       if (!(child instanceof HTMLElement)) {
         return false;
       }
-      return child.querySelector('.ask-input') !== null || child.dataset['skill'] !== undefined;
+      return (
+        child.querySelector('.ask-input') !== null ||
+        child.dataset['skill'] !== undefined ||
+        child.dataset['confirm'] !== undefined
+      );
     });
   }
 
@@ -144,5 +178,5 @@ export function createChatFeed(element: HTMLElement): ChatFeed {
     }, HIGHLIGHT_MS);
   }
 
-  return { appendEntry, appendAskCard, appendSkillCard, clear, fill, refill, scrollTo, highlight };
+  return { appendEntry, appendAskCard, appendConfirm, closeConfirm, appendSkillCard, clear, fill, refill, scrollTo, highlight };
 }

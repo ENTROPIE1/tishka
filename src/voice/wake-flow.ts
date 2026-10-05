@@ -57,7 +57,9 @@ const BUSY_REASON: Partial<Record<TishkaEvent['type'], BusyReason>> = {
   'tool.start': 'work',
   'speak.start': 'speech'
 };
-const BUSY_END = new Set<TishkaEvent['type']>(['idle', 'speak.end']);
+// Вопрос подтверждения — не «занят»: пока он открыт, ответ человека («да»/«нет»)
+// должен дойти до ядра репликой.
+const BUSY_END = new Set<TishkaEvent['type']>(['idle', 'speak.end', 'confirm.request']);
 
 // Связка голоса с окном ежа: ведение разговора, окно ожидания службы, решение
 // по фразе и правила занятости собраны в отдельных модулях, здесь — общая шина.

@@ -5,6 +5,7 @@ import { filterHallucinations } from '../../src/voice/stt-hallucination';
 import type { SttStatus, TranscribeResult } from '../../src/voice/stt-service';
 import { encodeWav } from '../../src/voice/wav';
 import type { TalkSource } from '../../src/pet/state';
+import { parseConfirmAnswer } from '../../src/voice/confirm-answer';
 
 export type TtsMode = 'ok' | 'rejected' | 'unreachable';
 
@@ -110,13 +111,15 @@ export function createFakeTts(mode: TtsMode): FakeTts {
 export interface FakeCore {
   handleUserText(text: string): Promise<Reply>;
   willReply(reply: Reply, holdMs?: number): void;
+  willConfirm(question: string, reply?: Reply): void;
   cancel(): void;
   calls(): string[];
 }
 
 interface ReplyScriptItem {
   reply: Reply;
-  holdMs: number;   // сколько ядро «работает» до ответа
+  holdMs: number;           // сколько ядро «работает» до ответа
+  confirm?: string;         // следующий ход ставит вопрос подтверждения
 }
 
 // Ядро: заданный ответ; события те же, что у настоящего processUserText.
@@ -127,16 +130,62 @@ export function createFakeCore(bus: EventBus, fallback: Reply): FakeCore {
   const calls: string[] = [];
   let holding = false;
   let aborted = false;
+  let confirmCounter = 0;
+  let pendingConfirm: { id: string; resolve(): void; deny(): void } | undefined;
   return {
     calls: () => calls,
     willReply(reply: Reply, holdMs = 0): void {
       script.push({ reply, holdMs });
     },
+    willConfirm(question: string, reply?: Reply): void {
+      script.push({ reply: reply ?? fallback, holdMs: 0, confirm: question });
+    },
     async handleUserText(text: string): Promise<Reply> {
       calls.push(text);
+      // Пока открыт вопрос подтверждения, следующая реплика — ответ на него.
+      if (pendingConfirm !== undefined) {
+        const active = pendingConfirm;
+        pendingConfirm = undefined;
+        bus.emit({ type: 'confirm.close', id: active.id });
+        if (parseConfirmAnswer(text) === true) {
+          active.resolve();
+        } else {
+          active.deny();
+        }
+        return { say: '' };
+      }
       bus.emit({ type: 'listen.end', text });
       bus.emit({ type: 'think.start' });
       const item = script.shift();
+      if (item?.confirm !== undefined) {
+        confirmCounter += 1;
+        const id = `confirm-${confirmCounter}`;
+        bus.emit({
+          type: 'confirm.request',
+          id,
+          connection: 'jira',
+          tool: 'jira__create',
+          action: 'создать задачу',
+          text: item.confirm
+        });
+        let final = item.reply;
+        await new Promise<void>((resolve) => {
+          pendingConfirm = {
+            id,
+            resolve: () => {
+              final = item.reply;
+              resolve();
+            },
+            deny: () => {
+              final = { say: 'Понял, не буду' };
+              resolve();
+            }
+          };
+        });
+        bus.emit({ type: 'reply', reply: final });
+        bus.emit({ type: 'idle' });
+        return final;
+      }
       const reply = item?.reply ?? fallback;
       if (item !== undefined && item.holdMs > 0) {
         holding = true;

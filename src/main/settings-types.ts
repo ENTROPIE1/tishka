@@ -24,6 +24,7 @@ export interface ConnectionView {
   secrets: ConnectionSecretView[];
   state: McpServerState;
   tools: number;
+  confirmChanges?: boolean;   // спрашивать человека перед меняющими инструментами (нет поля — да)
   error?: string;
 }
 

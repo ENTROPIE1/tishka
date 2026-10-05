@@ -95,7 +95,11 @@ export function openEditor(options: EditorOptions): void {
     if (envArea !== undefined) {
       Object.assign(secrets, parseEnv(envArea.value));
     }
-    return { template: options.template, name: name.value.trim(), fields, secrets };
+    const draft: ConnectionDraft = { template: options.template, name: name.value.trim(), fields, secrets };
+    if (options.view !== undefined) {
+      draft.confirmChanges = options.view.confirmChanges;
+    }
+    return draft;
   }
 
   function showErrors(errors: string[], ok?: string): void {
