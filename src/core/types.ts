@@ -24,6 +24,16 @@ export interface ToolCallOptions {
   background?: boolean;         // true — не слать tool.start и tool.end, вместо них background.tick
 }
 
+// Вопрос человеку перед меняющим инструментом: идентификатор, подключение,
+// инструмент и короткое описание действия без секретов.
+export interface ConfirmRequest {
+  id: string;
+  connection: string;   // имя подключения-источника
+  tool: string;         // имя инструмента
+  action: string;       // краткое описание действия с аргументами, не длиннее 300 знаков
+  text: string;         // готовая строка вопроса для окон
+}
+
 export interface ToolRegistry {
   register(def: ToolDef, handler: ToolHandler): void;
   unregisterSource(source: ToolDef['source']): void;
@@ -103,6 +113,8 @@ export type TishkaEvent =
   | { type: 'speak.end' }
   | { type: 'notify'; title: string; skillId?: string }
   | { type: 'background.tick'; tool: string }
+  | { type: 'confirm.request'; id: string; connection: string; tool: string; action: string; text: string }
+  | { type: 'confirm.close'; id: string }   // вопрос снят: ответ человека, отказ или остановка
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
   | { type: 'calendar.changed' }
@@ -179,5 +191,12 @@ export interface Config {
 }
 
 export type McpServerConfig =
-  | { name: string; transport: 'http'; url: string; headers?: Record<string, string> }
-  | { name: string; transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string> };
+  | { name: string; transport: 'http'; url: string; headers?: Record<string, string>; confirmChanges?: boolean }
+  | {
+      name: string;
+      transport: 'stdio';
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+      confirmChanges?: boolean;   // спрашивать человека перед меняющими инструментами; нет поля — да
+    };

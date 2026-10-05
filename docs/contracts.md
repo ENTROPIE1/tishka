@@ -67,6 +67,14 @@ interface ToolRegistry {
 
 `call` никогда не бросает исключение: ошибка возвращается как `{ ok: false, error }`.
 
+### Подтверждение изменений
+
+Тишка сам только читает и готовит, отправляет человек. Вызов инструмента с `readOnly: false` от подключения, у которого `confirmChanges` не выключен, не выполняется сразу: реестр ставит вопрос событием `confirm.request` (`id`, имя подключения, имя инструмента, короткое описание действия с аргументами без секретов, не длиннее 300 знаков). Ответ человека приходит через канал окна `tishka:confirm` парой `(id, yes|no)`: «да» — инструмент выполняется, «нет» — возвращается ошибка «Человек не подтвердил». Ожидание не дольше двух минут, затем это отказ. Пока вопрос открыт, ход не завершается; «стоп» и новая реплика снимают вопрос как отказ. Событие `confirm.close` снимает вопрос в окнах.
+
+Встроенные инструменты ядра (календарь, память, навыки, режим речи) и инструменты источника `builtin` безопасны и обратимы — подтверждение им не нужно. Вызов `readOnly: false` в фоне (расписание, слежение) не спрашивает и завершается ошибкой «Нужно подтверждение, выполните навык вручную». Голосом ответ разбирает модуль `src/voice/confirm-answer.ts`: «да», «давай», «подтверждаю» — да; «нет», «отмена», «не надо» — нет.
+
+Настройка подключения `confirmChanges` (нет поля — включено) правится в карточке на экране «Подключения» переключателем «Спрашивать перед изменениями».
+
 При `opts.background === true` события `tool.start` и `tool.end` не отправляются, вместо них — `background.tick` с именем вызванного инструмента. Так фоновые проверки наблюдений и расписания не переводят окно-питомец в состояние «работает».
 
 ## Ответ Тишки
@@ -134,6 +142,8 @@ type TishkaEvent =
   | { type: 'speak.end' }
   | { type: 'notify'; title: string; skillId?: string }
   | { type: 'background.tick'; tool: string }
+  | { type: 'confirm.request'; id: string; connection: string; tool: string; action: string; text: string }
+  | { type: 'confirm.close'; id: string }   // вопрос снят: ответ человека, отказ или остановка
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
   | { type: 'calendar.changed' }   // календарь изменился: экран перечитывает
@@ -281,8 +291,9 @@ interface Config {
 }
 
 type McpServerConfig =
-  | { name: string; transport: 'http'; url: string; headers?: Record<string, string> }
-  | { name: string; transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string> };
+  | { name: string; transport: 'http'; url: string; headers?: Record<string, string>; confirmChanges?: boolean }
+  | { name: string; transport: 'stdio'; command: string; args?: string[]; env?: Record<string, string>; confirmChanges?: boolean };
+  // confirmChanges — спрашивать человека перед меняющими инструментами; нет поля — да
 ```
 
 В `headers` и `env` секрет записывается ссылкой `${secret:ИМЯ}`. Подстановка происходит в главном процессе в момент подключения. Значение секрета не попадает в `config.json`, в журналы, в окна, в сообщения модели.

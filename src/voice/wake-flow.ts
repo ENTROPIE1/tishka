@@ -91,7 +91,9 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   // после готовности слушать. Тишка занят, пока думает, работает или говорит.
   const clock = createPhraseClock({ mark: deps.mark });
   const BUSY_START = new Set(['think.start', 'tool.start', 'speak.start']);
-  const BUSY_END = new Set(['idle', 'speak.end']);
+  // Вопрос подтверждения — не «занят»: пока он открыт, ответ человека («да»/«нет»)
+  // должен дойти до ядра репликой.
+  const BUSY_END = new Set(['idle', 'speak.end', 'confirm.request']);
 
   // Перед уходом по тишине значок мигает: состояние «скоро уйду» приходит за 5 секунд.
   function armTimer(): void {

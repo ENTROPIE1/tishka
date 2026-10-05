@@ -6,6 +6,7 @@ import { isMainWindow } from './chat-window';
 import type { SourceBus } from './source-bus';
 import {
   CANCEL_CHANNEL,
+  CONFIRM_CHANNEL,
   CONFIG_CHANGED_CHANNEL,
   COPY_IMAGE_CHANNEL,
   COPY_RICH_CHANNEL,
@@ -78,6 +79,15 @@ export function registerIpc(
   ipcMain.on(CANCEL_CHANNEL, (event) => {
     const sender = BrowserWindow.fromWebContents(event.sender);
     core.cancel(sender !== null && isMainWindow(sender) ? 'chat' : 'pet');
+  });
+
+  // Ответ на вопрос подтверждения из любого окна: «да» выполняет инструмент,
+  // «нет» возвращает отказ. Неизвестный вопрос ядро просто игнорирует.
+  ipcMain.on(CONFIRM_CHANNEL, (_event, id: unknown, yes: unknown) => {
+    if (typeof id !== 'string' || typeof yes !== 'boolean') {
+      return;
+    }
+    core.confirm(id, yes);
   });
 
   ipcMain.handle(HISTORY_CHANNEL, (_event, limit: unknown) => {

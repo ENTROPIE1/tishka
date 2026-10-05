@@ -94,6 +94,13 @@ function initEvents(): void {
         }
         clearStatus();
         break;
+      case 'confirm.request':
+        view.appendConfirm({ id: event.id, text: event.text });
+        clearStatus();
+        break;
+      case 'confirm.close':
+        view.closeConfirm(event.id);
+        break;
       case 'screenshot':
         // Снимок экрана ложится в ленту отдельной строкой до ответа; в ежа не уходит.
         view.appendEntry({

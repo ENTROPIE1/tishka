@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import type { Reply } from '../../src/core/types';
 import { createSourceBus } from '../../src/main/source-bus';
 import { createPetLifecycle } from '../../src/main/pet-lifecycle';
 import { createWakeFlow } from '../../src/voice/wake-flow';
@@ -325,6 +326,10 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     // Ядро занято: следующий ход держится holdMs, затем отвечает как обычно.
     coreWillWork(holdMs: number): void {
       core.willReply({ say: 'Работаю' }, holdMs);
+    },
+    // Следующий ход ставит вопрос подтверждения и ждёт ответа человека.
+    coreWillConfirm(question: string, reply?: Reply): void {
+      core.willConfirm(question, reply);
     },
     // Остановка из окна чата: реплика ставится в работу, затем приходит отмена.
     // Прерванный ход сам эмитит статус «Остановлено» с источником «чат» — тот

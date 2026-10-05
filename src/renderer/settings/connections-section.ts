@@ -96,6 +96,30 @@ export function mountConnectionsSection(root: HTMLElement): SettingsSection {
       box.append(el('div', 'connection-error', view.error));
     }
 
+    // Переключатель подтверждения меняющих инструментов этого подключения.
+    const confirm = el('input', 'checkbox-input');
+    confirm.type = 'checkbox';
+    confirm.checked = view.confirmChanges !== false;
+    const confirmField = field('Спрашивать перед изменениями', confirm);
+    confirm.addEventListener('change', () => {
+      void (async () => {
+        try {
+          // Меняем только настройку подтверждения: подключение целиком не
+          // пересобираем, чтобы не задеть секреты и адрес.
+          const current = await window.tishka.config.get();
+          const servers = current.config.mcpServers.map((server) =>
+            server.name === view.name ? { ...server, confirmChanges: confirm.checked } : server
+          );
+          await window.tishka.config.save({ ...current.config, mcpServers: servers });
+          await refresh();
+        } catch (error) {
+          confirm.checked = !confirm.checked;
+          showError(error);
+        }
+      })();
+    });
+    box.append(confirmField);
+
     const actions = el('div', 'row');
     const check = button('Проверить', 'button button-secondary');
     const edit = button('Изменить', 'button button-secondary');

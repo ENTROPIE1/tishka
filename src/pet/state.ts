@@ -21,6 +21,7 @@ export interface PetModel {
   say?: string;                  // текст в облачке
   panel?: Panel;                 // карточка результата
   ask?: { title: string; placeholder?: string };   // карточка ввода
+  confirm?: { id: string; text: string };          // вопрос подтверждения с кнопками
   queue: PetState[];             // состояния, которые нужно показать после текущего
   replies?: number;              // сколько раз приходил ответ; признак новой реплики
   leaving?: boolean;             // уход отложен: сначала договорить текущий ответ
@@ -66,6 +67,7 @@ function enter(model: PetModel, state: PetState, now: number, queue: PetState[] 
     if (model.say !== undefined) next.say = model.say;
     if (model.panel !== undefined) next.panel = model.panel;
     if (model.ask !== undefined) next.ask = model.ask;
+    if (model.confirm !== undefined) next.confirm = model.confirm;
     if (model.greeting === true && (state === 'appear' || state === 'listening')) next.greeting = true;
   }
   if (model.leaving === true && state !== 'leave') next.leaving = true;
@@ -134,6 +136,12 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
       // Статус из окна чата ежу не показываем: эта строка живёт только в ленте
       // чата. Статус от самого ежа по-прежнему ложится в облачко.
       return quiet ? model : { ...endGreeting(model), say: event.text };
+    case 'confirm.request': {
+      const confirm = { id: event.id, text: event.text };
+      return quiet && isAway(model) ? { ...model, confirm } : { ...endGreeting(model), say: event.text, confirm };
+    }
+    case 'confirm.close':
+      return model.confirm?.id === event.id ? { ...model, confirm: undefined } : model;
     case 'reply': {
       if (quiet) {
         const replies = (model.replies ?? 0) + 1;

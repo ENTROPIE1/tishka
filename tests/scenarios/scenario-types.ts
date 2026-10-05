@@ -75,6 +75,7 @@ export interface Scenario {
   sendFromChat(text: string): void;       // отправка текста из окна чата
   notifyFromSkill(title: string): void;   // уведомление от навыка
   coreWillWork(holdMs: number): void;     // ядро занято: следующий ход держится holdMs
+  coreWillConfirm(question: string, reply?: Reply): void;   // следующий ход ставит вопрос подтверждения
   stopFromChat(): void;                   // остановка из окна чата: строка только в ленте чата
   pressEye(question?: string): void;      // нажатие кнопки с глазом у ежа
   pressPetSend(text?: string): void;      // кнопка отправки строки ежа: занятому Тишке — остановка
