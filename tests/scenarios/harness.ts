@@ -11,7 +11,6 @@ import type { PetActivation } from '../../src/main/pet-activation';
 import type { Mover } from '../../src/main/pet-motion';
 import type { PetPlacement } from '../../src/main/pet-placement';
 import { defaultPetX, petLayout } from '../../src/pet/layout';
-import { STOPPED_TITLE } from '../../src/core/stopped';
 import { nextScreenLooking } from '../../src/core/screen-look';
 import { EVENT_CHANNEL } from '../../src/main/ipc-channels';
 import { createFakeCore, createFakeStt, createFakeTts } from './edges';
@@ -327,11 +326,13 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     coreWillWork(holdMs: number): void {
       core.willReply({ say: 'Работаю' }, holdMs);
     },
-    // Ядро сообщает об остановке из окна чата событием статуса, а не уведомлением:
-    // строка видна в ленте чата, скрытого ежа не поднимает.
+    // Остановка из окна чата: реплика ставится в работу, затем приходит отмена.
+    // Прерванный ход сам эмитит статус «Остановлено» с источником «чат» — тот
+    // путь, что и у настоящего ядра, а не прямая отправка события.
     stopFromChat(): void {
-      bus.emit({ type: 'status', text: STOPPED_TITLE });
-      bus.emit({ type: 'idle' });
+      core.willReply({ say: 'Работаю' }, 500);
+      void bus.run('chat', () => core.handleUserText('вопрос из чата')).catch(() => undefined);
+      setTimeout(() => core.cancel(), 0);
     },
     pressEye(question?: string): void {
       page.pressEye(question);

@@ -1,6 +1,7 @@
 import type { EventBus } from '../core/types';
 import type { TranscribeResult } from './stt-service';
 import { matchWake } from './wake';
+import { wavDurationSec } from './wav';
 
 // Эпоха разговора: номер, который меняется при каждом включении и выключении.
 interface Epoch {
@@ -24,8 +25,9 @@ export interface PhraseQueueDeps {
   accept(): boolean;
   transcribe(wav: Uint8Array): Promise<TranscribeResult>;
   // Распознанный текст; stale — сказан при другом состоянии разговора;
-  // startedAt — время начала фразы для правила времени.
-  onResult(result: TranscribeResult, stale: boolean, startedAt: number): void;
+  // startedAt — время начала фразы для правила времени; speechMs — длительность
+  // звука фразы (для отличия настоящего промаха от короткого шума).
+  onResult(result: TranscribeResult, stale: boolean, startedAt: number, speechMs: number): void;
 }
 
 export interface PhraseQueue {
@@ -51,7 +53,7 @@ export function createPhraseQueue(deps: PhraseQueueDeps): PhraseQueue {
     void deps
       .transcribe(item.wav)
       .then((result) => {
-        deps.onResult(result, item.epoch !== epoch.now(), item.startedAt);
+        deps.onResult(result, item.epoch !== epoch.now(), item.startedAt, wavDurationSec(item.wav) * 1000);
       })
       .finally(() => {
         recognizing = false;

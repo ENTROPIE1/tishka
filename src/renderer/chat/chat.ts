@@ -2,6 +2,7 @@ import { installLinkGuard } from '../shared/links';
 import { timingMark } from '../shared/timing';
 import { SCREEN_LOOK_TOOLS } from '../../core/screen-look';
 import { STOPPED_TITLE } from '../../core/stopped';
+import { REPLACED_NOTE } from '../../core/turn-queue';
 import { createChatFeed } from './feed';
 import { createComposer } from './composer';
 import { initAppShell } from './navigation';
@@ -105,9 +106,9 @@ function initEvents(): void {
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;
       case 'status':
-        // Служебная строка остановки из окна чата живёт только в ленте:
-        // ежа она не поднимает, в историю не пишется.
-        if (event.text === STOPPED_TITLE) {
+        // Служебные строки остановки и вытесненной реплики живут только в ленте:
+        // ежа они не поднимают, в историю не пишутся.
+        if (event.text === STOPPED_TITLE || event.text === REPLACED_NOTE) {
           view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.text });
         }
         break;

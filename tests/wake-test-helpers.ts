@@ -35,6 +35,7 @@ export interface Harness {
   captions: string[];
   stops: string[];
   hints: () => number;
+  missed: () => number;
   prompts: (string | undefined)[];
   soonChanges: boolean[];
   hidden: () => number;
@@ -67,6 +68,7 @@ export function makeHarness(
   const captions: string[] = [];
   const stops: string[] = [];
   let hints = 0;
+  let missed = 0;
   const prompts: (string | undefined)[] = [];
   const soonChanges: boolean[] = [];
 
@@ -134,6 +136,9 @@ export function makeHarness(
     onUnheardHint: () => {
       hints += 1;
     },
+    onMissedSpeech: () => {
+      missed += 1;
+    },
     onBusyPhrase: (text) => stopPhrase.phrase(text)
   });
 
@@ -149,6 +154,7 @@ export function makeHarness(
     captions,
     stops,
     hints: () => hints,
+    missed: () => missed,
     prompts,
     soonChanges,
     hidden: () => hiddenCount,

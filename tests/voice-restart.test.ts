@@ -80,4 +80,37 @@ describe('restartVoiceIfNeeded', () => {
     expect(stt.stop).not.toHaveBeenCalled();
     expect(stt.start).not.toHaveBeenCalled();
   });
+
+  it('успешный перезапуск завершает отложенное включение записи', async () => {
+    const stt = fakeStt();
+    const onReady = vi.fn();
+    const onFailed = vi.fn();
+    restartVoiceIfNeeded(stt, config('local', 'C:\\w\\whisper.exe'), config('remote'), { onReady, onFailed });
+
+    await vi.waitFor(() => expect(onReady).toHaveBeenCalledTimes(1));
+    expect(onFailed).not.toHaveBeenCalled();
+  });
+
+  it('неудачный перезапуск сообщает о неудаче', async () => {
+    const stt = fakeStt();
+    (stt.start as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, error: 'нет файла' });
+    const onReady = vi.fn();
+    const onFailed = vi.fn();
+    restartVoiceIfNeeded(stt, config('local', 'C:\\w\\whisper.exe'), config('remote'), { onReady, onFailed });
+
+    await vi.waitFor(() => expect(onFailed).toHaveBeenCalledWith('нет файла'));
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it('отменённый перезапуск неудачей не считается', async () => {
+    const stt = fakeStt();
+    (stt.start as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, error: 'Запуск отменён' });
+    const onReady = vi.fn();
+    const onFailed = vi.fn();
+    restartVoiceIfNeeded(stt, config('local', 'C:\\w\\whisper.exe'), config('remote'), { onReady, onFailed });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onReady).not.toHaveBeenCalled();
+    expect(onFailed).not.toHaveBeenCalled();
+  });
 });

@@ -7,6 +7,7 @@ import { createPhraseClock } from './phrase-time';
 import { createPhraseQueue, routeStaleText, type StaleTextDeps } from './stale-phrase';
 import { createSilenceTimer } from './silence-timer';
 import { createUnheardFlow } from './unheard';
+import { isMissedSpeech } from './missed-speech';
 
 export type WakeCommand = 'listen' | 'conversation-on' | 'conversation-off';
 
@@ -242,7 +243,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   // Текст направляется по времени начала фразы: репликой становится только
   // начавшаяся после готовности слушать. Сказанное раньше проверяется только на
   // имя (разговор выключен) и на слово остановки (Тишка занят) — в ядро не уходит.
-  function onResult(result: TranscribeResult, stale: boolean, startedAt: number): void {
+  function onResult(result: TranscribeResult, stale: boolean, startedAt: number, speechMs: number): void {
     if (result.ok) {
       // Речь распознана: серия неуверенных фраз прервана.
       unheard.heard();
@@ -272,17 +273,16 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       armTimer();
       return;
     }
-    // Пустой или шумовой отклик распознавания человеку не показываем:
-    // запись сработала на стук клавиш, прослушивание продолжается.
+    // Шум и короткий звук человеку не показываем; настоящий промах — подсказка о калибровке.
     if (result.empty === true) {
-      // Фраза не распознана: отсчёт тишины продолжается с места остановки.
+      if (isMissedSpeech(result, speechMs)) {
+        deps.onMissedSpeech?.();
+      }
       silence.resume();
       return;
     }
     if (result.error !== 'Не расслышал') {
       reportError(result.error);
-    } else {
-      deps.onMissedSpeech?.();
     }
     armTimer();
   }

@@ -4,6 +4,8 @@ export type ListenPauseReason = 'typing' | 'drag';
 export const TYPING_RESUME_MS = 2000;
 // Удержание ежа мышью: после отпускания запись молчит ещё секунду.
 export const DRAG_RESUME_MS = 1000;
+// Перетаскивание без движения: пауза записи не держится дольше этого срока.
+export const DRAG_MAX_MS = 10000;
 
 export interface ListenPause {
   // Причина без срока держится до release(reason), со сроком — до его истечения.
