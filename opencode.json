@@ -17,5 +17,23 @@
       "url": "http://127.0.0.1:8080/mcp",
       "enabled": false
     }
+  },
+  "provider": {
+    "lanit": {
+      "models": {
+        "DKS-Leo-B": {
+          "name": "DKS-Leo-B"
+        },
+        "DKS-Lynx-B": {
+          "name": "DKS-Lynx-B"
+        },
+        "DKS-Leo-A": {
+          "name": "DKS-Leo-A"
+        },
+        "DKS-Lynx-A": {
+          "name": "DKS-Lynx-A"
+        }
+      }
+    }
   }
 }

@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Кости Тишки</title>
+<link rel="icon" href="data:,">
+<style>
+:root { --bg:#1d1f24; --panel:#272a31; --line:#3a3e47; --text:#e6e6e6; --muted:#9aa0aa; --acc:#ffb347; --sel:#5ad1ff; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 system-ui, sans-serif; display:flex; height:100vh; overflow:hidden; }
+#left, #right { width:270px; background:var(--panel); border-right:1px solid var(--line); overflow-y:auto; padding:10px; }
+#right { border-right:none; border-left:1px solid var(--line); width:310px; }
+#stage { flex:1; position:relative; }
+canvas { display:block; width:100%; height:100%; }
+h3 { margin:14px 0 6px; font-size:13px; color:var(--acc); text-transform:uppercase; letter-spacing:.04em; }
+h3:first-child { margin-top:0; }
+.bone { padding:3px 6px; border-radius:4px; cursor:pointer; white-space:nowrap; }
+.bone:hover { background:#323640; }
+.bone.sel { background:#2e4a5a; color:#fff; }
+.bone small { color:var(--muted); }
+label { display:block; margin:6px 0 2px; color:var(--muted); }
+input[type=range] { width:100%; }
+input[type=number] { width:70px; background:#1b1d22; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:2px 4px; }
+select { background:#1b1d22; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px; width:100%; }
+button { background:#353a44; color:var(--text); border:1px solid #4a505c; border-radius:5px; padding:5px 9px; cursor:pointer; margin:2px 2px 2px 0; }
+button:hover { background:#414755; }
+button.main { background:#b9741c; border-color:#d48a2a; color:#fff; }
+.row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.two { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.hint { color:var(--muted); font-size:12px; }
+.layer { padding:3px 6px; margin:1px 0; border-radius:4px; cursor:grab; background:#2d3038; border:1px solid transparent; user-select:none; }
+.layer.mine { color:var(--sel); }
+.layer.sel { background:#2e4a5a; color:#fff; border-color:var(--sel); }
+.layer.over-top { border-top:2px solid var(--acc); }
+.layer.over-bottom { border-bottom:2px solid var(--acc); }
+.layer small { color:var(--muted); }
+#status { position:absolute; left:10px; bottom:8px; color:var(--muted); pointer-events:none; }
+#toast { position:absolute; right:12px; top:10px; background:#2e4a5a; padding:6px 10px; border-radius:6px; display:none; }
+.handPick { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; }
+.handPick button { padding:2px; margin:0; height:46px; display:flex; align-items:center; justify-content:center; }
+.handPick button img { max-width:38px; max-height:40px; }
+.handPick button.on { background:#2e4a5a; border-color:var(--sel); }
+</style>
+</head>
+<body>
+<div id="left">
+  <h3>Кости</h3>
+  <div class="hint">Точка кости — оранжевый кружок. Тащи его, чтобы перенести точку вращения.</div>
+  <div id="bones"></div>
+</div>
+<div id="stage"><canvas id="cv"></canvas><button id="toggleDots" style="position:absolute;left:10px;top:10px">Показать точки (H)</button><div id="status"></div><div id="toast"></div></div>
+<div id="right">
+  <h3>Мышью по картинке</h3>
+  <div class="hint">
+    <b>Кружок</b> — двигает точку кости.<br>
+    <b>Слой</b> (рукав, кисть, глаз…) — двигает сам слой. Стрелки клавиатуры — по 1 точке, с Shift — по 10.<br>
+    <b>Пустое место</b> — двигает вид, колёсико — масштаб.
+  </div>
+  <div class="row" style="margin-top:6px"><label style="margin:0"><input type="checkbox" id="lockLayers"> не трогать слои (только кости)</label></div>
+  <div id="layerInfo" class="hint" style="margin-top:4px"></div>
+
+  <h3>Выбранная кость</h3>
+  <div id="boneName" style="font-weight:600;font-size:15px">—</div>
+  <label>Родитель (к чему прикреплена)</label>
+  <select id="parent"></select>
+  <div class="row" style="margin-top:6px">X <input type="number" id="px"> Y <input type="number" id="py"></div>
+  <label>Проверить сгиб: <b id="rotv">0°</b></label>
+  <input type="range" id="rot" min="-120" max="120" value="0">
+  <div class="row">
+    <button id="wiggle">Покачать</button>
+    <button id="resetBone">Выпрямить</button>
+    <button id="resetAll">Выпрямить всё</button>
+  </div>
+  <button id="mirror" title="Точки этой кости и всех ниже по цепочке, сдвиги их слоёв и кисти — зеркально на другую сторону">Скопировать на другую сторону</button>
+
+  <h3>Лицо и кисти</h3>
+  <div class="two">
+    <div><label>Форма глаз</label><select id="eyeShape"><option value="orig">исходные</option><option value="neutral">обычные</option><option value="surprised">удивлённые</option><option value="angry">злые</option><option value="sad">грустные</option><option value="smiling">улыбаются</option><option value="happy">^ ^ радость</option><option value="laugh">&gt; &lt; смех</option><option value="suspicious">прищур</option><option value="sleepy">сонные</option></select></div>
+    <div><label>Зрачок</label><select id="iris"><option value="orig">исходный</option><option value="normal">обычный</option><option value="shock">шок</option><option value="cute">большой милый</option><option value="star">звёздочка</option><option value="heart">сердечко</option><option value="spiral">спираль</option><option value="sparkle">искра</option><option value="blank">пустой</option></select></div>
+    <div><label>Веки</label><select id="eyes"><option value="open">открыты</option><option value="half">полуприкрыты</option><option value="closed">закрыты</option></select></div>
+    <div><label>Брови</label><select id="brows"><option value="orig">исходные</option><option value="neutral">обычные</option><option value="surprised">удивлённые</option><option value="angry">злые</option><option value="sad">грустные</option><option value="worried">встревоженные</option><option value="kind">добрые</option><option value="focused">нахмуренные</option><option value="skeptical">скептические</option></select></div>
+    <div><label>Рот</label><select id="mouth">
+      <optgroup label="исходные"><option value="closed">закрыт</option><option value="half">приоткрыт</option><option value="open">открыт</option><option value="sad">грустный</option></optgroup>
+      <optgroup label="речь"><option value="m_closed">М Б П — сомкнут</option><option value="m_teeth">согласные — зубы</option><option value="m_e">Э И — широко</option><option value="m_a">А — открыт</option><option value="m_o">О — кругло</option><option value="m_u">У — трубочкой</option><option value="m_f">Ф В</option><option value="m_l">Л — язык</option></optgroup>
+      <optgroup label="эмоции"><option value="laugh">смех</option><option value="wow">удивление «о»</option><option value="grin">оскал-улыбка</option><option value="grumpy">ворчит</option></optgroup>
+    </select></div>
+  </div>
+  <button id="blink" style="margin-top:6px">Моргнуть</button>
+  <label style="margin-top:6px"><input type="checkbox" id="headphones"> наушники (не слышит)</label>
+  <div class="two"><div><label>Планшет</label><select id="tablet"><option value="none">нет</option><option value="back">крышкой к нам</option><option value="back_tilt">крышкой, наклон</option><option value="search">экран: результаты</option><option value="loading">экран: ищет</option><option value="done">экран: готово</option></select></div>
+  <div><label style="margin-top:22px"><input type="checkbox" id="glow"> свечение</label></div></div>
+  <label>Эффекты <span class="hint">(можно несколько)</span></label>
+  <div class="handPick" id="fxPick"></div>
+  <div class="row" style="margin-top:4px"><span class="hint">Рисовка:</span>
+    <label style="margin:0"><input type="radio" name="fxSet" value="1"> лист 1</label>
+    <label style="margin:0"><input type="radio" name="fxSet" value="2"> лист 2</label></div>
+  <label>Кисть ← (слева на картинке)</label><div class="handPick" id="pick_hand_l"></div>
+  <label>Кисть → (справа на картинке)</label><div class="handPick" id="pick_hand_r"></div>
+  <div id="handBox" style="display:none">
+    <label>Поворот кисти: <b id="hrotv"></b></label>
+    <input type="range" id="hrot" min="-180" max="180">
+    <label>Размер кисти: <b id="hscv"></b></label>
+    <input type="range" id="hsc" min="5" max="60">
+    <label style="margin-top:4px"><input type="checkbox" id="hflip"> отразить</label>
+    <button id="savePose" style="margin-top:6px">Запомнить позу руки для этого жеста</button>
+    <div class="hint">При выборе жеста рука сама встаёт в подходящую позу (её можно поменять сгибом плеча и локтя и запомнить). Кисть крепится запястьем к точке кости: поворот и размер — вокруг запястья. Всё запоминается для каждого жеста отдельно.</div>
+  </div>
+
+  <h3>Клипы и речь</h3>
+  <div class="handPick" id="clipBtns"></div>
+  <button id="stopClip" style="margin-top:4px">Стоп</button>
+  <label>Настроение ответа (mood)</label>
+  <select id="mood"><option value="neutral">обычное</option><option value="happy">радость</option><option value="confused">растерянность</option></select>
+  <label>Фраза голосом Тишки</label><select id="phrase"></select>
+  <div class="row" style="margin-top:4px"><button class="main" id="say">Сказать</button>
+    <label style="margin:0"><input type="radio" name="lipMode" value="letters" checked> по буквам</label>
+    <label style="margin:0"><input type="radio" name="lipMode" value="volume"> по громкости</label></div>
+  <label><input type="checkbox" id="voiceOff"> ответ вслух выключен (рот — только эмоция)</label>
+  <div class="hint">Как в приложении: событие выбирает клип, настроение — лицо. Радость и растерянность сначала проигрывают свой клип, потом речь.</div>
+
+  <h3>Вид</h3>
+  <div class="row"><label style="margin:0"><input type="checkbox" id="showBones"> кости</label>
+  <label style="margin:0"><input type="checkbox" id="showRef"> образец</label>
+  <label style="margin:0"><input type="checkbox" id="lightBg"> светлый фон</label></div>
+  <label style="margin-top:6px"><input type="checkbox" id="armFront"> рука на туловище — поверх толстовки (авто)</label>
+  <label style="margin-top:6px"><input type="checkbox" id="physOn" checked> ушки и иголки качаются (физика)</label>
+  <label>Прозрачность образца</label><input type="range" id="refOp" min="0" max="100" value="40">
+
+  <h3>Порядок слоёв</h3>
+  <div class="hint">Перетаскивай строки мышью. Сверху — самые задние, снизу — передние. Голубым — слои выбранной кости.</div>
+  <div id="layers"></div>
+
+  <h3>Файл</h3>
+  <button class="main" id="save">Сохранить rig.json</button>
+  <button id="load">Загрузить…</button>
+  <button id="defaults">Начать заново</button>
+  <input type="file" id="file" accept=".json" style="display:none">
+  <div class="hint">Работа сама сохраняется в браузере. Когда закончишь — «Сохранить», файл попадёт в «Загрузки».</div>
+</div>
+
+<script src="layers_meta.js"></script>
+<script src="hands_meta.js"></script>
+<script src="eyes_meta.js"></script>
+<script src="fx_meta.js"></script>
+<script src="clips.js"></script>
+<script src="speech/phrases.js"></script>
+<script src="rig_data.js"></script>
+<script>
+const HANDS = ['relaxed','wave','palm','offer','point_up','point','thumb_up','fist'];
+const HAND_RU = { relaxed:'опущена', wave:'машет', palm:'ладонь', offer:'«вот»', point_up:'палец вверх', point:'указывает', thumb_up:'класс', fist:'кулак' };
+// поза руки для проверки жеста (градусы плеча и локтя для левой на картинке руки; правая — зеркально)
+const ARM_POSES = { relaxed:[0,0], wave:[50,100], palm:[20,120], offer:[20,70], point_up:[15,140], point:[80,10], thumb_up:[15,90], fist:[-10,-150] };
+// поворот картинки так, чтобы кисть продолжала предплечье (считается по точке запястья)
+const autoRot = (pose, flip) => { const a = window.HAND_ANCHORS[pose]; return flip ? a.rotFlip : a.rot; };
+// эти картинки нарисованы другой рукой: без отражения большой палец смотрит вниз
+const FLIP_L = { thumb_up:true, offer:true };
+const BROWS = ['orig','neutral','surprised','angry','sad','worried','kind','focused','skeptical'];
+const VERSION = 3;
+
+// глаз: белок (форма) → зрачок, обрезанный по белку → контур с ресницами
+const SHAPES = Object.keys(window.EYE_SHAPES || {});
+function eyeLayers(s, L) {
+  const out = [], E = window.EYE_SHAPES || {};
+  out.push(L(`eye_${s}_white`,`eye_${s}`,{ group:`eyeWhite_${s}`, variant:'orig', eyePart:'white', side:s, shape:'orig' }));
+  for (const sh of SHAPES) if (E[sh].white) out.push(L(`eye_${s}_${sh}_white`,`eye_${s}`,{ group:`eyeWhite_${s}`, variant:sh, eyePart:'white', side:s, shape:sh }));
+  out.push(L(`eye_${s}_iris`,`iris_${s}`,{ group:`eyeIris_${s}`, variant:'orig', eyePart:'iris', side:s, iris:'orig' }));
+  out.push(L(`eye_${s}_highlight`,`iris_${s}`,{ group:`eyeIris_${s}`, variant:'orig_hl', eyePart:'hl', side:s, iris:'orig' }));
+  for (const iv of (window.IRIS_VARIANTS || []).slice(1)) out.push(L(`iris_${s}_${iv}`,`iris_${s}`,{ group:`eyeIris_${s}`, variant:iv, eyePart:'iris', side:s, iris:iv }));
+  for (const v of ['open','half','closed']) out.push(L(`eye_${s}_${v}`,`eye_${s}`,{ group:`eyeLine_${s}`, variant:v, eyePart:'line', side:s, shape:'orig', lid:v }));
+  for (const sh of SHAPES) out.push(L(`eye_${s}_${sh}_line`,`eye_${s}`,{ group:`eyeLine_${s}`, variant:sh, eyePart:'line', side:s, shape:sh, lid:'open' }));
+  return out;
+}
+
+function defaultRig() {
+  const B = (id, parent, x, y, label) => ({ id, parent, pivot:[x,y], label });
+  const M = x => 799 - x; // ось Тишки x = 399.5
+  const bones = [
+    B('hips', null, 399, 705, 'таз'),
+    B('torso', 'hips', 399, 705, 'туловище'),
+    B('neck', 'torso', 398, 440, 'шея'),
+    B('head', 'neck', 398, 405, 'голова'),
+    B('quills', 'head', 398, 330, 'иголки'),
+    B('ear_l', 'head', 335, 262, 'ухо ←'),  B('ear_r', 'head', M(335), 262, 'ухо →'),
+    B('brow_l', 'head', 346, 298, 'бровь ←'), B('brow_r', 'head', M(346), 298, 'бровь →'),
+    B('eye_l', 'head', 356, 312, 'глаз ←'), B('eye_r', 'head', 444, 312, 'глаз →'),
+    B('iris_l', 'eye_l', 365, 317, 'зрачок ←'), B('iris_r', 'eye_r', 434, 320, 'зрачок →'),
+    B('mouth', 'head', 400, 377, 'рот'),
+    B('fx', 'head', 400, 250, 'эффекты'),
+    B('ball', null, 560, 1136, 'мяч'),
+    B('arm_l_upper', 'torso', 300, 445, 'плечо ←'), B('arm_l_lower', 'arm_l_upper', 262, 610, 'локоть ←'), B('hand_l', 'arm_l_lower', 271, 745, 'кисть ←'),
+    B('arm_r_upper', 'torso', M(300), 445, 'плечо →'), B('arm_r_lower', 'arm_r_upper', M(262), 610, 'локоть →'), B('hand_r', 'arm_r_lower', M(271), 745, 'кисть →'),
+    B('leg_l_upper', 'hips', 345, 712, 'бедро ←'), B('leg_l_lower', 'leg_l_upper', 322, 880, 'колено ←'), B('shoe_l', 'leg_l_lower', 312, 1060, 'стопа ←'),
+    B('leg_r_upper', 'hips', M(345), 712, 'бедро →'), B('leg_r_lower', 'leg_r_upper', M(322), 880, 'колено →'), B('shoe_r', 'leg_r_lower', M(312), 1060, 'стопа →'),
+  ];
+  const L = (id, bone, extra = {}) => ({ id, src:`layers/${id}.png`, bone, dx:0, dy:0, ...extra });
+  const layers = [
+    L('quills','quills'),
+    L('hp_band','head',{ headphones:true }),
+    L('ear_l_outer','ear_l'), L('ear_l_inner','ear_l'), L('ear_r_outer','ear_r'), L('ear_r_inner','ear_r'),
+    L('bud_l','ear_l',{ buds:true }), L('bud_r','ear_r',{ buds:true }),
+    L('hoodie_back','torso'), L('neck','neck'),
+    L('leg_l_upper','leg_l_upper'), L('leg_r_upper','leg_r_upper'), L('leg_l_lower','leg_l_lower'), L('leg_r_lower','leg_r_lower'),
+    L('shoe_l','shoe_l'), L('shoe_r','shoe_r'), L('pants_top','hips'), L('hoodie_front','torso'),
+    ...['back','back_tilt','search','loading','done'].map(v => L(`tablet_${v}`,'torso',{ group:'tablet', variant:v })),
+    L('arm_l_upper','arm_l_upper'), L('arm_r_upper','arm_r_upper'),
+  ];
+  for (const side of ['l','r']) for (const p of HANDS)
+    layers.push({ id:`hand_${side}_${p}`, src:`hands/hand_${p}.png`, bone:`hand_${side}`, group:`hand_${side}`, variant:p,
+      hand:{ x:0, y:-8, rot:0, scale:0.2, flip: (side==='r') !== !!FLIP_L[p] } });
+  layers.push(L('arm_l_lower','arm_l_lower'), L('arm_r_lower','arm_r_lower'), L('head','head'));
+  for (const s of ['l','r']) layers.push(...eyeLayers(s, L));
+  for (const sd of ['l','r']) {
+    layers.push(L(`brow_${sd}`,`brow_${sd}`,{ group:`brow_${sd}`, variant:'orig' }));
+    for (const v of BROWS.slice(1)) layers.push(L(`brow_${sd}_${v}`,`brow_${sd}`,{ group:`brow_${sd}`, variant:v }));
+  }
+  layers.push(L('nose','head'));
+  for (const v of ['closed','half','open','sad', ...(window.MOUTHS || [])]) layers.push(L(`mouth_${v}`,'mouth',{ group:'mouth', variant:v }));
+  layers.push(L('tablet_glow','head',{ glow:true }));
+  layers.push(L('hp_cup_l','ear_l',{ headphones:true }), L('hp_cup_r','ear_r',{ headphones:true }));
+  for (const f of [...(window.FX || []), 'muted', 'case']) for (const n of (f === 'muted' || f === 'case' ? [1] : [1, 2]))
+    layers.push(L(`fx_${f}_${n}`,'fx',{ group:'fx', variant:`${f}_${n}`, fxName:f, fxSet:n }));
+  layers.push(L('prop_ball','ball',{ ball:true }));
+  return { version:VERSION, rev:0, canvas:1200, axisX:399.5, bones, layers, armPoses:JSON.parse(JSON.stringify(ARM_POSES)),
+    armFront:{ enabled:true, zone:'zone/torso', above:'hoodie_front' },
+    show:{ eyes:'open', eyeShape:'orig', iris:'orig', mouth:'closed', brows:'orig', hand_l:'relaxed', hand_r:'relaxed', fx:[], fxSet:1, headphones:false, tablet:'none', glow:true } };
+}
+
+// перенос старой версии: точки костей, сдвиги и порядок слоёв сохраняем; кисти в версии 3 крепятся иначе — по умолчанию
+function migrate(old) {
+  if (!old) return null;
+  if (old.version === VERSION) {
+    const d = defaultRig();
+    if (!old.armFront) old.armFront = d.armFront;
+    old.show = { ...d.show, ...old.show };
+    for (const b of d.bones) if (!old.bones.some(x => x.id === b.id)) old.bones.push(b);
+    // старые одиночные брови становятся вариантом 'orig'
+    for (const l of old.layers) if (/^brow_[lr]$/.test(l.id) && !l.group) { l.group = l.id; l.variant = 'orig'; }
+    // слои глаз переописаны в новой схеме (форма, зрачок, контур); сдвиги сохраняем
+    const byId = Object.fromEntries(d.layers.map(l => [l.id, l]));
+    old.layers = old.layers.map(l => (/^(eye|iris)_/.test(l.id) && byId[l.id]) ? { ...byId[l.id], dx:l.dx || 0, dy:l.dy || 0 } : l);
+    // слои, которых нет в файле, встают после своего соседа по умолчанию
+    d.layers.forEach((l, i) => {
+      if (old.layers.some(x => x.id === l.id)) return;
+      let at = -1;
+      for (let j = i - 1; j >= 0 && at < 0; j--) at = old.layers.findIndex(x => x.id === d.layers[j].id);
+      old.layers.splice(at + 1, 0, l);
+    });
+    return old;
+  }
+  const r = defaultRig();
+  for (const b of r.bones) { const o = (old.bones || []).find(x => x.id === b.id); if (o) { b.pivot = o.pivot; b.parent = o.parent; } }
+  if (old.version === 2) {
+    const fresh = Object.fromEntries(r.layers.map(l => [l.id, l]));
+    r.layers = old.layers.map(l => l.hand ? fresh[l.id] : { ...fresh[l.id], dx:l.dx || 0, dy:l.dy || 0 }).filter(Boolean);
+  }
+  if (old.show) for (const k of ['eyes','mouth','hand_l','hand_r']) if (old.show[k]) r.show[k] = old.show[k];
+  r.rev = old.rev || 0;
+  return r;
+}
+
+let poseT = {}, blinkK = 1, blinking = false, physR = {}, physS = {};
+let rig, sel = 'torso', selLayer = null, pose = {}, wiggleOn = false, t0 = performance.now(), blinkOverride = null;
+const view = { s:0.7, ox:0, oy:0 };
+const imgs = {};
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+
+function store() { try { localStorage.setItem('tishka-rig', JSON.stringify(rig)); } catch(e) {} }
+function restore() { try { const s = localStorage.getItem('tishka-rig'); return s ? JSON.parse(s) : null; } catch(e) { return null; } }
+function toast(t) { const e = $('toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => e.style.display = 'none', 1800); }
+function img(src) { if (!imgs[src]) { const i = new Image(); i.onload = draw; i.src = src; imgs[src] = i; } return imgs[src]; }
+const bone = id => rig.bones.find(b => b.id === id);
+const layer = id => rig.layers.find(l => l.id === id);
+
+// ---- матрицы ----
+function worldOf(id, cache = {}) {
+  if (cache[id]) return cache[id];
+  const b = bone(id), parentM = b.parent ? worldOf(b.parent, cache) : new DOMMatrix(), r = (pose[id] || 0) + (physR[id] || 0), t = poseT[id];
+  let m = parentM.translate(b.pivot[0] + (t ? t.x : 0), b.pivot[1] + (t ? t.y : 0)).rotate(r)
+    .scale(1, (t ? t.s : 1) * (physS[id] || 1)).translate(-b.pivot[0], -b.pivot[1]);
+  // моргание: глаз (с белком, контуром и зрачком) сжимается по высоте к нижнему веку
+  if (blinkK !== 1 && (id === 'eye_l' || id === 'eye_r')) {
+    const ly = b.pivot[1] + 22;
+    m = m.translate(b.pivot[0], ly).scale(1, blinkK).translate(-b.pivot[0], -ly);
+  }
+  return cache[id] = m;
+}
+// матрица слоя: из координат картинки в координаты холста 1200×1200
+function layerM(l, cache) {
+  const m = worldOf(l.bone, cache);
+  if (l.hand) {
+    const b = bone(l.bone), h = l.hand, a = window.HAND_ANCHORS[l.variant];
+    return m.translate(b.pivot[0] + h.x, b.pivot[1] + h.y).rotate(autoRot(l.variant, h.flip) + h.rot)
+      .scale(h.flip ? -h.scale : h.scale, h.scale).translate(-a.ax, -a.ay);
+  }
+  let lm = m.translate(l.dx || 0, l.dy || 0);
+  // клип может сдвинуть планшет (tabletY), чтобы руки держали его за края
+  if (l.group === 'tablet' && typeof play !== 'undefined' && play && play.c.tabletY) lm = lm.translate(0, play.c.tabletY);
+  // у удивлённых глаз зрачок меньше: масштаб вокруг центра нашего зрачка
+  if (l.eyePart === 'iris' || l.eyePart === 'hl') {
+    const e = eyeState(), k = e.useShape ? window.EYE_SHAPES[e.shape].irisScale : 1, M = window.MASKS[`layers/eye_${l.side}_iris.png`];
+    if (k !== 1 && M) { const cx = M.x + M.gw * 1.5, cy = M.y + M.gh * 1.5; lm = lm.translate(cx, cy).scale(k).translate(-cx, -cy); }
+  }
+  return lm;
+}
+// белок и контур одной формы двигаются вместе
+function linked(l) {
+  if ((l.eyePart === 'white' || l.eyePart === 'line') && l.shape !== 'orig')
+    return rig.layers.filter(x => x.side === l.side && x.shape === l.shape && (x.eyePart === 'white' || x.eyePart === 'line'));
+  return [l];
+}
+const viewM = () => new DOMMatrix().translate(view.ox, view.oy).scale(view.s);
+function toRig(e) { const r = cv.getBoundingClientRect(); return new DOMPoint((e.clientX - r.left - view.ox) / view.s, (e.clientY - r.top - view.oy) / view.s); }
+
+// wink: 'l' или 'r' — этот глаз закрыт, второй живёт как обычно
+function eyeState(side) {
+  const sh = rig.show, st = (side && sh.wink === side) ? 'closed' : (blinkOverride || sh.eyes), shape = sh.eyeShape || 'orig';
+  const useShape = st === 'open' && shape !== 'orig';
+  const whiteOn = st !== 'closed' && (!useShape || window.EYE_SHAPES[shape].white);
+  return { st, shape, useShape, whiteOn, iris: sh.iris || 'orig' };
+}
+function visible(l) {
+  const sh = rig.show;
+  if (l.eyePart) {
+    const e = eyeState(l.side);
+    if (l.eyePart === 'white') return e.whiteOn && l.shape === (e.useShape ? e.shape : 'orig');
+    if (l.eyePart === 'line') return e.useShape ? l.shape === e.shape : (l.shape === 'orig' && l.lid === e.st);
+    if (!e.whiteOn) return false;
+    if (l.eyePart === 'hl') return e.iris === 'orig' && e.st === 'open';
+    return l.iris === e.iris;
+  }
+  if (l.headphones) return false;
+  if (l.ball) return !!sh.ball;
+  if (l.buds) return !!sh.headphones;
+  if (l.glow) return !!sh.glow && !!sh.tablet && sh.tablet !== 'none';
+  if (l.fxName) {
+    const set = rig.layers.some(x => x.fxName === l.fxName && x.fxSet === sh.fxSet) ? sh.fxSet : 1;
+    return (sh.fx || []).includes(l.fxName) && l.fxSet === set;
+  }
+  if (!l.group) return true;
+  if (l.group === 'mouth') return l.variant === sh.mouth;
+  if (l.group.startsWith('brow_')) return l.variant === (sh.brows || 'orig');
+  return l.variant === sh[l.group];
+}
+
+function maskHas(M, q) {
+  const gx = Math.floor((q.x - M.x) / 3), gy = Math.floor((q.y - M.y) / 3);
+  if (gx < 0 || gy < 0 || gx >= M.gw || gy >= M.gh) return false;
+  if (!M.bits) M.bits = Uint8Array.from(atob(M.b), c => c.charCodeAt(0));
+  const n = gy * M.gw + gx;
+  return !!(M.bits[n >> 3] & (128 >> (n & 7)));
+}
+// правило наложения: если запястье или середина предплечья зашли на туловище,
+// предплечье и кисть этой стороны рисуются сразу поверх толстовки
+function armInFront(s, cache) {
+  const rule = rig.armFront; if (!rule || !rule.enabled) return false;
+  const Z = window.MASKS[rule.zone]; if (!Z) return false;
+  const torsoInv = worldOf('torso', cache).inverse();
+  const wrist = worldOf(`arm_${s}_lower`, cache).transformPoint(new DOMPoint(...bone(`hand_${s}`).pivot));
+  const elbow = worldOf(`arm_${s}_upper`, cache).transformPoint(new DOMPoint(...bone(`arm_${s}_lower`).pivot));
+  const mid = new DOMPoint((wrist.x + elbow.x) / 2, (wrist.y + elbow.y) / 2);
+  return [wrist, mid].some(p => maskHas(Z, torsoInv.transformPoint(p)));
+}
+function drawOrder(cache) {
+  let order = rig.layers;
+  // клип может вынести кости вперёд (рука на макушке поверх головы)
+  if (typeof play !== 'undefined' && play && play.c.underTablet) {
+    const f = l => play.c.underTablet.includes(l.bone), rest = order.filter(l => !f(l)), at = rest.findIndex(l => l.group === 'tablet');
+    if (at >= 0) order = [...rest.slice(0, at), ...order.filter(f), ...rest.slice(at)];
+  }
+  if (typeof play !== 'undefined' && play && play.c.front) {
+    const f = l => play.c.front.includes(l.bone);
+    order = [...order.filter(l => !f(l)), ...order.filter(f)];
+  }
+  const rule = rig.armFront; if (!rule || !rule.enabled) return order;
+  for (const s of ['l','r']) {
+    if (!armInFront(s, cache)) continue;
+    const move = l => l.bone === `arm_${s}_lower` || l.bone === `hand_${s}`;
+    const moved = order.filter(move), rest = order.filter(l => !move(l)), at = rest.findIndex(l => l.id === rule.above) + 1;
+    order = [...rest.slice(0, at), ...moved, ...rest.slice(at)];
+  }
+  return order;
+}
+function hitLayer(p) {
+  const cache = {}, order = drawOrder(cache);
+  for (let k = order.length - 1; k >= 0; k--) {
+    const l = order[k]; if (!visible(l)) continue;
+    const M = window.MASKS && window.MASKS[l.src]; if (!M) continue;
+    if (maskHas(M, layerM(l, cache).inverse().transformPoint(p))) return l;
+  }
+  return null;
+}
+
+function draw() {
+  const W = cv.clientWidth, H = cv.clientHeight, dpr = devicePixelRatio || 1;
+  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle = $('lightBg').checked ? '#f4f1ea' : '#2b2e35'; ctx.fillRect(0,0,W,H);
+  const D = new DOMMatrix([dpr,0,0,dpr,0,0]).multiply(viewM()), cache = {};
+  ctx.setTransform(D); ctx.strokeStyle = 'rgba(128,128,128,.35)'; ctx.lineWidth = 1 / view.s; ctx.strokeRect(0,0,rig.canvas,rig.canvas);
+  const front = ['l','r'].filter(s => armInFront(s, cache));
+  for (const l of drawOrder(cache)) {
+    if (!visible(l)) continue;
+    const i = img(l.src); if (!i.complete || !i.naturalWidth) continue;
+    if (l.eyePart === 'iris' || l.eyePart === 'hl') { drawClipped(l, i, D, cache); continue; }
+    if (l.bone === 'quills' && drawQuills(l, i, D, cache)) continue;
+    ctx.setTransform(D.multiply(layerM(l, cache))); ctx.drawImage(i, 0, 0);
+  }
+  if ($('showRef').checked) {
+    const i = img('layers/reference_full.png');
+    if (i.complete) { ctx.setTransform(D); ctx.globalAlpha = $('refOp').value / 100; ctx.drawImage(i,0,0); ctx.globalAlpha = 1; }
+  }
+  // рамка выбранного слоя
+  const sl = selLayer && layer(selLayer);
+  if (sl && visible(sl) && window.MASKS[sl.src]) {
+    const M = window.MASKS[sl.src], m = D.multiply(layerM(sl, cache));
+    const k = Math.hypot(m.a, m.b) / dpr;
+    ctx.setTransform(m); ctx.setLineDash([6 / k, 4 / k]);
+    ctx.strokeStyle = '#5ad1ff'; ctx.lineWidth = 1.5 / k; ctx.strokeRect(M.x, M.y, M.gw * 3, M.gh * 3); ctx.setLineDash([]);
+  }
+  if ($('showBones').checked) {
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    for (const b of rig.bones) if (b.parent) {
+      const p = screenPivot(b, cache), q = screenPivot(bone(b.parent), cache);
+      ctx.strokeStyle = b.id === sel ? 'rgba(90,209,255,.9)' : 'rgba(255,179,71,.55)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(q.x,q.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    }
+    for (const b of rig.bones) {
+      const p = screenPivot(b, cache), on = b.id === sel;
+      ctx.fillStyle = on ? '#5ad1ff' : '#ffb347'; ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, on ? 8 : 5, 0, 7); ctx.fill(); ctx.stroke();
+      if (on) { ctx.fillStyle = '#fff'; ctx.font = '13px system-ui'; ctx.fillText(b.label, p.x + 12, p.y - 8); }
+    }
+  }
+  const b = bone(sel);
+  $('status').textContent = `${b.label}: точка (${Math.round(b.pivot[0])}, ${Math.round(b.pivot[1])})` + (sl ? ` · слой ${sl.id}` : '') + (front.length ? ` · поверх толстовки: ${front.map(s => s === 'l' ? 'рука ←' : 'рука →').join(', ')}` : '');
+}
+// ---------- иглы гнутся ----------
+// Слой игл режется на кольца вокруг точки кости «иглы» с мягкими переходами.
+// Кольцо до QUILL_R0 неподвижно относительно головы; дальше доля движения растёт и к QUILL_R1 становится полной.
+// Поворот, сдвиг и растяжение кости «иглы» (из клипа и физики) применяются к кольцу с его долей.
+const qbuf = document.createElement('canvas'), qctx = qbuf.getContext('2d');
+const QUILL_R0 = 110, QUILL_R1 = 300, QUILL_RINGS = [0, 110, 140, 170, 200, 235, 270, 310, 420];
+const quillCache = {};
+function quillRings(l, img) {
+  if (quillCache[l.src]) return quillCache[l.src];
+  const M = window.MASKS[l.src], b = bone(l.bone); if (!M || !img.complete || !img.naturalWidth) return null;
+  const x0 = M.x - 4, y0 = M.y - 4, w = M.gw * 3 + 8, h = M.gh * 3 + 8, cx = b.pivot[0] - x0, cy = b.pivot[1] - y0;
+  const R = QUILL_RINGS, out = [], far = R[R.length - 1];
+  for (let k = 0; k < R.length - 1; k++) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+    g.drawImage(img, -x0, -y0);
+    // маска кольца: треугольник от предыдущего радиуса к следующему (сумма всех масок = 1)
+    const lo = k === 0 ? 0 : R[k - 1], mid = R[k], hi = R[k + 1];
+    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, far);
+    const st = (r, a) => grad.addColorStop(Math.min(1, Math.max(0, r / far)), `rgba(0,0,0,${a})`);
+    if (k === 0) { st(0, 1); st(mid, 1); st(hi, 0); }
+    else if (k === R.length - 2) { st(lo, 0); st(mid, 1); st(far, 1); }
+    else { st(lo, 0); st(mid, 1); st(hi, 0); }
+    g.globalCompositeOperation = 'destination-in'; g.fillStyle = grad; g.fillRect(0, 0, w, h);
+    const wgt = Math.max(0, Math.min(1, (mid - QUILL_R0) / (QUILL_R1 - QUILL_R0)));
+    out.push({ c, x0, y0, wgt });
+  }
+  return quillCache[l.src] = out;
+}
+function drawQuills(l, img, D, cache) {
+  const rings = quillRings(l, img); if (!rings) return false;
+  const b = bone(l.bone), head = b.parent ? worldOf(b.parent, cache) : new DOMMatrix();
+  const ang = (pose[b.id] || 0) + (physR[b.id] || 0), t = poseT[b.id] || { x: 0, y: 0, s: 1 }, sc = t.s * (physS[b.id] || 1);
+  const [px, py] = b.pivot;
+  // кольца складываются (lighter) в отдельном буфере: на стыках половинки дают ровно исходную картинку
+  if (qbuf.width !== cv.width || qbuf.height !== cv.height) { qbuf.width = cv.width; qbuf.height = cv.height; }
+  qctx.setTransform(1, 0, 0, 1, 0, 0); qctx.globalCompositeOperation = 'source-over'; qctx.clearRect(0, 0, qbuf.width, qbuf.height);
+  qctx.globalCompositeOperation = 'lighter';
+  for (const r of rings) {
+    const k = r.wgt;
+    qctx.setTransform(D.multiply(head).translate(px + t.x * k + (l.dx || 0), py + t.y * k + (l.dy || 0)).rotate(ang * k).scale(1, 1 + (sc - 1) * k).translate(-px, -py));
+    qctx.drawImage(r.c, r.x0, r.y0);
+  }
+  qctx.globalCompositeOperation = 'source-over';
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(qbuf, 0, 0);
+  return true;
+}
+
+// зрачок рисуется только внутри видимого белка своего глаза
+const off = document.createElement('canvas'), octx = off.getContext('2d');
+function drawClipped(l, i, D, cache) {
+  const w = rig.layers.find(x => x.eyePart === 'white' && x.side === l.side && visible(x)), wi = w && img(w.src);
+  if (!w || !wi.complete) { ctx.setTransform(D.multiply(layerM(l, cache))); ctx.drawImage(i, 0, 0); return; }
+  if (off.width !== cv.width || off.height !== cv.height) { off.width = cv.width; off.height = cv.height; }
+  octx.setTransform(1,0,0,1,0,0); octx.globalCompositeOperation = 'source-over'; octx.clearRect(0, 0, off.width, off.height);
+  octx.setTransform(D.multiply(layerM(l, cache))); octx.drawImage(i, 0, 0);
+  octx.globalCompositeOperation = 'destination-in';
+  octx.setTransform(D.multiply(layerM(w, cache))); octx.drawImage(wi, 0, 0);
+  octx.globalCompositeOperation = 'source-over';
+  ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(off, 0, 0);
+}
+function screenPivot(b, cache) {
+  const pm = b.parent ? worldOf(b.parent, cache) : new DOMMatrix();
+  return viewM().multiply(pm).transformPoint(new DOMPoint(b.pivot[0], b.pivot[1]));
+}
+
+// ---- мышь и клавиатура ----
+let drag = null;
+cv.addEventListener('mousedown', e => {
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, cache = {};
+  let best = null, bd = 11;
+  if ($('showBones').checked) for (const b of rig.bones) { const p = screenPivot(b, cache), d = Math.hypot(p.x - mx, p.y - my); if (d < bd) { bd = d; best = b; } }
+  if (best) { selLayer = null; select(best.id); drag = { kind:'pivot' }; return; }
+  const l = !$('lockLayers').checked && hitLayer(toRig(e));
+  if (l) { selectLayer(l.id); drag = { kind:'layer', last:toRig(e) }; return; }
+  drag = { kind:'pan', x:e.clientX, y:e.clientY, ox:view.ox, oy:view.oy };
+});
+addEventListener('mousemove', e => {
+  if (!drag) return;
+  if (drag.kind === 'pan') { view.ox = drag.ox + e.clientX - drag.x; view.oy = drag.oy + e.clientY - drag.y; draw(); return; }
+  const p = toRig(e);
+  if (drag.kind === 'pivot') {
+    const b = bone(sel), pm = b.parent ? worldOf(b.parent) : new DOMMatrix(), q = pm.inverse().transformPoint(p);
+    b.pivot = [Math.round(q.x), Math.round(q.y)];
+  } else if (drag.kind === 'layer') { nudgeLayer(drag.last, p); drag.last = p; }
+  syncPanel(); draw();
+});
+addEventListener('mouseup', () => { if (drag && drag.kind !== 'pan') store(); drag = null; });
+// сдвиг слоя на вектор от a к b (координаты холста) в системе его кости
+function nudgeLayer(a, b) {
+  const l = layer(selLayer); if (!l) return;
+  const inv = worldOf(l.bone).inverse(), A = inv.transformPoint(a), B = inv.transformPoint(b);
+  if (l.hand) { l.hand.x += B.x - A.x; l.hand.y += B.y - A.y; }
+  else for (const x of linked(l)) { x.dx = Math.round(((x.dx || 0) + B.x - A.x) * 10) / 10; x.dy = Math.round(((x.dy || 0) + B.y - A.y) * 10) / 10; }
+}
+addEventListener('keydown', e => {
+  if (!selLayer || e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const k = e.shiftKey ? 10 : 1, d = { ArrowLeft:[-k,0], ArrowRight:[k,0], ArrowUp:[0,-k], ArrowDown:[0,k] }[e.key];
+  if (!d) return; e.preventDefault();
+  const l = layer(selLayer);
+  if (l.hand) { l.hand.x += d[0]; l.hand.y += d[1]; } else for (const x of linked(l)) { x.dx = (x.dx || 0) + d[0]; x.dy = (x.dy || 0) + d[1]; }
+  store(); syncPanel(); draw();
+});
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, k = e.deltaY < 0 ? 1.12 : 1/1.12;
+  view.ox = mx - (mx - view.ox) * k; view.oy = my - (my - view.oy) * k; view.s *= k; draw();
+}, { passive:false });
+
+// ---- панели ----
+function curHand(side) { return rig.layers.find(l => l.group === side && l.variant === rig.show[side]); }
+function handSide() { const l = selLayer && layer(selLayer); if (l && l.hand) return l.group; return sel.startsWith('hand_') ? sel : null; }
+function select(id) { sel = id; buildBones(); buildLayers(); syncPanel(); draw(); }
+function selectLayer(id) { selLayer = id; sel = layer(id).bone; buildBones(); buildLayers(); syncPanel(); draw(); }
+function depth(b) { let d = 0; while (b.parent) { b = bone(b.parent); d++; } return d; }
+function buildBones() {
+  const box = $('bones'); box.innerHTML = '';
+  const walk = parent => rig.bones.filter(b => b.parent === parent).forEach(b => {
+    const e = document.createElement('div'); e.className = 'bone' + (b.id === sel ? ' sel' : '');
+    e.style.paddingLeft = 6 + depth(b) * 14 + 'px';
+    e.innerHTML = `${b.label} <small>${b.id}${pose[b.id] ? ' · ' + pose[b.id] + '°' : ''}</small>`;
+    e.onclick = () => { selLayer = null; select(b.id); }; box.appendChild(e); walk(b.id);
+  });
+  walk(null);
+}
+
+// порядок слоёв: группы (жесты кисти, контуры глаза, рты) — одной строкой
+const keyOf = l => l.group || l.id;
+function blocks() {
+  const out = [];
+  for (const l of rig.layers) { const last = out.at(-1); if (last && l.group && keyOf(last[0]) === l.group) last.push(l); else out.push([l]); }
+  return out;
+}
+let dragKey = null;
+function buildLayers() {
+  const box = $('layers'); box.innerHTML = '';
+  const selKey = selLayer && keyOf(layer(selLayer));
+  for (const blk of blocks()) {
+    const l = blk[0], key = keyOf(l);
+    const e = document.createElement('div');
+    e.className = 'layer' + (l.bone === sel ? ' mine' : '') + (key === selKey ? ' sel' : '');
+    e.draggable = true; e.dataset.key = key;
+    e.innerHTML = l.group ? `${key} <small>(${blk.length} вар.)</small>` : key;
+    e.onclick = () => { const v = l.group ? blk.find(x => visible(x)) || l : l; selectLayer(v.id); };
+    e.ondragstart = ev => { dragKey = key; ev.dataTransfer.effectAllowed = 'move'; };
+    e.ondragover = ev => { ev.preventDefault(); const r = e.getBoundingClientRect(), top = ev.clientY < r.top + r.height / 2;
+      e.classList.toggle('over-top', top); e.classList.toggle('over-bottom', !top); };
+    e.ondragleave = () => e.classList.remove('over-top','over-bottom');
+    e.ondrop = ev => { ev.preventDefault(); const r = e.getBoundingClientRect(); moveBlock(dragKey, key, ev.clientY < r.top + r.height / 2); };
+    box.appendChild(e);
+  }
+}
+function moveBlock(from, to, before) {
+  if (!from || from === to) { buildLayers(); return; }
+  const bl = blocks(), i = bl.findIndex(b => keyOf(b[0]) === from), [moved] = bl.splice(i, 1);
+  let j = bl.findIndex(b => keyOf(b[0]) === to); if (!before) j++;
+  bl.splice(j, 0, moved); rig.layers = bl.flat(); store(); buildLayers(); draw();
+}
+
+function buildHandPickers() {
+  for (const side of ['hand_l','hand_r']) {
+    const box = $('pick_' + side); box.innerHTML = '';
+    for (const p of HANDS) {
+      const b = document.createElement('button'); b.title = HAND_RU[p];
+      b.className = rig.show[side] === p ? 'on' : '';
+      b.innerHTML = `<img src="hands/hand_${p}.png" style="transform:rotate(${autoRot(p, side === 'hand_r') + 180}deg)${side === 'hand_r' ? ' scaleX(-1)' : ''}">`;
+      b.onclick = () => { rig.show[side] = p; applyArmPose(side, p); store(); selectLayer(curHand(side).id); buildHandPickers(); };
+      box.appendChild(b);
+    }
+  }
+}
+function applyArmPose(side, p) {
+  const s = side.slice(-1), k = s === 'l' ? 1 : -1, [u, w] = (rig.armPoses || ARM_POSES)[p] || [0,0];
+  pose[`arm_${s}_upper`] = u * k; pose[`arm_${s}_lower`] = w * k; buildBones();
+}
+// зеркальная пара кости: _l ↔ _r
+const twin = id => /_l(_|$)/.test(id) ? id.replace(/_l(_|$)/, '_r$1') : /_r(_|$)/.test(id) ? id.replace(/_r(_|$)/, '_l$1') : null;
+function mirrorToTwin() {
+  const ids = [sel, ...rig.bones.filter(b => isDesc(b.id, sel)).map(b => b.id)];
+  if (!twin(sel)) { toast('У этой кости нет пары'); return; }
+  for (const id of ids) {
+    const a = bone(id), b = bone(twin(id)); if (!b) continue;
+    b.pivot = [Math.round(2 * rig.axisX - a.pivot[0]), a.pivot[1]];
+    for (const l of rig.layers.filter(l => l.bone === id)) {
+      const t = layer(twin(l.id) || l.id.replace(/_l_/, '_r_')); if (!t || t === l) continue;
+      if (l.hand) Object.assign(t.hand, { x:-l.hand.x, y:l.hand.y, rot:-l.hand.rot, scale:l.hand.scale });
+      else { t.dx = -(l.dx || 0); t.dy = l.dy || 0; }
+    }
+  }
+  store(); buildBones(); syncPanel(); draw(); toast(`Скопировано на ${bone(twin(sel)).label}`);
+}
+const FX_RU = { sweat:'капля пота', exclaim:'!', question:'?', heart:'сердце', hearts:'сердечки', zzz:'Zzz', sparkles:'искры', blush:'румянец',
+  tear:'слеза', notes:'ноты', bulb:'идея', gear:'шестерёнка', check:'готово', dizzy:'кружится', steam:'пар', vein:'злится', muted:'не слышит', case:'кейс' };
+function buildFxPicker() {
+  const box = $('fxPick'); box.innerHTML = '';
+  for (const f of [...(window.FX || []), 'muted', 'case']) {
+    const b = document.createElement('button'), on = (rig.show.fx || []).includes(f);
+    b.className = on ? 'on' : ''; b.title = FX_RU[f] || f;
+    b.innerHTML = `<span style="font-size:11px">${FX_RU[f] || f}</span>`;
+    b.onclick = () => { const a = new Set(rig.show.fx || []); a.has(f) ? a.delete(f) : a.add(f); rig.show.fx = [...a]; store(); buildFxPicker(); draw(); };
+    box.appendChild(b);
+  }
+  for (const r of document.querySelectorAll('input[name=fxSet]')) r.checked = +r.value === (rig.show.fxSet || 1);
+}
+for (const r of document.querySelectorAll('input[name=fxSet]')) r.onchange = e => { rig.show.fxSet = +e.target.value; store(); draw(); };
+function syncPanel() {
+  const b = bone(sel);
+  $('boneName').textContent = `${b.label} (${b.id})`;
+  const ps = $('parent'); ps.innerHTML = '<option value="">— нет (корень)</option>';
+  for (const o of rig.bones) if (o.id !== b.id && !isDesc(o.id, b.id)) ps.add(new Option(`${o.label} (${o.id})`, o.id, false, o.id === b.parent));
+  $('px').value = b.pivot[0]; $('py').value = b.pivot[1];
+  $('rot').value = pose[sel] || 0; $('rotv').textContent = (pose[sel] || 0) + '°';
+  const l = selLayer && layer(selLayer);
+  $('layerInfo').textContent = l ? `Слой: ${l.id}` + (l.hand ? '' : ` · сдвиг ${l.dx || 0}, ${l.dy || 0}`) : 'Слой не выбран — щёлкни по нему на картинке или в списке.';
+  const side = handSide(); $('handBox').style.display = side ? '' : 'none';
+  if (side) {
+    const h = curHand(side).hand;
+    $('hrot').value = h.rot; $('hrotv').textContent = Math.round(h.rot) + '°';
+    $('hsc').value = Math.round(h.scale * 100); $('hscv').textContent = Math.round(h.scale * 100) + '%';
+    $('hflip').checked = h.flip;
+  }
+  $('armFront').checked = !!(rig.armFront && rig.armFront.enabled);
+  $('eyeShape').value = rig.show.eyeShape || 'orig'; $('iris').value = rig.show.iris || 'orig';
+  $('headphones').checked = !!rig.show.headphones;
+  $('tablet').value = rig.show.tablet || 'none'; $('glow').checked = !!rig.show.glow;
+  $('eyes').value = rig.show.eyes; $('brows').value = rig.show.brows || 'orig'; $('mouth').value = rig.show.mouth;
+}
+function isDesc(id, anc) { let b = bone(id); while (b && b.parent) { if (b.parent === anc) return true; b = bone(b.parent); } return false; }
+
+$('parent').onchange = e => { bone(sel).parent = e.target.value || null; store(); buildBones(); draw(); };
+$('px').oninput = e => { bone(sel).pivot[0] = +e.target.value; store(); draw(); };
+$('py').oninput = e => { bone(sel).pivot[1] = +e.target.value; store(); draw(); };
+$('rot').oninput = e => { pose[sel] = +e.target.value; $('rotv').textContent = pose[sel] + '°'; buildBones(); draw(); };
+$('resetBone').onclick = () => { delete pose[sel]; syncPanel(); buildBones(); draw(); };
+$('resetAll').onclick = () => { pose = {}; wiggleOn = false; $('wiggle').textContent = 'Покачать'; syncPanel(); buildBones(); draw(); };
+$('wiggle').onclick = () => { wiggleOn = !wiggleOn; $('wiggle').textContent = wiggleOn ? 'Стоп' : 'Покачать'; t0 = performance.now(); if (wiggleOn) tick(); };
+function tick() { if (!wiggleOn) return; pose[sel] = Math.round(Math.sin((performance.now() - t0) / 350) * 25); $('rot').value = pose[sel]; $('rotv').textContent = pose[sel] + '°'; draw(); requestAnimationFrame(tick); }
+$('mirror').onclick = mirrorToTwin;
+$('savePose').onclick = () => {
+  const side = handSide(); if (!side) return;
+  const s = side.slice(-1), k = s === 'l' ? 1 : -1, p = rig.show[side];
+  rig.armPoses = rig.armPoses || JSON.parse(JSON.stringify(ARM_POSES));
+  rig.armPoses[p] = [(pose[`arm_${s}_upper`] || 0) * k, (pose[`arm_${s}_lower`] || 0) * k];
+  store(); toast(`Поза для жеста «${HAND_RU[p]}» запомнена`);
+};
+// моргание: закрывается быстро (60 мс), миг закрыт (40 мс), открывается медленнее (110 мс)
+function doBlink() {
+  if (blinking) return; blinking = true; const t0 = performance.now();
+  const step = now => {
+    const t = now - t0;
+    if (t < 60) blinkK = 1 - 0.92 * (t / 60) ** 2;
+    else if (t < 100) blinkK = 0.08;
+    else if (t < 210) { const u = (t - 100) / 110; blinkK = 0.08 + 0.92 * (1 - (1 - u) ** 2); }
+    else { blinkK = 1; blinking = false; draw(); return; }
+    draw(); requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+$('blink').onclick = doBlink;
+$('hrot').oninput = e => { curHand(handSide()).hand.rot = +e.target.value; $('hrotv').textContent = e.target.value + '°'; store(); draw(); };
+$('hsc').oninput = e => { curHand(handSide()).hand.scale = e.target.value / 100; $('hscv').textContent = e.target.value + '%'; store(); draw(); };
+$('hflip').onchange = e => { curHand(handSide()).hand.flip = e.target.checked; store(); draw(); };
+for (const id of ['showBones','showRef','lightBg','refOp']) $(id).oninput = () => { syncDots(); draw(); };
+function syncDots() { $('toggleDots').textContent = $('showBones').checked ? 'Спрятать точки (H)' : 'Показать точки (H)'; }
+function toggleDots() { $('showBones').checked = !$('showBones').checked; syncDots(); draw(); }
+$('toggleDots').onclick = toggleDots;
+addEventListener('keydown', e => { if ((e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') && !/INPUT|SELECT/.test(e.target.tagName)) toggleDots(); });
+$('armFront').onchange = e => { rig.armFront.enabled = e.target.checked; store(); draw(); };
+$('eyes').onchange = e => { rig.show.eyes = e.target.value; store(); draw(); };
+$('eyeShape').onchange = e => { rig.show.eyeShape = e.target.value; store(); draw(); };
+$('iris').onchange = e => { rig.show.iris = e.target.value; store(); draw(); };
+// поза «держит планшет»: локти в стороны, кисти на боковых краях планшета
+const HOLD = { upper:-6, lower:-164.7 };
+$('tablet').onchange = e => {
+  rig.show.tablet = e.target.value; store();
+  for (const sd of ['l','r']) { const k = sd === 'l' ? 1 : -1;
+    if (e.target.value === 'none') { delete pose[`arm_${sd}_upper`]; delete pose[`arm_${sd}_lower`]; }
+    else { pose[`arm_${sd}_upper`] = (rig.tabletHold || HOLD).upper * k; pose[`arm_${sd}_lower`] = (rig.tabletHold || HOLD).lower * k; } }
+  buildBones(); syncPanel(); draw();
+};
+$('glow').onchange = e => { rig.show.glow = e.target.checked; store(); draw(); };
+$('headphones').onchange = e => { rig.show.headphones = e.target.checked; store(); draw(); };
+$('brows').onchange = e => { rig.show.brows = e.target.value; store(); draw(); };
+$('mouth').onchange = e => { rig.show.mouth = e.target.value; store(); draw(); };
+
+$('save').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(rig, null, 2)], { type:'application/json' }));
+  a.download = 'rig.json'; a.click(); toast('rig.json сохранён в «Загрузки»');
+};
+$('load').onclick = () => $('file').click();
+$('file').onchange = async e => {
+  try { rig = migrate(JSON.parse(await e.target.files[0].text())); pose = {}; selLayer = null; store(); buildHandPickers(); select(rig.bones[0].id); toast('Загружено'); }
+  catch (err) { toast('Не получилось прочитать файл'); }
+};
+$('defaults').onclick = () => { if (confirm('Сбросить все точки, сдвиги слоёв и положения кистей к начальным?')) { rig = defaultRig(); pose = {}; selLayer = null; store(); buildHandPickers(); select('torso'); } };
+
+function fit() { const W = cv.clientWidth, H = cv.clientHeight; view.s = Math.min(W / 520, H / 1220); view.ox = W / 2 - 400 * view.s; view.oy = H / 2 - 605 * view.s; }
+addEventListener('resize', draw);
+// ---------- проигрыватель клипов ----------
+const CLIP_RU = { idle:'покой', walk:'идёт', listen:'слушает', talk:'говорит', think:'думает', work:'работает', found:'вот что нашёл', notify:'зовёт', happy:'радость', confused:'не понял', dance:'танцует', kick:'пинает мяч', sleep:'спит' };
+let play = null, speaking = null, baseShow = null, blend = null, rafOn = false;
+function keyAt(keys, t, linear) {
+  const v = (k, i) => k[i] ?? (i === 4 ? 1 : 0);
+  if (t <= keys[0][0]) return [1, 2, 3, 4].map(i => v(keys[0], i));
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) {
+    const a = keys[i - 1], b = keys[i], u = (t - a[0]) / ((b[0] - a[0]) || 1), e = linear ? u : (1 - Math.cos(Math.PI * u)) / 2;
+    return [1, 2, 3, 4].map(j => v(a, j) + (v(b, j) - v(a, j)) * e);
+  }
+  return [1, 2, 3, 4].map(i => v(keys[keys.length - 1], i));
+}
+function snapshot() { return { pose: { ...pose }, poseT: JSON.parse(JSON.stringify(poseT)) }; }
+function playClip(name, onEnd) {
+  const c = window.CLIPS[name]; if (!c) return;
+  if (!baseShow) baseShow = { ...JSON.parse(JSON.stringify(rig.show)), hand_l:'relaxed', hand_r:'relaxed', tablet:'none', fx:[] };
+  rig.show = JSON.parse(JSON.stringify(baseShow));
+  blend = { from: snapshot(), t0: performance.now() };
+  play = { name, c, t0: performance.now(), setIdx: 0, onEnd };
+  for (const b of document.querySelectorAll('#clipBtns button')) b.className = b.dataset.clip === name ? 'on' : '';
+  ensureLoop();
+}
+function stopAll() {
+  play = null; if (speaking) { speaking.audio.pause(); speaking = null; }
+  if (baseShow) { rig.show = baseShow; baseShow = null; }
+  pose = {}; poseT = {}; blend = null;
+  for (const b of document.querySelectorAll('#clipBtns button')) b.className = '';
+  syncPanel(); buildBones(); draw();
+}
+function applyClip(now) {
+  const c = play.c; let t = (now - play.t0) / 1000;
+  if (t >= c.len) {
+    if (c.loop) { play.t0 += c.len * 1000 * Math.floor(t / c.len); t %= c.len; play.setIdx = 0; rig.show = JSON.parse(JSON.stringify(baseShow)); }
+    else { const done = play.onEnd; play = null; if (done) done(); else if (c.next) playClip(c.next); return; }
+  }
+  // события лица и жестов
+  const sets = c.set || [];
+  while (play.setIdx < sets.length && sets[play.setIdx][0] <= t) { Object.assign(rig.show, sets[play.setIdx][1]); play.setIdx++; }
+  // кости: значения клипа, первые 0,2 с — перетекание из прежней позы
+  const target = {}, targetT = {};
+  for (const [id, keys] of Object.entries(c.bones)) { const [r, x, y, sc] = keyAt(keys, t, (c.linear || []).includes(id)); target[id] = r; targetT[id] = { x, y, s: sc }; }
+  const k = blend ? Math.min(1, (now - blend.t0) / 200) : 1;
+  const ids = new Set([...Object.keys(target), ...(blend ? [...Object.keys(blend.from.pose), ...Object.keys(blend.from.poseT)] : [])]);
+  pose = {}; poseT = {};
+  for (const id of ids) {
+    const r0 = blend ? (blend.from.pose[id] || 0) : 0, t0_ = blend ? (blend.from.poseT[id] || { x:0, y:0, s:1 }) : { x:0, y:0, s:1 };
+    const r1 = target[id] || 0, t1 = targetT[id] || { x:0, y:0, s:1 };
+    pose[id] = r0 + (r1 - r0) * k;
+    poseT[id] = { x: t0_.x + (t1.x - t0_.x) * k, y: t0_.y + (t1.y - t0_.y) * k, s: t0_.s + (t1.s - t0_.s) * k };
+  }
+  if (k >= 1) blend = null;
+}
+// ---------- речь ----------
+function lipShape(ph, frame) {
+  const mode = document.querySelector('input[name=lipMode]:checked').value;
+  if (mode === 'volume') { const e = ph.env[frame] || 0; return e < 0.15 ? null : e < 0.45 ? 'm_teeth' : 'm_a'; }
+  let v = null; for (const [t, m] of ph.mouth) { if (t > frame) break; v = m; }
+  return v === 'rest' ? null : v;
+}
+function startSpeech(ph, after) {
+  const audio = new Audio(ph.wav);
+  speaking = { audio, ph, after, rest: (baseShow || rig.show).mouth };
+  audio.onended = () => { const a = speaking && speaking.after; speaking = null; if (baseShow) rig.show.mouth = baseShow.mouth; if (a) a(); };
+  audio.play().catch(() => { toast('Браузер не дал включить звук — нажми ещё раз'); speaking = null; });
+  ensureLoop();
+}
+function say() {
+  const ph = window.PHRASES[+$('phrase').value], mood = $('mood').value;
+  if (speaking) { speaking.audio.pause(); speaking = null; }
+  if (!baseShow) baseShow = { ...JSON.parse(JSON.stringify(rig.show)), hand_l:'relaxed', hand_r:'relaxed', tablet:'none', fx:[] };
+  Object.assign(baseShow, window.MOODS[mood]);
+  const talk = () => playClip('talk');
+  const speakNow = () => { talk(); startSpeech(ph, () => playClip('idle')); };
+  if (mood === 'happy') playClip('happy', speakNow);
+  else if (mood === 'confused') playClip('confused', speakNow);
+  else speakNow();
+}
+function ensureLoop() { if (rafOn) return; rafOn = true; requestAnimationFrame(loop); }
+function loop(now) {
+  if (play) applyClip(now);
+  physStep(now);
+  if (speaking && !$('voiceOff').checked) {
+    const m = lipShape(speaking.ph, Math.floor(speaking.audio.currentTime * speaking.ph.fps));
+    rig.show.mouth = m || (baseShow ? baseShow.mouth : speaking.rest);
+  }
+  draw(); requestAnimationFrame(loop);
+}
+// ---------- физика ушей и игл ----------
+// Каждая кость — пружина на своей точке крепления: k — жёсткость, c — затухание,
+// A — отставание от разгона точки крепления, G — гравитация (торчащее вверх сильнее заваливается в сторону наклона),
+// sway — собственное покачивание, sway2 — мелкая дрожь (иглы), sy — иглы ещё и пружинят по высоте при прыжке.
+const PHYS = {
+  quills: { k: 60, c: 7, A: 0.8, G: 1100, sy: true, sway: 80, f: 1.2, ph: 0.6, sway2: 160, f2: 3.1 },
+  ear_l: { k: 120, c: 9, A: 0.6, G: 900, sway: 240, f: 0.45, ph: 0 },
+  ear_r: { k: 120, c: 9, A: 0.6, G: 900, sway: 240, f: 0.53, ph: 1.7 },
+};
+const phys = {}; let physLast = null;
+function physStep(now) {
+  if (!$('physOn').checked) { physR = {}; physS = {}; physLast = now; return; }
+  const dt = physLast ? Math.min(0.05, (now - physLast) / 1000) : 0; physLast = now; if (!dt) return;
+  physR = {}; physS = {};                                   // движение родителя — без самой физики
+  const cache = {}, lim = x => Math.max(-4000, Math.min(4000, x));
+  for (const [id, P] of Object.entries(PHYS)) {
+    const b = bone(id); if (!b || !b.parent) continue;
+    const m = worldOf(b.parent, cache), p = m.transformPoint(new DOMPoint(b.pivot[0], b.pivot[1]));
+    const tilt = Math.atan2(m.b, m.a) * 180 / Math.PI + (pose[id] || 0);
+    const st = phys[id] || (phys[id] = { th: 0, v: 0, s: 1, sv: 0, px: p.x, py: p.y, vx: 0, vy: 0, act: 0 });
+    const vx = (p.x - st.px) / dt, vy = (p.y - st.py) / dt, ax = lim((vx - st.vx) / dt), ay = lim((vy - st.vy) / dt);
+    st.px = p.x; st.py = p.y; st.vx = vx; st.vy = vy;
+    // насколько персонаж сейчас двигается: в покое тряска почти гаснет (15%), в движении — полная
+    st.act += (Math.hypot(vx, vy) - st.act) * Math.min(1, dt * 3);
+    const live = 0.15 + 0.85 * Math.min(1, st.act / 120);
+    let f = -P.k * st.th - P.c * st.v - P.A * ax + P.G * Math.sin((tilt + st.th) * Math.PI / 180);
+    if (P.sway) f += live * P.sway * Math.sin(2 * Math.PI * P.f * now / 1000 + P.ph);
+    if (P.sway2) f += live * P.sway2 * Math.sin(2 * Math.PI * P.f2 * now / 1000);   // мелкая дрожь
+    st.v += f * dt; st.th = Math.max(-25, Math.min(25, st.th + st.v * dt));
+    if (P.sy) { const fs = -90 * (st.s - 1) - 9 * st.sv + 0.0036 * ay; st.sv += fs * dt; st.s = Math.max(0.85, Math.min(1.15, st.s + st.sv * dt)); }
+  }
+  for (const [id, st] of Object.entries(phys)) { physR[id] = st.th; if (PHYS[id].sy) physS[id] = st.s; }
+}
+
+function buildClipPanel() {
+  const box = $('clipBtns'); box.innerHTML = '';
+  for (const name of Object.keys(window.CLIPS || {})) {
+    const b = document.createElement('button'); b.dataset.clip = name; b.innerHTML = `<span style="font-size:11px">${CLIP_RU[name] || name}</span>`;
+    b.onclick = () => playClip(name); box.appendChild(b);
+  }
+  const ps = $('phrase'); ps.innerHTML = '';
+  (window.PHRASES || []).forEach((ph, i) => ps.add(new Option(ph.text, i)));
+  $('stopClip').onclick = stopAll; $('say').onclick = say;
+}
+
+// файл rig_data.js из папки модели главнее, если он новее того, что сохранено в браузере
+const saved = migrate(restore()), shipped = window.RIG_FILE ? migrate(window.RIG_FILE) : null;
+rig = (shipped && (!saved || (shipped.rev || 0) > (saved.rev || 0))) ? shipped : (saved || shipped || defaultRig()); store();
+// лицо и значки — состояние предпросмотра, а не часть рига: при открытии всегда обычное лицо с открытыми глазами
+rig.show = { ...defaultRig().show, hand_l: 'relaxed', hand_r: 'relaxed' }; store();
+// само моргает раз в 3–5 секунд — и в покое, и в клипах, и во время речи; кроме клипов noBlink и глаз ^ ^, > <, сонных
+(function autoBlink() {
+  setTimeout(() => {
+    const noBlinkShape = ['happy', 'laugh', 'sleepy'].includes(rig.show.eyeShape);
+    if (!(play && play.c.noBlink) && rig.show.eyes === 'open' && !noBlinkShape && !blinking) doBlink();
+    autoBlink();
+  }, 3000 + Math.random() * 2000);
+})();
+fit(); buildHandPickers(); buildFxPicker(); buildClipPanel(); $('showBones').checked = false; select(sel); syncDots(); ensureLoop();
+</script>
+</body>
+</html>

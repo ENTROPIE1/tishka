@@ -1,0 +1,2195 @@
+// rig.json, присланный владелицей, с правками; номер rev растёт при каждом обновлении
+window.RIG_FILE={
+ "version": 3,
+ "rev": 14,
+ "canvas": 1200,
+ "axisX": 399.5,
+ "bones": [
+  {
+   "id": "hips",
+   "parent": null,
+   "pivot": [
+    399,
+    704
+   ],
+   "label": "таз"
+  },
+  {
+   "id": "torso",
+   "parent": "hips",
+   "pivot": [
+    399,
+    705
+   ],
+   "label": "туловище"
+  },
+  {
+   "id": "neck",
+   "parent": "torso",
+   "pivot": [
+    398,
+    440
+   ],
+   "label": "шея"
+  },
+  {
+   "id": "head",
+   "parent": "neck",
+   "pivot": [
+    398,
+    405
+   ],
+   "label": "голова"
+  },
+  {
+   "id": "quills",
+   "parent": "head",
+   "pivot": [
+    398,
+    330
+   ],
+   "label": "иголки"
+  },
+  {
+   "id": "ear_l",
+   "parent": "head",
+   "pivot": [
+    348,
+    263
+   ],
+   "label": "ухо ←"
+  },
+  {
+   "id": "ear_r",
+   "parent": "head",
+   "pivot": [
+    451,
+    263
+   ],
+   "label": "ухо →"
+  },
+  {
+   "id": "brow_l",
+   "parent": "head",
+   "pivot": [
+    346,
+    298
+   ],
+   "label": "бровь ←"
+  },
+  {
+   "id": "brow_r",
+   "parent": "head",
+   "pivot": [
+    453,
+    298
+   ],
+   "label": "бровь →"
+  },
+  {
+   "id": "eye_l",
+   "parent": "head",
+   "pivot": [
+    356,
+    312
+   ],
+   "label": "глаз ←"
+  },
+  {
+   "id": "eye_r",
+   "parent": "head",
+   "pivot": [
+    444,
+    312
+   ],
+   "label": "глаз →"
+  },
+  {
+   "id": "iris_l",
+   "parent": "eye_l",
+   "pivot": [
+    365,
+    317
+   ],
+   "label": "зрачок ←"
+  },
+  {
+   "id": "iris_r",
+   "parent": "eye_r",
+   "pivot": [
+    434,
+    320
+   ],
+   "label": "зрачок →"
+  },
+  {
+   "id": "mouth",
+   "parent": "head",
+   "pivot": [
+    400,
+    377
+   ],
+   "label": "рот"
+  },
+  {
+   "id": "arm_l_upper",
+   "parent": "torso",
+   "pivot": [
+    319,
+    459
+   ],
+   "label": "плечо ←"
+  },
+  {
+   "id": "arm_l_lower",
+   "parent": "arm_l_upper",
+   "pivot": [
+    286,
+    596
+   ],
+   "label": "локоть ←"
+  },
+  {
+   "id": "hand_l",
+   "parent": "arm_l_lower",
+   "pivot": [
+    256,
+    740
+   ],
+   "label": "кисть ←"
+  },
+  {
+   "id": "arm_r_upper",
+   "parent": "torso",
+   "pivot": [
+    487,
+    468
+   ],
+   "label": "плечо →"
+  },
+  {
+   "id": "arm_r_lower",
+   "parent": "arm_r_upper",
+   "pivot": [
+    511,
+    592
+   ],
+   "label": "локоть →"
+  },
+  {
+   "id": "hand_r",
+   "parent": "arm_r_lower",
+   "pivot": [
+    543,
+    740
+   ],
+   "label": "кисть →"
+  },
+  {
+   "id": "leg_l_upper",
+   "parent": "hips",
+   "pivot": [
+    345,
+    712
+   ],
+   "label": "бедро ←"
+  },
+  {
+   "id": "leg_l_lower",
+   "parent": "leg_l_upper",
+   "pivot": [
+    322,
+    880
+   ],
+   "label": "колено ←"
+  },
+  {
+   "id": "shoe_l",
+   "parent": "leg_l_lower",
+   "pivot": [
+    312,
+    1060
+   ],
+   "label": "стопа ←"
+  },
+  {
+   "id": "leg_r_upper",
+   "parent": "hips",
+   "pivot": [
+    454,
+    712
+   ],
+   "label": "бедро →"
+  },
+  {
+   "id": "leg_r_lower",
+   "parent": "leg_r_upper",
+   "pivot": [
+    477,
+    880
+   ],
+   "label": "колено →"
+  },
+  {
+   "id": "shoe_r",
+   "parent": "leg_r_lower",
+   "pivot": [
+    487,
+    1060
+   ],
+   "label": "стопа →"
+  },
+  {
+   "id": "fx",
+   "parent": "head",
+   "pivot": [
+    400,
+    250
+   ],
+   "label": "эффекты"
+  }
+ ],
+ "layers": [
+  {
+   "id": "pants_top",
+   "src": "layers/pants_top.png",
+   "bone": "hips",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "quills",
+   "src": "layers/quills.png",
+   "bone": "quills",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "hp_band",
+   "src": "layers/hp_band.png",
+   "bone": "head",
+   "dx": 0,
+   "dy": 0,
+   "headphones": true
+  },
+  {
+   "id": "hoodie_back",
+   "src": "layers/hoodie_back.png",
+   "bone": "torso",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "ear_l_outer",
+   "src": "layers/ear_l_outer.png",
+   "bone": "ear_l",
+   "dx": 11.4,
+   "dy": 9.6
+  },
+  {
+   "id": "ear_l_inner",
+   "src": "layers/ear_l_inner.png",
+   "bone": "ear_l",
+   "dx": 10.2,
+   "dy": 7.2
+  },
+  {
+   "id": "ear_r_outer",
+   "src": "layers/ear_r_outer.png",
+   "bone": "ear_r",
+   "dx": -11.4,
+   "dy": 9.6
+  },
+  {
+   "id": "ear_r_inner",
+   "src": "layers/ear_r_inner.png",
+   "bone": "ear_r",
+   "dx": -10.2,
+   "dy": 7.2
+  },
+  {
+   "id": "bud_l",
+   "src": "layers/bud_l.png",
+   "bone": "ear_l",
+   "dx": 0,
+   "dy": 0,
+   "buds": true
+  },
+  {
+   "id": "bud_r",
+   "src": "layers/bud_r.png",
+   "bone": "ear_r",
+   "dx": 0,
+   "dy": 0,
+   "buds": true
+  },
+  {
+   "id": "neck",
+   "src": "layers/neck.png",
+   "bone": "neck",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "leg_l_upper",
+   "src": "layers/leg_l_upper.png",
+   "bone": "leg_l_upper",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "leg_l_lower",
+   "src": "layers/leg_l_lower.png",
+   "bone": "leg_l_lower",
+   "dx": 0,
+   "dy": 1.6
+  },
+  {
+   "id": "shoe_l",
+   "src": "layers/shoe_l.png",
+   "bone": "shoe_l",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "leg_r_upper",
+   "src": "layers/leg_r_upper.png",
+   "bone": "leg_r_upper",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "leg_r_lower",
+   "src": "layers/leg_r_lower.png",
+   "bone": "leg_r_lower",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "shoe_r",
+   "src": "layers/shoe_r.png",
+   "bone": "shoe_r",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "hoodie_front",
+   "src": "layers/hoodie_front.png",
+   "bone": "torso",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "arm_l_upper",
+   "src": "layers/arm_l_upper.png",
+   "bone": "arm_l_upper",
+   "dx": 3.1,
+   "dy": -1.4
+  },
+  {
+   "id": "hand_l_relaxed",
+   "src": "hands/hand_relaxed.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "relaxed",
+   "hand": {
+    "x": 4.190984084615593,
+    "y": -11.143238063461695,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "hand_l_wave",
+   "src": "hands/hand_wave.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "wave",
+   "hand": {
+    "x": 5.692143958373549,
+    "y": -9.465195684951368,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "hand_l_palm",
+   "src": "hands/hand_palm.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "palm",
+   "hand": {
+    "x": 0,
+    "y": -8,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "hand_l_offer",
+   "src": "hands/hand_offer.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "offer",
+   "hand": {
+    "x": 7.398269668433386,
+    "y": -7.075216291445827,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "hand_l_point_up",
+   "src": "hands/hand_point_up.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "point_up",
+   "hand": {
+    "x": 4.494379019923429,
+    "y": -5.17794609862608,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "hand_l_point",
+   "src": "hands/hand_point.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "point",
+   "hand": {
+    "x": -0.4183251849208318,
+    "y": -7.581674815079168,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "hand_l_thumb_up",
+   "src": "hands/hand_thumb_up.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "thumb_up",
+   "hand": {
+    "x": 4.829019396904698,
+    "y": -5.211964351275128,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "hand_l_fist",
+   "src": "hands/hand_fist.png",
+   "bone": "hand_l",
+   "group": "hand_l",
+   "variant": "fist",
+   "hand": {
+    "x": 0,
+    "y": -8,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "arm_l_lower",
+   "src": "layers/arm_l_lower.png",
+   "bone": "arm_l_lower",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "arm_r_upper",
+   "src": "layers/arm_r_upper.png",
+   "bone": "arm_r_upper",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "hand_r_relaxed",
+   "src": "hands/hand_relaxed.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "relaxed",
+   "hand": {
+    "x": -1.9747283317454958,
+    "y": -11.291213886242417,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "hand_r_wave",
+   "src": "hands/hand_wave.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "wave",
+   "hand": {
+    "x": -8.541805485299733,
+    "y": -8.80148774650604,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "hand_r_palm",
+   "src": "hands/hand_palm.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "palm",
+   "hand": {
+    "x": -1.6376209111845128,
+    "y": -7.098755508987892,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "hand_r_offer",
+   "src": "hands/hand_offer.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "offer",
+   "hand": {
+    "x": -5.924184995236374,
+    "y": -4.708786113757469,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "hand_r_point_up",
+   "src": "hands/hand_point_up.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "point_up",
+   "hand": {
+    "x": -3.2610381922288525,
+    "y": -7.205643463160413,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "hand_r_point",
+   "src": "hands/hand_point.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "point",
+   "hand": {
+    "x": 0,
+    "y": -8,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": true
+   }
+  },
+  {
+   "id": "hand_r_thumb_up",
+   "src": "hands/hand_thumb_up.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "thumb_up",
+   "hand": {
+    "x": -3.991902551376711,
+    "y": -5.266819764613047,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "hand_r_fist",
+   "src": "hands/hand_fist.png",
+   "bone": "hand_r",
+   "group": "hand_r",
+   "variant": "fist",
+   "hand": {
+    "x": 0,
+    "y": -8,
+    "rot": 0,
+    "scale": 0.2,
+    "flip": false
+   }
+  },
+  {
+   "id": "arm_r_lower",
+   "src": "layers/arm_r_lower.png",
+   "bone": "arm_r_lower",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "tablet_back",
+   "src": "layers/tablet_back.png",
+   "bone": "torso",
+   "dx": 0,
+   "dy": 0,
+   "group": "tablet",
+   "variant": "back"
+  },
+  {
+   "id": "tablet_back_tilt",
+   "src": "layers/tablet_back_tilt.png",
+   "bone": "torso",
+   "dx": 0,
+   "dy": 0,
+   "group": "tablet",
+   "variant": "back_tilt"
+  },
+  {
+   "id": "tablet_search",
+   "src": "layers/tablet_search.png",
+   "bone": "torso",
+   "dx": 0,
+   "dy": 0,
+   "group": "tablet",
+   "variant": "search"
+  },
+  {
+   "id": "tablet_loading",
+   "src": "layers/tablet_loading.png",
+   "bone": "torso",
+   "dx": 0,
+   "dy": 0,
+   "group": "tablet",
+   "variant": "loading"
+  },
+  {
+   "id": "tablet_done",
+   "src": "layers/tablet_done.png",
+   "bone": "torso",
+   "dx": 0,
+   "dy": 0,
+   "group": "tablet",
+   "variant": "done"
+  },
+  {
+   "id": "head",
+   "src": "layers/head.png",
+   "bone": "head",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "eye_l_white",
+   "src": "layers/eye_l_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "orig",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "orig"
+  },
+  {
+   "id": "eye_l_neutral_white",
+   "src": "layers/eye_l_neutral_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "neutral",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "neutral"
+  },
+  {
+   "id": "eye_l_surprised_white",
+   "src": "layers/eye_l_surprised_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "surprised",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "surprised"
+  },
+  {
+   "id": "eye_l_angry_white",
+   "src": "layers/eye_l_angry_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "angry",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "angry"
+  },
+  {
+   "id": "eye_l_sad_white",
+   "src": "layers/eye_l_sad_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "sad",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "sad"
+  },
+  {
+   "id": "eye_l_smiling_white",
+   "src": "layers/eye_l_smiling_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "smiling",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "smiling"
+  },
+  {
+   "id": "eye_l_suspicious_white",
+   "src": "layers/eye_l_suspicious_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "suspicious",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "suspicious"
+  },
+  {
+   "id": "eye_l_sleepy_white",
+   "src": "layers/eye_l_sleepy_white.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_l",
+   "variant": "sleepy",
+   "eyePart": "white",
+   "side": "l",
+   "shape": "sleepy"
+  },
+  {
+   "id": "eye_l_iris",
+   "src": "layers/eye_l_iris.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "orig",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "orig"
+  },
+  {
+   "id": "eye_l_highlight",
+   "src": "layers/eye_l_highlight.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "orig_hl",
+   "eyePart": "hl",
+   "side": "l",
+   "iris": "orig"
+  },
+  {
+   "id": "iris_l_normal",
+   "src": "layers/iris_l_normal.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "normal",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "normal"
+  },
+  {
+   "id": "iris_l_shock",
+   "src": "layers/iris_l_shock.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "shock",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "shock"
+  },
+  {
+   "id": "iris_l_cute",
+   "src": "layers/iris_l_cute.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "cute",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "cute"
+  },
+  {
+   "id": "iris_l_star",
+   "src": "layers/iris_l_star.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "star",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "star"
+  },
+  {
+   "id": "iris_l_heart",
+   "src": "layers/iris_l_heart.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "heart",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "heart"
+  },
+  {
+   "id": "iris_l_spiral",
+   "src": "layers/iris_l_spiral.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "spiral",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "spiral"
+  },
+  {
+   "id": "iris_l_sparkle",
+   "src": "layers/iris_l_sparkle.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "sparkle",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "sparkle"
+  },
+  {
+   "id": "iris_l_blank",
+   "src": "layers/iris_l_blank.png",
+   "bone": "iris_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_l",
+   "variant": "blank",
+   "eyePart": "iris",
+   "side": "l",
+   "iris": "blank"
+  },
+  {
+   "id": "eye_l_open",
+   "src": "layers/eye_l_open.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "open",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "orig",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_half",
+   "src": "layers/eye_l_half.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "half",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "orig",
+   "lid": "half"
+  },
+  {
+   "id": "eye_l_closed",
+   "src": "layers/eye_l_closed.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "closed",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "orig",
+   "lid": "closed"
+  },
+  {
+   "id": "eye_l_neutral_line",
+   "src": "layers/eye_l_neutral_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "neutral",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "neutral",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_surprised_line",
+   "src": "layers/eye_l_surprised_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "surprised",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "surprised",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_angry_line",
+   "src": "layers/eye_l_angry_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "angry",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "angry",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_sad_line",
+   "src": "layers/eye_l_sad_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "sad",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "sad",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_smiling_line",
+   "src": "layers/eye_l_smiling_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "smiling",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "smiling",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_happy_line",
+   "src": "layers/eye_l_happy_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "happy",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "happy",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_laugh_line",
+   "src": "layers/eye_l_laugh_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "laugh",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "laugh",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_suspicious_line",
+   "src": "layers/eye_l_suspicious_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "suspicious",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "suspicious",
+   "lid": "open"
+  },
+  {
+   "id": "eye_l_sleepy_line",
+   "src": "layers/eye_l_sleepy_line.png",
+   "bone": "eye_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_l",
+   "variant": "sleepy",
+   "eyePart": "line",
+   "side": "l",
+   "shape": "sleepy",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_white",
+   "src": "layers/eye_r_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "orig",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "orig"
+  },
+  {
+   "id": "eye_r_neutral_white",
+   "src": "layers/eye_r_neutral_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "neutral",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "neutral"
+  },
+  {
+   "id": "eye_r_surprised_white",
+   "src": "layers/eye_r_surprised_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "surprised",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "surprised"
+  },
+  {
+   "id": "eye_r_angry_white",
+   "src": "layers/eye_r_angry_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "angry",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "angry"
+  },
+  {
+   "id": "eye_r_sad_white",
+   "src": "layers/eye_r_sad_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "sad",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "sad"
+  },
+  {
+   "id": "eye_r_smiling_white",
+   "src": "layers/eye_r_smiling_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "smiling",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "smiling"
+  },
+  {
+   "id": "eye_r_suspicious_white",
+   "src": "layers/eye_r_suspicious_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "suspicious",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "suspicious"
+  },
+  {
+   "id": "eye_r_sleepy_white",
+   "src": "layers/eye_r_sleepy_white.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeWhite_r",
+   "variant": "sleepy",
+   "eyePart": "white",
+   "side": "r",
+   "shape": "sleepy"
+  },
+  {
+   "id": "eye_r_iris",
+   "src": "layers/eye_r_iris.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "orig",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "orig"
+  },
+  {
+   "id": "eye_r_highlight",
+   "src": "layers/eye_r_highlight.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "orig_hl",
+   "eyePart": "hl",
+   "side": "r",
+   "iris": "orig"
+  },
+  {
+   "id": "iris_r_normal",
+   "src": "layers/iris_r_normal.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "normal",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "normal"
+  },
+  {
+   "id": "iris_r_shock",
+   "src": "layers/iris_r_shock.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "shock",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "shock"
+  },
+  {
+   "id": "iris_r_cute",
+   "src": "layers/iris_r_cute.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "cute",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "cute"
+  },
+  {
+   "id": "iris_r_star",
+   "src": "layers/iris_r_star.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "star",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "star"
+  },
+  {
+   "id": "iris_r_heart",
+   "src": "layers/iris_r_heart.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "heart",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "heart"
+  },
+  {
+   "id": "iris_r_spiral",
+   "src": "layers/iris_r_spiral.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "spiral",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "spiral"
+  },
+  {
+   "id": "iris_r_sparkle",
+   "src": "layers/iris_r_sparkle.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "sparkle",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "sparkle"
+  },
+  {
+   "id": "iris_r_blank",
+   "src": "layers/iris_r_blank.png",
+   "bone": "iris_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeIris_r",
+   "variant": "blank",
+   "eyePart": "iris",
+   "side": "r",
+   "iris": "blank"
+  },
+  {
+   "id": "eye_r_open",
+   "src": "layers/eye_r_open.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "open",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "orig",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_half",
+   "src": "layers/eye_r_half.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "half",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "orig",
+   "lid": "half"
+  },
+  {
+   "id": "eye_r_closed",
+   "src": "layers/eye_r_closed.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "closed",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "orig",
+   "lid": "closed"
+  },
+  {
+   "id": "eye_r_neutral_line",
+   "src": "layers/eye_r_neutral_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "neutral",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "neutral",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_surprised_line",
+   "src": "layers/eye_r_surprised_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "surprised",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "surprised",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_angry_line",
+   "src": "layers/eye_r_angry_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "angry",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "angry",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_sad_line",
+   "src": "layers/eye_r_sad_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "sad",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "sad",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_smiling_line",
+   "src": "layers/eye_r_smiling_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "smiling",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "smiling",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_happy_line",
+   "src": "layers/eye_r_happy_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "happy",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "happy",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_laugh_line",
+   "src": "layers/eye_r_laugh_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "laugh",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "laugh",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_suspicious_line",
+   "src": "layers/eye_r_suspicious_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "suspicious",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "suspicious",
+   "lid": "open"
+  },
+  {
+   "id": "eye_r_sleepy_line",
+   "src": "layers/eye_r_sleepy_line.png",
+   "bone": "eye_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "eyeLine_r",
+   "variant": "sleepy",
+   "eyePart": "line",
+   "side": "r",
+   "shape": "sleepy",
+   "lid": "open"
+  },
+  {
+   "id": "brow_l",
+   "src": "layers/brow_l.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "orig"
+  },
+  {
+   "id": "brow_l_neutral",
+   "src": "layers/brow_l_neutral.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "neutral"
+  },
+  {
+   "id": "brow_l_surprised",
+   "src": "layers/brow_l_surprised.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "surprised"
+  },
+  {
+   "id": "brow_l_angry",
+   "src": "layers/brow_l_angry.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "angry"
+  },
+  {
+   "id": "brow_l_sad",
+   "src": "layers/brow_l_sad.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "sad"
+  },
+  {
+   "id": "brow_l_worried",
+   "src": "layers/brow_l_worried.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "worried"
+  },
+  {
+   "id": "brow_l_kind",
+   "src": "layers/brow_l_kind.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "kind"
+  },
+  {
+   "id": "brow_l_focused",
+   "src": "layers/brow_l_focused.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "focused"
+  },
+  {
+   "id": "brow_l_skeptical",
+   "src": "layers/brow_l_skeptical.png",
+   "bone": "brow_l",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_l",
+   "variant": "skeptical"
+  },
+  {
+   "id": "brow_r",
+   "src": "layers/brow_r.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "orig"
+  },
+  {
+   "id": "brow_r_neutral",
+   "src": "layers/brow_r_neutral.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "neutral"
+  },
+  {
+   "id": "brow_r_surprised",
+   "src": "layers/brow_r_surprised.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "surprised"
+  },
+  {
+   "id": "brow_r_angry",
+   "src": "layers/brow_r_angry.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "angry"
+  },
+  {
+   "id": "brow_r_sad",
+   "src": "layers/brow_r_sad.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "sad"
+  },
+  {
+   "id": "brow_r_worried",
+   "src": "layers/brow_r_worried.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "worried"
+  },
+  {
+   "id": "brow_r_kind",
+   "src": "layers/brow_r_kind.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "kind"
+  },
+  {
+   "id": "brow_r_focused",
+   "src": "layers/brow_r_focused.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "focused"
+  },
+  {
+   "id": "brow_r_skeptical",
+   "src": "layers/brow_r_skeptical.png",
+   "bone": "brow_r",
+   "dx": 0,
+   "dy": 0,
+   "group": "brow_r",
+   "variant": "skeptical"
+  },
+  {
+   "id": "nose",
+   "src": "layers/nose.png",
+   "bone": "head",
+   "dx": 0,
+   "dy": 0
+  },
+  {
+   "id": "mouth_closed",
+   "src": "layers/mouth_closed.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "closed"
+  },
+  {
+   "id": "mouth_half",
+   "src": "layers/mouth_half.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "half"
+  },
+  {
+   "id": "mouth_open",
+   "src": "layers/mouth_open.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "open"
+  },
+  {
+   "id": "mouth_sad",
+   "src": "layers/mouth_sad.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "sad"
+  },
+  {
+   "id": "mouth_m_closed",
+   "src": "layers/mouth_m_closed.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_closed"
+  },
+  {
+   "id": "mouth_m_teeth",
+   "src": "layers/mouth_m_teeth.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_teeth"
+  },
+  {
+   "id": "mouth_m_e",
+   "src": "layers/mouth_m_e.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_e"
+  },
+  {
+   "id": "mouth_m_a",
+   "src": "layers/mouth_m_a.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_a"
+  },
+  {
+   "id": "mouth_m_o",
+   "src": "layers/mouth_m_o.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_o"
+  },
+  {
+   "id": "mouth_m_u",
+   "src": "layers/mouth_m_u.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_u"
+  },
+  {
+   "id": "mouth_m_f",
+   "src": "layers/mouth_m_f.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_f"
+  },
+  {
+   "id": "mouth_m_l",
+   "src": "layers/mouth_m_l.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "m_l"
+  },
+  {
+   "id": "mouth_laugh",
+   "src": "layers/mouth_laugh.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "laugh"
+  },
+  {
+   "id": "mouth_wow",
+   "src": "layers/mouth_wow.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "wow"
+  },
+  {
+   "id": "mouth_grin",
+   "src": "layers/mouth_grin.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "grin"
+  },
+  {
+   "id": "mouth_grumpy",
+   "src": "layers/mouth_grumpy.png",
+   "bone": "mouth",
+   "dx": 0,
+   "dy": 0,
+   "group": "mouth",
+   "variant": "grumpy"
+  },
+  {
+   "id": "tablet_glow",
+   "src": "layers/tablet_glow.png",
+   "bone": "head",
+   "dx": 0,
+   "dy": 0,
+   "glow": true
+  },
+  {
+   "id": "hp_cup_l",
+   "src": "layers/hp_cup_l.png",
+   "bone": "ear_l",
+   "dx": 0,
+   "dy": 0,
+   "headphones": true
+  },
+  {
+   "id": "hp_cup_r",
+   "src": "layers/hp_cup_r.png",
+   "bone": "ear_r",
+   "dx": 0,
+   "dy": 0,
+   "headphones": true
+  },
+  {
+   "id": "fx_sweat_1",
+   "src": "layers/fx_sweat_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "sweat_1",
+   "fxName": "sweat",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_sweat_2",
+   "src": "layers/fx_sweat_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "sweat_2",
+   "fxName": "sweat",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_exclaim_1",
+   "src": "layers/fx_exclaim_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "exclaim_1",
+   "fxName": "exclaim",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_exclaim_2",
+   "src": "layers/fx_exclaim_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "exclaim_2",
+   "fxName": "exclaim",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_question_1",
+   "src": "layers/fx_question_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "question_1",
+   "fxName": "question",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_question_2",
+   "src": "layers/fx_question_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "question_2",
+   "fxName": "question",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_heart_1",
+   "src": "layers/fx_heart_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "heart_1",
+   "fxName": "heart",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_heart_2",
+   "src": "layers/fx_heart_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "heart_2",
+   "fxName": "heart",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_hearts_1",
+   "src": "layers/fx_hearts_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "hearts_1",
+   "fxName": "hearts",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_hearts_2",
+   "src": "layers/fx_hearts_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "hearts_2",
+   "fxName": "hearts",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_zzz_1",
+   "src": "layers/fx_zzz_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "zzz_1",
+   "fxName": "zzz",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_zzz_2",
+   "src": "layers/fx_zzz_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "zzz_2",
+   "fxName": "zzz",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_sparkles_1",
+   "src": "layers/fx_sparkles_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "sparkles_1",
+   "fxName": "sparkles",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_sparkles_2",
+   "src": "layers/fx_sparkles_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "sparkles_2",
+   "fxName": "sparkles",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_blush_1",
+   "src": "layers/fx_blush_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "blush_1",
+   "fxName": "blush",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_blush_2",
+   "src": "layers/fx_blush_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "blush_2",
+   "fxName": "blush",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_tear_1",
+   "src": "layers/fx_tear_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "tear_1",
+   "fxName": "tear",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_tear_2",
+   "src": "layers/fx_tear_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "tear_2",
+   "fxName": "tear",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_notes_1",
+   "src": "layers/fx_notes_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "notes_1",
+   "fxName": "notes",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_notes_2",
+   "src": "layers/fx_notes_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "notes_2",
+   "fxName": "notes",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_bulb_1",
+   "src": "layers/fx_bulb_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "bulb_1",
+   "fxName": "bulb",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_bulb_2",
+   "src": "layers/fx_bulb_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "bulb_2",
+   "fxName": "bulb",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_gear_1",
+   "src": "layers/fx_gear_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "gear_1",
+   "fxName": "gear",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_gear_2",
+   "src": "layers/fx_gear_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "gear_2",
+   "fxName": "gear",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_check_1",
+   "src": "layers/fx_check_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "check_1",
+   "fxName": "check",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_check_2",
+   "src": "layers/fx_check_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "check_2",
+   "fxName": "check",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_dizzy_1",
+   "src": "layers/fx_dizzy_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "dizzy_1",
+   "fxName": "dizzy",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_dizzy_2",
+   "src": "layers/fx_dizzy_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "dizzy_2",
+   "fxName": "dizzy",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_steam_1",
+   "src": "layers/fx_steam_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "steam_1",
+   "fxName": "steam",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_steam_2",
+   "src": "layers/fx_steam_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "steam_2",
+   "fxName": "steam",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_vein_1",
+   "src": "layers/fx_vein_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "vein_1",
+   "fxName": "vein",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_vein_2",
+   "src": "layers/fx_vein_2.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "vein_2",
+   "fxName": "vein",
+   "fxSet": 2
+  },
+  {
+   "id": "fx_muted_1",
+   "src": "layers/fx_muted_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "muted_1",
+   "fxName": "muted",
+   "fxSet": 1
+  },
+  {
+   "id": "fx_case_1",
+   "src": "layers/fx_case_1.png",
+   "bone": "fx",
+   "dx": 0,
+   "dy": 0,
+   "group": "fx",
+   "variant": "case_1",
+   "fxName": "case",
+   "fxSet": 1
+  }
+ ],
+ "armPoses": {
+  "relaxed": [
+   0,
+   0
+  ],
+  "wave": [
+   50,
+   100
+  ],
+  "palm": [
+   20,
+   120
+  ],
+  "offer": [
+   20,
+   70
+  ],
+  "point_up": [
+   15,
+   140
+  ],
+  "point": [
+   80,
+   10
+  ],
+  "thumb_up": [
+   15,
+   90
+  ],
+  "fist": [
+   -10,
+   -150
+  ]
+ },
+ "show": {
+  "eyes": "open",
+  "eyeShape": "orig",
+  "iris": "orig",
+  "mouth": "closed",
+  "brows": "orig",
+  "hand_l": "relaxed",
+  "hand_r": "relaxed",
+  "fx": [],
+  "fxSet": 1,
+  "headphones": false,
+  "tablet": "none",
+  "glow": true
+ },
+ "armFront": {
+  "enabled": false,
+  "zone": "zone/torso",
+  "above": "hoodie_front"
+ }
+};
