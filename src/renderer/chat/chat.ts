@@ -91,6 +91,16 @@ function initEvents(): void {
         }
         clearStatus();
         break;
+      case 'screenshot':
+        // Снимок экрана ложится в ленту отдельной строкой до ответа; в ежа не уходит.
+        view.appendEntry({
+          kind: 'screenshot',
+          id: crypto.randomUUID(),
+          at: nowIso(),
+          title: event.title,
+          path: event.path
+        });
+        break;
       case 'notify':
         view.appendEntry({ kind: 'message', id: crypto.randomUUID(), at: nowIso(), from: 'system', text: event.title });
         break;

@@ -31,6 +31,12 @@ export interface ToolRegistry {
 
 export type Mood = 'neutral' | 'happy' | 'confused';
 
+// Как пришла реплика человека: голосом или набранным текстом.
+export type InputSource = 'voice' | 'text';
+
+// Режим ответа Тишки: вслух и текстом или только текстом.
+export type SpeechMode = 'voice' | 'text';
+
 export type Panel =
   | { kind: 'list'; title: string; items: { title: string; subtitle?: string; url?: string }[] }
   | { kind: 'text'; title: string; markdown: string }
@@ -52,6 +58,7 @@ export type TishkaEvent =
   | { type: 'tool.end'; tool: string; ok: boolean }
   | { type: 'status'; text: string }   // текст в облачке, состояние не меняется
   | { type: 'reply'; reply: Reply }
+  | { type: 'screenshot'; title: string; path: string }   // снимок в ленте чата: в облачке и карточке ежа не показывается
   | { type: 'speak.start'; text: string }
   | { type: 'speak.level'; level: number }   // 0..1
   | { type: 'speak.end' }

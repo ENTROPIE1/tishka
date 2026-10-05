@@ -61,7 +61,7 @@ export function registerIpc(bus: SourceBus, core: TishkaCore, secrets: SecretSto
     // Реплика из чата, пока окно в фокусе, не будит ежа: ответ виден в чате.
     const window = BrowserWindow.fromWebContents(event.sender);
     const source = window !== null && isMainWindow(window) && window.isFocused() ? 'chat' : 'pet';
-    void bus.run(source, () => core.handleUserText(trimmed)).catch(() => undefined);
+    void bus.run(source, () => core.handleUserText(trimmed, 'text')).catch(() => undefined);
   });
 
   // Остановка доступна любому окну: чат и окно ежа используют один канал.

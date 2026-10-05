@@ -37,7 +37,7 @@ function clamp(text: string): string {
 }
 
 function describe(entry: HistoryEntry): string {
-  if (entry.kind === 'divider') {
+  if (entry.kind === 'divider' || entry.kind === 'screenshot') {
     return '';
   }
   const date = new Date(entry.at).toLocaleString('ru-RU');

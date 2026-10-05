@@ -58,6 +58,32 @@ export function messageElement(entry: HistoryEntry): HTMLElement {
     return message;
   }
 
+  // Снимок экрана — отдельная строка ленты: уменьшенная картинка над ответом,
+  // щелчок открывает файл в полном размере.
+  if (entry.kind === 'screenshot') {
+    message.className = 'msg msg-tishka';
+    const content = document.createElement('div');
+    content.className = 'msg-content';
+    content.append(
+      panelElement(
+        { kind: 'image', title: entry.title, path: entry.path },
+        {
+          onCopyImage: (path) => {
+            void window.tishka.copyImage(path);
+          },
+          onOpenImage: (path) => {
+            void window.tishka.openImage(path);
+          }
+        }
+      )
+    );
+    const shotTime = document.createElement('div');
+    shotTime.className = 'msg-time';
+    shotTime.textContent = timeLabel(entry.at);
+    message.append(content, shotTime);
+    return message;
+  }
+
   message.className = `msg msg-${entry.from}`;
   if (entry.from === 'tishka' && entry.mood !== undefined) {
     message.classList.add(`mood-${entry.mood}`);

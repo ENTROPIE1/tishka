@@ -3,7 +3,7 @@ import { LlmError } from '../llm/client';
 import { isCancelled, withCancel } from '../cancel';
 import { memoryBlock, type MemoryLine } from '../memory/prompt';
 import { stepTools } from '../skills/tools';
-import type { EventBus, Reply, ToolDef, ToolRegistry, ToolResult } from '../types';
+import type { EventBus, InputSource, Reply, SpeechMode, ToolDef, ToolRegistry, ToolResult } from '../types';
 import { shortenUserMessage, trimHistory } from './context';
 import type { FyrLevel } from './persona';
 import { buildSystemPrompt } from './prompt';
@@ -17,13 +17,14 @@ export interface AgentDeps {
   events: EventBus;
   getModel: () => string;
   getPersona?: () => { fyr: FyrLevel };
+  getSpeechMode?: () => SpeechMode;
   memory?: { search(query: string, limit?: number): MemoryLine[] };
   now: () => Date;
   mark?: TimingMark;
 }
 
 export interface Agent {
-  handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply>;
+  handle(userText: string, opts?: { signal?: AbortSignal; source?: InputSource }): Promise<Reply>;
   history(): ChatMessage[];
   reset(): void;
 }
@@ -63,13 +64,16 @@ export function createAgent(deps: AgentDeps): Agent {
   const history: ChatMessage[] = [];
   let rounds = 0;
 
-  function refreshSystemMessage(userText: string): void {
+  function refreshSystemMessage(userText: string, source: InputSource): void {
     const fyr = deps.getPersona?.().fyr ?? 'sometimes';
     const guide = skillGuide(stepTools(deps.registry));
     const block = memoryBlock(deps.memory?.search(userText, 8) ?? []);
     const system: ChatMessage = {
       role: 'system',
-      content: buildSystemPrompt(deps.now(), fyr, guide, block)
+      content: buildSystemPrompt(deps.now(), fyr, guide, block, {
+        speechMode: deps.getSpeechMode?.() ?? 'text',
+        userSource: source
+      })
     };
     if (history[0]?.role === 'system') {
       history[0] = system;
@@ -125,9 +129,9 @@ export function createAgent(deps: AgentDeps): Agent {
     }
   }
 
-  async function handle(userText: string, opts?: { signal?: AbortSignal }): Promise<Reply> {
+  async function handle(userText: string, opts?: { signal?: AbortSignal; source?: InputSource }): Promise<Reply> {
     const signal = opts?.signal;
-    refreshSystemMessage(userText);
+    refreshSystemMessage(userText, opts?.source ?? 'text');
     const userMessage: ChatMessage = { role: 'user', content: userText };
     push(userMessage);
     rounds = 0;

@@ -62,6 +62,36 @@ describe('createChatFeed', () => {
     expect(container.lastElementChild?.contains(again)).toBe(true);
   });
 
+  it('снимок экрана рисуется отдельной строкой с уменьшенной картинкой', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const feed = createChatFeed(container);
+
+    feed.refill([
+      { kind: 'screenshot', id: 's1', at: '2026-10-02T10:00:00.000Z', title: 'Снимок экрана', path: 'C:/shots/a.png' }
+    ]);
+
+    const img = container.querySelector<HTMLImageElement>('img.card-image');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('src')).toContain('a.png');
+    expect(container.querySelector('[data-id="s1"]')).not.toBeNull();
+  });
+
+  it('удалённый файл снимка даёт строку-заглушку', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const feed = createChatFeed(container);
+
+    feed.refill([
+      { kind: 'screenshot', id: 's1', at: '2026-10-02T10:00:00.000Z', title: 'Снимок экрана', path: 'C:/shots/gone.png' }
+    ]);
+
+    const img = container.querySelector<HTMLImageElement>('img.card-image');
+    img?.dispatchEvent(new Event('error'));
+
+    expect(container.querySelector('.card-image-missing')?.textContent).toBe('Снимок экрана удалён');
+  });
+
   it('refill сохраняет карточку «Навык сохранён» в конце ленты', () => {
     const container = document.createElement('div');
     document.body.append(container);

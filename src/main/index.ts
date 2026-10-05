@@ -1,6 +1,7 @@
 import { app, globalShortcut, ipcMain, Menu, Notification, shell } from 'electron';
 import { join } from 'node:path';
 import { createTishkaCore, type TishkaCore } from '../core/app';
+import type { Config } from '../core/types';
 import { saveConfig as persistConfig } from '../core/config';
 import { electronCrypto } from '../core/secrets/electron-crypto';
 import { createSecretStore } from '../core/secrets/store';
@@ -12,7 +13,7 @@ import { createMemoryWatch, type MemoryWatch } from './memory-watch';
 import { createProcessMemory } from './process-memory';
 import { OPEN_CHAT_CHANNEL, PET_SPEAK_DONE_CHANNEL } from './ipc-channels';
 import { registerAutomationIpc } from './ipc-automations';
-import { registerIpc } from './ipc';
+import { broadcastConfigChanged, registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
 import { registerSpeechIpc } from './ipc-speech';
 import { registerTimingIpc } from './ipc-timing';
@@ -101,6 +102,23 @@ app.whenReady().then(async () => {
   const reader = createWebReader();
   webReader = reader;
 
+  // Настройки сохранены ядром (в том числе инструментом speech_mode): окна
+  // перечитывают состояние, службы применяют изменения без перезапуска.
+  const handleConfigChanged = (previous: Config, next: Config): void => {
+    broadcastConfigChanged();
+    // Голос перезапускается сам, если изменились программа, модель или адрес.
+    if (stt !== undefined) {
+      restartVoiceIfNeeded(stt, previous, next);
+    }
+    if (previous.app.autostart !== next.app.autostart) {
+      app.setLoginItemSettings(loginItemSettings(next.app.autostart));
+    }
+    speech?.warm();
+    petWake?.broadcast();
+    chatTalk?.broadcast();
+    tray?.refresh();
+  };
+
   const tishka = createTishkaCore({
     dataDir,
     presetsDir: join(appRoot, 'presets'),
@@ -113,28 +131,18 @@ app.whenReady().then(async () => {
     now: () => new Date(),
     mark,
     captureScreen: (target) => screenCapture.capture(target),
-    readWeb: (url, options) => reader.read(url, options)
+    readWeb: (url, options) => reader.read(url, options),
+    // Переключение режима ответа и доступность синтеза обслуживает окно звука.
+    stopSpeaking: () => speech?.stopSpeaking(),
+    voiceAvailable: async () => (await speech?.health())?.ok ?? false,
+    onConfigChanged: handleConfigChanged
   });
   core = tishka;
 
   registerIpc(bus, tishka, secrets);
   registerTimingIpc({ logPath: timingLogPath, openPath: (path) => shell.openPath(path) });
   registerAutomationIpc(tishka);
-  registerSettingsIpc(tishka, secrets, {
-    // Голос перезапускается сам, если изменились программа, модель или адрес.
-    onConfigSaved: (previous, next) => {
-      if (stt !== undefined) {
-        restartVoiceIfNeeded(stt, previous, next);
-      }
-      if (previous.app.autostart !== next.app.autostart) {
-        app.setLoginItemSettings(loginItemSettings(next.app.autostart));
-      }
-      speech?.warm();
-      petWake?.broadcast();
-      chatTalk?.broadcast();
-      tray?.refresh();
-    }
-  });
+  registerSettingsIpc(tishka, secrets);
   ipcMain.handle(OPEN_CHAT_CHANNEL, () => {
     openMainWindow('chat');
   });
@@ -206,7 +214,7 @@ app.whenReady().then(async () => {
 
   const listen = createPetListen({
     bus,
-    core: { handleUserText: (text) => bus.run('pet', () => tishka.handleUserText(text)) },
+    core: { handleUserText: (text) => bus.run('pet', () => tishka.handleUserText(text, 'voice')) },
     stt: sttService,
     sendCommand: (command) => pet?.listenCommand(command),
     onMissedSpeech: () => calibrationHint.missed()
@@ -229,7 +237,9 @@ app.whenReady().then(async () => {
     // Реплика голосом относится к тому окну, что ведёт разговор: чат или ёж.
     core: {
       handleUserText: (text) =>
-        bus.run(wakeFlow.conversationOwner() === 'chat' ? 'chat' : 'pet', () => tishka.handleUserText(text))
+        bus.run(wakeFlow.conversationOwner() === 'chat' ? 'chat' : 'pet', () =>
+          tishka.handleUserText(text, 'voice')
+        )
     },
     bus,
     memoryName: () => tishka.memoryName(),

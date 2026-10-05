@@ -26,6 +26,9 @@ export function historyEntryText(entry: HistoryEntry): string {
   if (entry.kind === 'divider') {
     return '';
   }
+  if (entry.kind === 'screenshot') {
+    return `${entry.title}\n${entry.path}`;
+  }
   return entry.panel === undefined ? entry.text : `${entry.text}\n${panelText(entry.panel)}`;
 }
 

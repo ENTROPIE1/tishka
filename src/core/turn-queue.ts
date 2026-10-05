@@ -1,6 +1,6 @@
-import type { Reply } from './types';
+import type { InputSource, Reply } from './types';
 
-export type TurnRunner = (text: string, signal: AbortSignal) => Promise<Reply>;
+export type TurnRunner = (text: string, signal: AbortSignal, source: InputSource) => Promise<Reply>;
 
 export interface TurnQueueDeps {
   run: TurnRunner;
@@ -13,18 +13,20 @@ export const CANCELLED_REPLY: Reply = { say: 'Остановлено' };
 
 interface Running {
   text: string;
+  source: InputSource;
   controller: AbortController;
   promise: Promise<Reply>;
 }
 
 interface Waiting {
   text: string;
+  source: InputSource;
   promise: Promise<Reply>;
   resolve(reply: Reply): void;
 }
 
 export interface TurnQueue {
-  push(text: string): Promise<Reply>;
+  push(text: string, source?: InputSource): Promise<Reply>;
   cancel(): boolean;               // true — отменён выполняющийся ход или очищена очередь
   busy(): boolean;
   resetBetweenTurns(): void;
@@ -46,14 +48,14 @@ export function createTurnQueue(deps: TurnQueueDeps): TurnQueue {
     const next = waiting;
     waiting = undefined;
     if (next !== undefined) {
-      start(next.text, next.resolve);
+      start(next.text, next.source, next.resolve);
     }
   }
 
-  function start(text: string, resolve: (reply: Reply) => void): Promise<Reply> {
+  function start(text: string, source: InputSource, resolve: (reply: Reply) => void): Promise<Reply> {
     const controller = new AbortController();
-    const promise = deps.run(text, controller.signal);
-    running = { text, controller, promise };
+    const promise = deps.run(text, controller.signal, source);
+    running = { text, source, controller, promise };
     void promise
       .catch(() => CANCELLED_REPLY)
       .then((reply) => {
@@ -66,9 +68,9 @@ export function createTurnQueue(deps: TurnQueueDeps): TurnQueue {
     return promise;
   }
 
-  function push(text: string): Promise<Reply> {
+  function push(text: string, source: InputSource = 'text'): Promise<Reply> {
     if (running === undefined) {
-      return start(text, () => undefined);
+      return start(text, source, () => undefined);
     }
     if (running.text === text) {
       return running.promise;
@@ -83,7 +85,7 @@ export function createTurnQueue(deps: TurnQueueDeps): TurnQueue {
     const promise = new Promise<Reply>((res) => {
       resolve = res;
     });
-    waiting = { text, promise, resolve };
+    waiting = { text, source, promise, resolve };
     return promise;
   }
 

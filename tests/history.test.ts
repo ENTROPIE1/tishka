@@ -278,6 +278,28 @@ describe('createHistory', () => {
     history.stop();
   });
 
+  it('снимок экрана хранится ссылкой и восстанавливается при перечитывании', async () => {
+    const file = await tempHistoryPath();
+    const firstBus = createEventBus();
+    const first = createHistory(file, firstBus, () => FIXED_NOW);
+    await first.start();
+
+    firstBus.emit({ type: 'screenshot', title: 'Снимок экрана', path: 'C:/shots/a.png' });
+
+    const shot = first.list().find((entry) => entry.kind === 'screenshot');
+    expect(shot).toMatchObject({ kind: 'screenshot', title: 'Снимок экрана', path: 'C:/shots/a.png' });
+    first.stop();
+
+    const second = createHistory(file, createEventBus(), () => FIXED_NOW);
+    await second.start();
+
+    expect(second.list().find((entry) => entry.kind === 'screenshot')).toMatchObject({
+      kind: 'screenshot',
+      path: 'C:/shots/a.png'
+    });
+    second.stop();
+  });
+
   it('разделитель переживает перезапуск', async () => {
     const file = await tempHistoryPath();
     const firstBus = createEventBus();

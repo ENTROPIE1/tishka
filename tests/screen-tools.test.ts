@@ -131,6 +131,27 @@ describe('registerScreenTools', () => {
     expect(data.panel).toEqual({ kind: 'image', title: 'Снимок экрана', path: savedPath });
   });
 
+  it('screen_look сохраняет снимок и шлёт событие screenshot для ленты', async () => {
+    const events = createEventBus();
+    const shots: { title: string; path: string }[] = [];
+    events.on((event) => {
+      if (event.type === 'screenshot') {
+        shots.push({ title: event.title, path: event.path });
+      }
+    });
+    const look = vi.fn(async () => ({ ok: true, content: 'вижу таблицу', data: { source: 'Монитор', png: PNG } }));
+    const registry = createToolRegistry(events);
+    registerScreenTools(registry, makeDeps({ look, events }), true);
+
+    const result = await registry.call('screen_look', {});
+
+    const savedPath = join('C:/tishka-data/screenshots', '2026-10-04_15-30-05.png');
+    expect(mockedWriteFile).toHaveBeenCalledWith(savedPath, PNG);
+    expect(shots).toEqual([{ title: 'Снимок экрана', path: savedPath }]);
+    expect(result.ok).toBe(true);
+    expect(result.reply).toBeUndefined();
+  });
+
   it('ошибка снимка возвращается понятной строкой', async () => {
     const registry = createToolRegistry(createEventBus());
     registerScreenTools(
