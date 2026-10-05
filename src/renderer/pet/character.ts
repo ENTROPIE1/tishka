@@ -1,3 +1,4 @@
+import type { PetCharacterSize } from '../../pet/character-size';
 import type { PetState } from '../../pet/state';
 
 export type ClipName =
@@ -31,6 +32,8 @@ export interface Character {
   setMouth(level: number): void;
   setFlip(flipped: boolean): void;
   clips(): ClipName[];
+  // Пропорции персонажа на экране: раскладка окна ежа учитывает их.
+  metrics(): PetCharacterSize;
   dispose(): void;
 }
 

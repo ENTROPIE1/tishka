@@ -173,7 +173,7 @@ interface Config {
   llm: { baseUrl: string; model: string; visionModel: string; api: 'chat' | 'responses' };   // api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses, формат OpenAI Responses)
   voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl
   mcpServers: McpServerConfig[];
-  persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
+  persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; показываемый персонаж: 'hedgehog' (прежний ёж, по умолчанию) или 'tishka' (костная модель)
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран, по умолчанию true

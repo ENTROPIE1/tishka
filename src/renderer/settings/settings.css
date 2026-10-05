@@ -553,3 +553,80 @@
   color: var(--muted);
 }
 
+.section-subtitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.appearance {
+  margin-bottom: 16px;
+}
+
+.appearance-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.appearance-card {
+  flex: 0 0 auto;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-soft);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.appearance-card:hover {
+  border-color: var(--accent);
+}
+
+.appearance-card.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.appearance-thumb {
+  width: 108px;
+  height: 108px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 55%);
+}
+
+.appearance-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.appearance-thumb .hedgehog {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Ёжик-заглушка в уменьшенной картинке: цвета без анимаций. */
+.appearance-thumb .hh-spike { fill: #6b3d1c; stroke: #fff3df; stroke-width: 1; stroke-linejoin: round; }
+.appearance-thumb .hh-body { fill: #a9662f; stroke: #fff3df; stroke-width: 1.5; }
+.appearance-thumb .hh-belly { fill: #c98a52; }
+.appearance-thumb .hh-leg { fill: #8a4f24; stroke: #fff3df; stroke-width: 1; }
+.appearance-thumb .hh-face { fill: #f4dcbb; stroke: #fff3df; stroke-width: 1.5; }
+.appearance-thumb .hh-ear { fill: #d79a63; stroke: #fff3df; stroke-width: 1; }
+.appearance-thumb .hh-eye { fill: #241a12; }
+.appearance-thumb .hh-glint { fill: #ffffff; }
+.appearance-thumb .hh-nose { fill: #241a12; }
+.appearance-thumb .hh-mouth-shape { fill: #7a3b2a; }
+.appearance-thumb #hh-eyes-happy { display: none; }
+

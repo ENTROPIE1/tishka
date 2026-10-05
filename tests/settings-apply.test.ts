@@ -213,7 +213,7 @@ describe('сохранение настроек и подключения', () =
       ...core.config(),
       voice: { ...core.config().voice, tts: { ...core.config().voice.tts, enabled: true } }
     });
-    await core.saveConfig({ ...core.config(), persona: { fyr: 'often' } });
+    await core.saveConfig({ ...core.config(), persona: { ...core.config().persona, fyr: 'often' } });
     await core.saveConfig({
       ...core.config(),
       app: { ...core.config().app, warmMinutes: 45 }
@@ -230,7 +230,7 @@ describe('сохранение настроек и подключения', () =
       createMcpConnection: trackingFactory(log)
     });
 
-    await core.saveConfig({ ...core.config(), persona: { fyr: 'off' } });
+    await core.saveConfig({ ...core.config(), persona: { ...core.config().persona, fyr: 'off' } });
     expect(log.starts).toEqual(['confluence', 'exchange']);
 
     const changed = core.config().mcpServers.map((server) =>

@@ -54,6 +54,7 @@ export function createPetFacade(deps: PetFacadeDeps): PetWindow {
     },
     dragBy(): void {},
     dragEnd(): void {},
+    refreshLayout(): void {},
     listenCommand(command): void {
       browserWindow.webContents.send(PET_LISTEN_COMMAND_CHANNEL, command);
     },

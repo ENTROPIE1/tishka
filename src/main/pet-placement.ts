@@ -24,10 +24,15 @@ function displayAreas(): WorkArea[] {
 export class PetPlacement {
   layout: PetLayout;
   readonly geometry: PetGeometry;
+  private area: WorkArea;
 
-  constructor(initialPetX: number | null, private readonly content: PetLayoutContent) {
+  // Содержимое раскладки — функция: смена персонажа меняет размер фигуры
+  // без пересоздания окна.
+  constructor(initialPetX: number | null, private readonly content: () => PetLayoutContent) {
     const area = screen.getPrimaryDisplay().workArea;
-    this.layout = petLayout(area, initialPetX ?? defaultPetX(area, content), content);
+    this.area = area;
+    const contentNow = content();
+    this.layout = petLayout(area, initialPetX ?? defaultPetX(area, contentNow), contentNow);
     this.geometry = { y: this.layout.window.y, hiddenX: area.x + area.width };
     this.ensureOnScreen();
   }
@@ -56,8 +61,14 @@ export class PetPlacement {
     this.apply(area, petX);
   }
 
+  // Пересчёт после смены персонажа: место и экран те же, меняются размеры.
+  refresh(): void {
+    this.apply(this.area, this.layout.petX);
+  }
+
   private apply(area: WorkArea, petX: number): void {
-    this.layout = petLayout(area, petX, this.content);
+    this.area = area;
+    this.layout = petLayout(area, petX, this.content());
     this.geometry.y = this.layout.window.y;
     this.geometry.hiddenX = area.x + area.width;
   }

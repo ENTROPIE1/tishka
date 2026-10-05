@@ -40,6 +40,7 @@ describe('defaultConfig', () => {
     expect(config.mcpServers).toEqual([]);
     expect(config.petMode).toBe(false);
     expect(config.web).toEqual({ enabled: true });
+    expect(config.persona).toEqual({ fyr: 'sometimes', character: 'hedgehog' });
   });
 });
 
@@ -121,6 +122,27 @@ describe('loadConfig', () => {
     );
     const config = await loadConfig(dir);
     expect(config.voice.stt.mode).toBe('local');
+  });
+
+  it('старые настройки без персонажа — прежний ёж', async () => {
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({ persona: { fyr: 'often' } }) as never);
+    const config = await loadConfig(dir);
+    expect(config.persona.character).toBe('hedgehog');
+    expect(config.persona.fyr).toBe('often');
+  });
+
+  it('выбранный персонаж сохраняется и читается', async () => {
+    mockedReadFile.mockResolvedValueOnce(
+      JSON.stringify({ persona: { fyr: 'sometimes', character: 'tishka' } }) as never
+    );
+    const config = await loadConfig(dir);
+    expect(config.persona.character).toBe('tishka');
+  });
+
+  it('неизвестное значение персонажа читается как прежний ёж', async () => {
+    mockedReadFile.mockResolvedValueOnce(JSON.stringify({ persona: { character: 'robot' } }) as never);
+    const config = await loadConfig(dir);
+    expect(config.persona.character).toBe('hedgehog');
   });
 
   it('читает tts и игнорирует старое поле ttsEngine', async () => {    mockedReadFile.mockResolvedValueOnce(

@@ -5,6 +5,7 @@ import type { Config, McpServerConfig } from './types';
 export const CONFIG_FILE = 'config.json';
 
 type FyrLevel = Config['persona']['fyr'];
+type CharacterKind = Config['persona']['character'];
 type Sensitivity = Config['voice']['sensitivity'];
 type LlmApi = Config['llm']['api'];
 type SttMode = Config['voice']['stt']['mode'];
@@ -30,7 +31,7 @@ export function defaultConfig(): Config {
       tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
     },
     mcpServers: [],
-    persona: { fyr: 'sometimes' },
+    persona: { fyr: 'sometimes', character: 'hedgehog' },
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },
@@ -76,6 +77,10 @@ function pickVolume(value: unknown, fallback: number): number {
 
 function pickFyr(value: unknown, fallback: FyrLevel): FyrLevel {
   return value === 'off' || value === 'sometimes' || value === 'often' ? value : fallback;
+}
+
+function pickCharacter(value: unknown, fallback: CharacterKind): CharacterKind {
+  return value === 'hedgehog' || value === 'tishka' ? value : fallback;
 }
 
 function pickSensitivity(value: unknown, fallback: Sensitivity): Sensitivity {
@@ -247,7 +252,10 @@ export function mergeConfig(value: unknown): Config {
       }
     },
     mcpServers: parseMcpServers(value.mcpServers),
-    persona: { fyr: pickFyr(persona.fyr, defaults.persona.fyr) },
+    persona: {
+      fyr: pickFyr(persona.fyr, defaults.persona.fyr),
+      character: pickCharacter(persona.character, defaults.persona.character)
+    },
     pet: { x: pickPetX(pet.x, defaults.pet.x) },
     petMode: pickBoolean(value.petMode, defaults.petMode),
     screen: { enabled: pickBoolean(screen.enabled, defaults.screen.enabled) },
