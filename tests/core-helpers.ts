@@ -14,6 +14,14 @@ export const FIXED_NOW = new Date('2026-10-02T10:00:00');
 const cores: TishkaCore[] = [];
 const dirs: string[] = [];
 
+// Временный каталог, который уберёт cleanupCores: удаление с повторами не
+// роняет тест, если на Windows каталог ещё занят записью.
+export async function tempDir(prefix = 'tishka-test-'): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), prefix));
+  dirs.push(dir);
+  return dir;
+}
+
 // Свой каталог данных на каждый тест, ядро останавливаем до удаления, а удаление
 // повторяем: на Windows каталог иногда занят ещё не завершённой записью.
 export async function cleanupCores(): Promise<void> {
@@ -93,8 +101,7 @@ export interface CoreHandle {
 }
 
 export async function setupCore(options: CoreSetupOptions = {}): Promise<CoreHandle> {
-  const dataDir = await mkdtemp(join(tmpdir(), 'tishka-core-'));
-  dirs.push(dataDir);
+  const dataDir = await tempDir('tishka-core-');
   if (options.config !== undefined) {
     await writeFile(join(dataDir, 'config.json'), JSON.stringify(options.config), 'utf8');
   }

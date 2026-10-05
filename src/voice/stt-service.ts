@@ -22,6 +22,8 @@ export interface SttServiceOptions {
   fetch?: typeof fetch;
   fileExists?: (path: string) => boolean;
   mark?: TimingMark;
+  onStatusChange?: (status: SttStatus) => void;   // переход состояния готовой службы по адресу
+  remotePollMs?: { down?: number; up?: number };  // период повторной проверки адреса
 }
 
 export interface SttService {
@@ -37,6 +39,10 @@ const CYRILLIC_ERROR = 'Путь к службе распознавания до
 export const START_CANCELLED = 'Запуск отменён';
 const NOT_CONFIGURED = 'Распознавание речи не настроено';
 export const REMOTE_UNREACHABLE = 'Служба распознавания не отвечает по адресу';
+// Готовая служба по адресу может появиться позже приложения (туннель поднят
+// после запуска) или пропасть. Пока не отвечает — проверяем чаще.
+const REMOTE_POLL_DOWN_MS = 5000;
+const REMOTE_POLL_UP_MS = 30000;
 
 export function createSttService(options: SttServiceOptions): SttService {
   const spawnFn = options.spawn ?? spawn;
@@ -47,6 +53,57 @@ export function createSttService(options: SttServiceOptions): SttService {
   let state: SttStatus = 'off';
   let child: ChildProcess | undefined;
   let childRunId = 0;
+  let pollTimer: ReturnType<typeof setTimeout> | undefined;
+
+  // Сообщаем окнам о переходе состояния, случившемся в фоне (повторная
+  // проверка адреса). Результат явного start() окна получают как обычно.
+  function announce(next: SttStatus): void {
+    if (state === next) {
+      return;
+    }
+    state = next;
+    options.onStatusChange?.(next);
+  }
+
+  function stopPolling(): void {
+    if (pollTimer !== undefined) {
+      clearTimeout(pollTimer);
+      pollTimer = undefined;
+    }
+  }
+
+  // Повторная проверка готовой службы по адресу: пока не отвечает — раз в 5
+  // секунд, пока отвечает — раз в 30 секунд, чтобы заметить пропажу.
+  function pollRemote(run: RunToken): void {
+    stopPolling();
+    const downMs = options.remotePollMs?.down ?? REMOTE_POLL_DOWN_MS;
+    const upMs = options.remotePollMs?.up ?? REMOTE_POLL_UP_MS;
+    function schedule(delayMs: number): void {
+      if (run.cancelled) {
+        return;
+      }
+      pollTimer = setTimeout(() => {
+        void tick();
+      }, delayMs);
+      pollTimer.unref?.();
+    }
+    async function tick(): Promise<void> {
+      if (run.cancelled) {
+        return;
+      }
+      const startedAt = Date.now();
+      const alive = await probe(fetchFn, options.getConfig().sttUrl);
+      if (run.cancelled) {
+        return;
+      }
+      announce(alive ? 'ready' : 'off');
+      mark?.('stt.ready', { ok: alive, probe: true });
+      const interval = alive ? upMs : downMs;
+      schedule(Math.max(0, interval - (Date.now() - startedAt)));
+    }
+    schedule(state === 'ready' ? upMs : downMs);
+  }
+
   function killOwnProcess(id: number): void {
     if (childRunId !== id) {
       return;
@@ -115,6 +172,7 @@ export function createSttService(options: SttServiceOptions): SttService {
       }
       state = alive ? 'ready' : 'off';
       mark?.('stt.ready', { ok: alive, probe: true });
+      pollRemote(run);
       return alive ? { ok: true } : { ok: false, error: REMOTE_UNREACHABLE };
     }
 
@@ -184,6 +242,7 @@ export function createSttService(options: SttServiceOptions): SttService {
 
   function stop(): void {
     runs.cancel();
+    stopPolling();
     killOwnProcess(childRunId);
     state = 'off';
   }

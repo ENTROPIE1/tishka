@@ -79,6 +79,9 @@ app.whenReady().then(async () => {
   mark('app.ready');
   const dataDir = app.getPath('userData');
   const appRoot = app.isPackaged ? app.getAppPath() : join(__dirname, '..', '..');
+  // Адрес сервера разработки есть только в `npm run dev`: там автоперезапуск
+  // по памяти не нужен, страницы берутся с сервера.
+  const devMode = process.env['ELECTRON_RENDERER_URL'] !== undefined;
   const secrets = createSecretStore(join(dataDir, 'secrets.bin'), electronCrypto);
 
   // Окно-питомец создаётся ниже, а снимок запрашивается уже после запуска,
@@ -139,7 +142,21 @@ app.whenReady().then(async () => {
     console.error('[tishka] не удалось запустить ядро:', error instanceof Error ? error.message : error);
   }
 
-  const sttService = createSttService({ getConfig: () => tishka.config().voice, mark });
+  const sttService = createSttService({
+    getConfig: () => tishka.config().voice,
+    mark,
+    // Готовая служба по адресу появляется и пропадает в фоне: перевод состояния
+    // разговаривает с окнами как обычный результат запуска.
+    onStatusChange: (status) => {
+      if (status === 'ready') {
+        wakeFlow.noteReady();
+      } else if (status === 'error' || status === 'off') {
+        wakeFlow.noteFailed();
+      }
+      petWake?.broadcast();
+      chatTalk?.broadcast();
+    }
+  });
   stt = sttService;
 
   pet = createPetWindow({
@@ -312,11 +329,15 @@ app.whenReady().then(async () => {
     notify: (text) => {
       new Notification({ title: 'Тишка', body: text }).show();
     },
+    canRelaunch: !devMode,
     relaunch: () => {
       app.relaunch();
       app.quit();
     },
-    log: (message) => console.warn(`[tishka] ${message}`)
+    log: (message) => {
+      console.warn(`[tishka] ${message}`);
+      mark('memory.watch', { message });
+    }
   });
   memoryWatch.start();
 

@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'node:child_process';
 import { vi } from 'vitest';
 import type { Config } from '../src/core/types';
-import { createSttService } from '../src/voice/stt-service';
+import { createSttService, type SttServiceOptions } from '../src/voice/stt-service';
 
 export type HandlerMap = Record<string, (...args: unknown[]) => void>;
 
@@ -57,12 +57,14 @@ export function service(
   getConfig: () => Config['voice'],
   spawn: ReturnType<typeof vi.fn>,
   fetchMock: ReturnType<typeof vi.fn>,
-  fileExists: (path: string) => boolean = () => true
+  fileExists: (path: string) => boolean = () => true,
+  extra: Partial<SttServiceOptions> = {}
 ) {
   return createSttService({
     getConfig,
     spawn: spawn as unknown as typeof import('node:child_process').spawn,
     fetch: fetchMock as unknown as typeof fetch,
-    fileExists
+    fileExists,
+    ...extra
   });
 }

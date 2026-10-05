@@ -6,6 +6,7 @@ import { createPetActivation } from './pet-activation';
 import { createPetLifecycle, type PetLifecycle } from './pet-lifecycle';
 import { Mover } from './pet-motion';
 import { PetPlacement } from './pet-placement';
+import { loadRendererPage } from './renderer-page';
 import type { PetWindow, PetWindowDeps } from './pet-window-types';
 
 export type { PetWindow, PetWindowDeps } from './pet-window-types';
@@ -31,12 +32,7 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     callback(permission === 'media');
   });
   window.webContents.session.setPermissionCheckHandler((_contents, permission) => permission === 'media');
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (rendererUrl !== undefined) {
-    void window.loadURL(`${rendererUrl}/pet/index.html`);
-  } else {
-    void window.loadFile(join(__dirname, '../renderer/pet/index.html'));
-  }
+  loadRendererPage(window, 'pet', { rendererUrl: process.env['ELECTRON_RENDERER_URL'] });
 
   const mover = new Mover(window, placement.geometry);
   const activation = createPetActivation(window);
