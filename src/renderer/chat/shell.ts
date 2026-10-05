@@ -1,12 +1,13 @@
-export type ScreenName = 'chat' | 'connections' | 'memory' | 'voice' | 'persona' | 'automations';
+export type ScreenName = 'chat' | 'automations' | 'calendar' | 'connections' | 'memory' | 'voice' | 'persona';
 
 export const SCREEN_NAMES: readonly ScreenName[] = [
   'chat',
+  'automations',
+  'calendar',
   'connections',
   'memory',
   'voice',
-  'persona',
-  'automations'
+  'persona'
 ];
 
 export function isScreenName(value: unknown): value is ScreenName {

@@ -21,6 +21,12 @@ const WEB_RULE = [
   'Внутренние страницы компании (вики, почта) читаются через их подключения, а не через web_read.'
 ].join('\n');
 
+const CALENDAR_RULE = [
+  '«занеси», «поставь в календарь», «запланируй», «я занят до», «не беспокой час» — calendar_add.',
+  '«что у меня сегодня», «когда я свободен» — calendar_agenda и calendar_free.',
+  'О встречах из почты, если загрузка не настроена, — прежние инструменты подключения.'
+].join('\n');
+
 const SPEECH_MODE_RULE = [
   'Режим ответа переключается инструментом speech_mode по явной просьбе: «говори голосом», «отвечай вслух», «озвучивай» — mode=voice; «пиши текстом», «не говори вслух», «помолчи», «без звука» — mode=text.',
   'На вопрос «ты сейчас говоришь или пишешь?» отвечай по текущему режиму ответа и по тому, как пришла реплика человека.'
@@ -59,7 +65,8 @@ export function buildSystemPrompt(
   fyr: FyrLevel = 'sometimes',
   skillGuideSection?: string,
   memorySection?: string,
-  context?: PromptContext
+  context?: PromptContext,
+  situation?: string
 ): string {
   const date = DATE.format(now);
   const weekday = WEEKDAY.format(now);
@@ -93,9 +100,14 @@ export function buildSystemPrompt(
       '',
       WEB_RULE,
       '',
+      CALENDAR_RULE,
+      '',
       MEMORY_RULES
     ].join('\n')
   ];
+  if (situation !== undefined && situation !== '') {
+    sections.push(`Обстановка в календаре: ${situation}`);
+  }
   if (skillGuideSection !== undefined && skillGuideSection !== '') {
     sections.push(skillGuideSection);
   }

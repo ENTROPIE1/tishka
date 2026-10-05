@@ -1,4 +1,5 @@
 import { mountAutomationsScreen } from './automations/screen';
+import { mountCalendarScreen } from './calendar/screen';
 import { mountSettingsScreens } from './settings-screens';
 import { createShell, isScreenName, type Shell, type ScreenName } from './shell';
 
@@ -20,13 +21,15 @@ function screen(id: string): HTMLElement {
 export function initAppShell(): Shell {
   const sections = mountSettingsScreens();
   mountAutomationsScreen(screen('screen-automations'));
+  mountCalendarScreen(screen('screen-calendar'));
   const screens: Record<ScreenName, HTMLElement> = {
     chat: screen('screen-chat'),
+    automations: screen('screen-automations'),
+    calendar: screen('screen-calendar'),
     connections: screen('screen-connections'),
     memory: screen('screen-memory'),
     voice: screen('screen-voice'),
-    persona: screen('screen-persona'),
-    automations: screen('screen-automations')
+    persona: screen('screen-persona')
   };
   const shell = createShell({
     screens,

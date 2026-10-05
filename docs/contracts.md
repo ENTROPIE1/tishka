@@ -136,6 +136,7 @@ type TishkaEvent =
   | { type: 'background.tick'; tool: string }
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
+  | { type: 'calendar.changed' }   // календарь изменился: экран перечитывает
   | { type: 'skill.removed'; skillId: string }
   | { type: 'error'; message: string }
   | { type: 'idle' };
@@ -181,6 +182,37 @@ type Step =
 
 В файле навыка не бывает секретов.
 
+## Календарь
+
+Ядро хранит события в `calendar.json` в каталоге данных (`src/core/calendar/`).
+
+```ts
+type CalendarKind = 'meeting' | 'focus' | 'personal' | 'reminder' | 'away';
+type CalendarSource = 'local' | `exchange:${string}` | 'schedule';
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;                 // ISO со смещением
+  end: string;
+  allDay: boolean;
+  kind: CalendarKind;
+  source: CalendarSource;
+  externalId?: string;           // идентификатор в источнике загрузки
+  location?: string;
+  link?: string;                 // ссылка на подключение к встрече
+  note?: string;
+  remindMinutes: number | null;  // null — не напоминать
+  updatedAt: string;
+}
+```
+
+Свои события (`source: local`) человек правит и удаляет. Загруженные (`exchange:<имя>`) правятся только по `remindMinutes` и `note`; исчезнувшие в источнике удаляются следующей загрузкой. События `source: schedule` — напоминания и разовые запуски навыков — видны из хранилища расписания только для чтения, без копирования. Запись файла атомарная, повреждённый файл даёт пустой календарь и строку в журнале времени.
+
+Напоминание о событии — `notify` за `remindMinutes` до начала, одно на событие; после перезапуска пропущенное больше чем на пять минут не шлётся. Во время события `focus` уведомления навыков и слежения копятся и после его конца показываются строкой `note`.
+
+Инструменты Тишки: `calendar_agenda` (сегодня, завтра, неделя или даты), `calendar_add` (при пересечении событие всё равно создаётся, пересечение сообщается), `calendar_update` и `calendar_remove` (только свои события), `calendar_free` (свободные окна в рабочее время), `calendar_status` (обстановка сейчас). Разбор дат живёт отдельным модулем и понимает «завтра в 15», «в пятницу с 10 до 11», «через час на 30 минут». В системную подсказку каждого хода входит одна-две строки обстановки.
+
 ## Секреты и настройки
 
 ```ts
@@ -197,6 +229,12 @@ interface Config {
   voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number; bySentence: boolean } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl; bySentence — озвучивать по предложениям, не дожидаясь всего текста (по умолчанию включено)
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; показываемый персонаж: 'hedgehog' (прежний ёж, по умолчанию) или 'tishka' (костная модель)
+  calendar: {
+    workHours: { days: Partial<Record<'mon'|'tue'|'wed'|'thu'|'fri'|'sat'|'sun', { start: string; end: string } | null>>; lunch?: { start: string; end: string } };   // рабочее время по дням недели, null — выходной; по умолчанию пн–пт 09:00–18:00
+    defaultRemindMinutes: number;   // за сколько минут напоминать по умолчанию
+    quietOutsideWork: boolean;      // вне рабочего времени не напоминать вслух о рабочих встречах
+    sources?: Record<string, boolean>;   // имя подключения Exchange — загружать встречи (задача 106)
+  };
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран, по умолчанию true

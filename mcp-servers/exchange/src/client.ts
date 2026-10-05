@@ -8,6 +8,9 @@ export interface Meeting {
   location: string;
   organizer: string;
   joinUrl?: string;
+  id?: string;          // идентификатор встречи в Exchange
+  allDay?: boolean;     // встреча на весь день
+  cancelled?: boolean;  // отменена организатором
 }
 
 export type EwsPost = (
@@ -25,7 +28,7 @@ const NO_ERROR = 'NoError';
 const FAULT_LIMIT = 300;
 const SECRET_PLACEHOLDER = '[скрыто]';
 
-const XML_PARSER = new XMLParser({ removeNSPrefix: true });
+const XML_PARSER = new XMLParser({ removeNSPrefix: true, ignoreAttributes: false, attributeNamePrefix: '@_' });
 
 export function createExchangeClient(opts: {
   ewsUrl: string;
@@ -127,9 +130,21 @@ function readFault(body: string): { text: string; responseCode: string } {
     return { text: '', responseCode: '' };
   }
   return {
-    text: asText(fault.faultstring) || asText(fault.Reason?.Text),
-    responseCode: asText(fault.detail?.ResponseCode) || asText(fault.Detail?.ResponseCode)
+    text: nodeText(fault.faultstring) || nodeText(fault.Reason?.Text),
+    responseCode: nodeText(fault.detail?.ResponseCode) || nodeText(fault.Detail?.ResponseCode)
   };
+}
+
+// С включёнными атрибутами узел с xml:lang приходит объектом с текстом в #text.
+function nodeText(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (value !== null && typeof value === 'object' && '#text' in value) {
+    const text = (value as { '#text'?: unknown })['#text'];
+    return typeof text === 'string' ? text : '';
+  }
+  return '';
 }
 
 // сначала убираем секреты: обрезка не должна оставить часть пароля в тексте
@@ -164,6 +179,8 @@ function buildFindItemSoap(from: Date, to: Date): string {
           <t:FieldURI FieldURI="calendar:End" />
           <t:FieldURI FieldURI="calendar:Location" />
           <t:FieldURI FieldURI="calendar:Organizer" />
+          <t:FieldURI FieldURI="calendar:IsAllDayEvent" />
+          <t:FieldURI FieldURI="calendar:IsCancelled" />
         </t:AdditionalProperties>
       </m:ItemShape>
       <m:CalendarView StartDate="${from.toISOString()}" EndDate="${to.toISOString()}" />
@@ -247,7 +264,21 @@ function toMeeting(item: RawCalendarItem): Meeting {
   if (joinUrl !== undefined) {
     meeting.joinUrl = joinUrl;
   }
+  const id = asText(item.ItemId?.['@_Id']);
+  if (id !== '') {
+    meeting.id = id;
+  }
+  if (asBool(item.IsAllDayEvent)) {
+    meeting.allDay = true;
+  }
+  if (asBool(item.IsCancelled)) {
+    meeting.cancelled = true;
+  }
   return meeting;
+}
+
+function asBool(value: unknown): boolean {
+  return value === true || value === 'true';
 }
 
 function toIso(value: unknown): string {
@@ -285,6 +316,9 @@ interface RawCalendarItem {
   End?: unknown;
   Location?: unknown;
   Organizer?: { Mailbox?: RawMailbox };
+  ItemId?: { '@_Id'?: unknown };
+  IsAllDayEvent?: unknown;
+  IsCancelled?: unknown;
 }
 
 interface RawResponseMessage {

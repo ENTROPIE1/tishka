@@ -19,6 +19,7 @@ export interface AgentDeps {
   getPersona?: () => { fyr: FyrLevel; character?: 'hedgehog' | 'tishka' };
   getSpeechMode?: () => SpeechMode;
   memory?: { search(query: string, limit?: number): MemoryLine[] };
+  situation?: () => string;
   now: () => Date;
   mark?: TimingMark;
 }
@@ -104,11 +105,18 @@ export function createAgent(deps: AgentDeps): Agent {
     const block = memoryBlock(deps.memory?.search(userText, 8) ?? []);
     const system: ChatMessage = {
       role: 'system',
-      content: buildSystemPrompt(deps.now(), fyr, guide, block, {
-        speechMode: deps.getSpeechMode?.() ?? 'text',
-        userSource: source,
-        character: persona?.character
-      })
+      content: buildSystemPrompt(
+        deps.now(),
+        fyr,
+        guide,
+        block,
+        {
+          speechMode: deps.getSpeechMode?.() ?? 'text',
+          userSource: source,
+          character: persona?.character
+        },
+        deps.situation?.()
+      )
     };
     if (history[0]?.role === 'system') {
       history[0] = system;
