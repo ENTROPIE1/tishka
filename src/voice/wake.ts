@@ -264,6 +264,74 @@ export function isDismiss(text: string, wakeWords: string[] = ['тишка']): b
   return isDismissByMeaning(text);
 }
 
+// Слова вызова: «приходи», «иди сюда», «ты тут». После имени они не просьба,
+// а обращение: ёж появляется и слушает, в ядро такие слова не уходят.
+const SUMMON_TURNS = [
+  'приходи', 'приди', 'иди сюда', 'подойди', 'появись', 'покажись', 'выходи',
+  'вылезай', 'ты где', 'ты тут', 'ты здесь', 'ау', 'эй', 'сюда', 'ко мне',
+  'нужен', 'ты нужен'
+];
+
+// Вежливые вставки внутри слов вызова («иди сюда, пожалуйста») просьбой не
+// делают: они пропускаются вместе со словами вызова.
+const SUMMON_FILLERS = new Set(['пожалуйста', 'ну']);
+
+const SUMMON_KEYS = SUMMON_TURNS.map((turn) => turn.split(/\s+/).map(key));
+
+// Готовый ответ на вызов, когда ёж уже на экране: модель не нужна.
+export const SUMMON_REPLY = 'Фыр, я здесь.';
+
+// Самое длинное слово вызова, начинающееся на позиции i; 0 — вызова нет.
+function matchSummonAt(keys: string[], i: number): number {
+  let best = 0;
+  for (const phrase of SUMMON_KEYS) {
+    if (phrase.length <= best || i + phrase.length > keys.length) {
+      continue;
+    }
+    let matched = true;
+    for (let offset = 0; offset < phrase.length; offset += 1) {
+      if (keys[i + offset] !== phrase[offset]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) {
+      best = phrase.length;
+    }
+  }
+  return best;
+}
+
+// Слова вызова в начале остатка срезаются. summoned — было ли слово вызова;
+// остаток только из них (и вежливых вставок) считается пустым.
+export function stripSummon(text: string): { summoned: boolean; request: string } {
+  const tokens = text.trim().split(/\s+/).filter((token) => token !== '');
+  const keys = tokens.map(key);
+  let i = 0;
+  let summoned = false;
+  while (i < tokens.length) {
+    const length = matchSummonAt(keys, i);
+    if (length > 0) {
+      summoned = true;
+      i += length;
+      continue;
+    }
+    if (SUMMON_FILLERS.has(keys[i] ?? '')) {
+      i += 1;
+      continue;
+    }
+    break;
+  }
+  return { summoned, request: tokens.slice(i).join(' ').trim() };
+}
+
+// Обращение словами вызова без просьбы: целиком или сразу после имени.
+export function isSummonOnly(text: string, wakeWords: string[] = ['тишка']): boolean {
+  const match = matchWake(text, wakeWords);
+  const parsed = stripSummon(match.matched ? match.rest : text);
+  return parsed.summoned && parsed.request === '';
+}
+
 // Слова остановки текущей работы: короткая отдельная фраза, сказанная в
 // разговоре, пока Тишка думает, работает или говорит.
 const STOP_PHRASES = ['стоп', 'хватит', 'остановись', 'отмена'];

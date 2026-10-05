@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WAKE_PROMPT, isDismiss, isStopPhrase, matchWake, wakePrompt } from '../src/voice/wake';
+import {
+  WAKE_PROMPT,
+  isDismiss,
+  isStopPhrase,
+  isSummonOnly,
+  matchWake,
+  stripSummon,
+  wakePrompt
+} from '../src/voice/wake';
 import { flush, makeHarness, voice, wav, type Harness } from './wake-test-helpers';
 
 // Источники обращений по имени, увиденные шиной.
@@ -54,6 +62,40 @@ describe('matchWake', () => {
   it('своё имя из wakeWords работает так же', () => {
     expect(matchWake('ёжик открой доску', ['ёжик'])).toEqual({ matched: true, rest: 'открой доску' });
     expect(matchWake('ежик, сколько времени', ['ёжик'])).toEqual({ matched: true, rest: 'сколько времени' });
+  });
+});
+
+describe('слова вызова', () => {
+  it('распознаёт обращение без просьбы', () => {
+    const phrases = [
+      'приходи', 'приди', 'иди сюда', 'подойди', 'появись', 'покажись', 'выходи',
+      'вылезай', 'ты где', 'ты тут', 'ты здесь', 'ау', 'эй', 'сюда', 'ко мне',
+      'нужен', 'ты нужен',
+      'Тишка, приходи',
+      'иди сюда, пожалуйста',
+      'ты тут?',
+      'Тишка, ты здесь'
+    ];
+    for (const text of phrases) {
+      expect(isSummonOnly(text)).toBe(true);
+    }
+  });
+
+  it('срезает слова вызова перед настоящей просьбой', () => {
+    expect(stripSummon('иди сюда, который час')).toEqual({ summoned: true, request: 'который час' });
+    expect(stripSummon('приходи')).toEqual({ summoned: true, request: '' });
+    expect(stripSummon('приди ко мне, пожалуйста')).toEqual({ summoned: true, request: '' });
+    expect(stripSummon('иди сюда, какие у меня встречи')).toEqual({
+      summoned: true,
+      request: 'какие у меня встречи'
+    });
+  });
+
+  it('настоящую просьбу за вызов не принимает', () => {
+    for (const text of ['какие у меня встречи', 'где отчёт', 'ты не свободен', 'привет']) {
+      expect(isSummonOnly(text)).toBe(false);
+    }
+    expect(stripSummon('где отчёт')).toEqual({ summoned: false, request: 'где отчёт' });
   });
 });
 

@@ -62,6 +62,9 @@ export interface Scenario {
   feedMic(value: number, ms: number): void;  // звук в микрофон: уровень и длительность
   noise(): boolean;                       // шум: пустое распознавание
   typeKey(): void;                        // печать в строке ежа
+  micRecord(): void;                      // ручная разовая запись (значок/клавиша)
+  recordSilence(): void;                  // разовая запись закончилась тишиной
+  recordNoise(): void;                    // разовая запись закончилась шумом без слов
   pressPet(): void;                       // нажатие ежа мышью
   releasePet(): void;                     // отпускание ежа
   sendFromComposer(text: string): void;   // отправка текста из строки ежа

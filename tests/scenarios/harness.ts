@@ -6,6 +6,7 @@ import { UNHEARD_HINT } from '../../src/voice/unheard';
 import { createSpeechOutput, type SpeechOutput } from '../../src/main/pet-speak';
 import { createPetSpeakPlay } from '../../src/main/pet-speak-play';
 import { registerPetWake, type PetWake } from '../../src/main/pet-wake';
+import { createPetListen, type PetListen } from '../../src/main/pet-listen';
 import type { PetActivation } from '../../src/main/pet-activation';
 import type { Mover } from '../../src/main/pet-motion';
 import type { PetPlacement } from '../../src/main/pet-placement';
@@ -80,6 +81,9 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   });
 
   let petWake: PetWake | undefined;
+  // Связка разовой записи окна: создаётся после ежа, но нужна и обработчикам
+  // строки, поэтому ссылка живёт заранее.
+  let petListen: PetListen | undefined;
   // Ссылки на модули, которые создаются позже окна: фраза и конец звука.
   let recognize: (wav: Uint8Array, startedAt: number) => void = () => undefined;
   let speakDone: (id: number | undefined) => void = () => undefined;
@@ -93,6 +97,8 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     },
     onScreenLookStop: () => core.cancel(),
     onComposerSend: (text) => {
+      // Отправка текста отменяет идущую разовую запись (как USER_TEXT_CHANNEL).
+      petListen?.cancel();
       void bus.run('pet', () => core.handleUserText(text)).catch(() => undefined);
     },
     onComposerStop: () => core.cancel(),
@@ -128,6 +134,24 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   });
 
   const pet = createPetFacade({ bus, lifecycle, win, layout, activation });
+
+  // Разовая запись окна: ручная (значок/клавиша) и запущенная приложением
+  // после вызова по имени. Распознавание — тот же подставной STT.
+  petListen = createPetListen({
+    bus,
+    core: { handleUserText: (text) => core.handleUserText(text) },
+    stt: {
+      status: () => stt.status(),
+      transcribe: (wav: Uint8Array, prompt?: string) => stt.transcribe(wav, prompt)
+    } as unknown as Parameters<typeof createPetListen>[0]['stt'],
+    sendCommand: (command) => {
+      if (command === 'start') {
+        pet.listenCommand('start');
+      } else {
+        pet.listenCommand(command === 'cancel' ? 'cancel' : 'stop');
+      }
+    }
+  });
 
   // Слова остановки голосом, как в main/index.ts: занятому Тишке «стоп»
   // останавливает работу и речь, в ядро не уходит.
@@ -280,13 +304,22 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       mic.feed(value, ms);
     },
     noise: () => page.say(),
-    typeKey: () => page.typeKey(),
+    typeKey(): void {
+      petListen?.cancel();
+      page.typeKey();
+    },
+    micRecord: () => petListen?.toggle('click'),
+    recordSilence: () => petListen?.handleResult({ kind: 'nospeech' }),
+    recordNoise: () =>
+      petListen?.handleResult({ kind: 'wav', data: new Uint8Array([1, 2, 3, 4]) }),
     pressPet: () => page.press(),
     releasePet: () => page.release(),
     sendFromComposer: (text: string): void => {
+      petListen?.cancel();
       void bus.run('pet', () => core.handleUserText(text)).catch(() => undefined);
     },
     sendFromChat: (text: string): void => {
+      petListen?.cancel();
       void bus.run('chat', () => core.handleUserText(text)).catch(() => undefined);
     },
     notifyFromSkill: (title: string): void => bus.emit({ type: 'notify', title }),
