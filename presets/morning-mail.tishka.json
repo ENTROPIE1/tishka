@@ -1,0 +1,29 @@
+{
+  "format": "tishka-skill/1",
+  "id": "morning-mail",
+  "name": "Что в почте с утра",
+  "description": "Показывает непрочитанные письма за сегодня списком",
+  "phrases": ["что в почте с утра", "проверь почту", "какие новые письма"],
+  "requires": ["exchange"],
+  "trigger": { "type": "manual" },
+  "steps": [
+    {
+      "id": "mails",
+      "tool": "exchange__mail_search",
+      "args": { "unread": true, "since": "{{today}}", "limit": 10 }
+    },
+    {
+      "id": "digest",
+      "ask": "Вот непрочитанные письма за сегодня: {{steps.mails.content}}. Сделай короткий список: от кого и о чём, по одному пункту на письмо."
+    },
+    {
+      "id": "answer",
+      "say": "Посмотрел почту, непрочитанные в карточке",
+      "show": {
+        "kind": "text",
+        "title": "Непрочитанные письма",
+        "markdown": "{{steps.digest.content}}"
+      }
+    }
+  ]
+}

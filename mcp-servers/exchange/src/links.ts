@@ -82,6 +82,11 @@ export function mailDraftLink(owaUrl: string, params: MailDraftParams): string {
   );
 }
 
+// Ссылка на письмо в веб-почте Outlook: открывает его по идентификатору EWS.
+export function mailItemLink(owaUrl: string, itemId: string): string {
+  return buildLink(owaUrl, '/mail/inbox', [['ItemID', itemId]]);
+}
+
 export function meetingDraftLink(owaUrl: string, params: MeetingDraftParams): string {
   return buildLink(
     owaUrl,
