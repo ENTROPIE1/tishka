@@ -1,3 +1,5 @@
+import type { CalendarConfig } from './calendar/types';
+
 export interface ToolDef {
   name: string;                 // для MCP: "<сервер>__<инструмент>"
   description: string;
@@ -67,6 +69,7 @@ export type TishkaEvent =
   | { type: 'background.tick'; tool: string }
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
+  | { type: 'calendar.changed' }
   | { type: 'skill.removed'; skillId: string }
   | { type: 'error'; message: string }
   | { type: 'idle' };
@@ -125,6 +128,7 @@ export interface Config {
   };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often' };   // как часто Тишка говорит «фыр», по умолчанию 'sometimes'
+  calendar: CalendarConfig;   // рабочее время, напоминания календаря
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран

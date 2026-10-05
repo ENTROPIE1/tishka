@@ -95,10 +95,19 @@ function calendarItem(params: {
   end: string;
   location: string;
   organizer: string;
+  id?: string;
+  allDay?: boolean;
+  cancelled?: boolean;
 }): string {
+  const id = params.id === undefined ? '' : `<t:ItemId Id="${params.id}" />`;
+  const flags =
+    `<t:IsAllDayEvent>${params.allDay === true ? 'true' : 'false'}</t:IsAllDayEvent>` +
+    `<t:IsCancelled>${params.cancelled === true ? 'true' : 'false'}</t:IsCancelled>`;
   return (
     '<t:CalendarItem>' +
+    id +
     `<t:Subject>${params.subject}</t:Subject>` +
+    flags +
     `<t:Start>${params.start}</t:Start>` +
     `<t:End>${params.end}</t:End>` +
     `<t:Location>${params.location}</t:Location>` +
@@ -161,6 +170,28 @@ describe('createExchangeClient', () => {
       joinUrl: 'https://zoom.example.org/j/12345'
     });
     expect(meetings[2]).not.toHaveProperty('joinUrl');
+  });
+
+  it('читает идентификатор, признак всего дня и отмену', async () => {
+    const { client } = setup(
+      findItemResponse(
+        calendarItem({
+          subject: 'Отпуск',
+          start: '2026-10-05T09:00:00Z',
+          end: '2026-10-06T09:00:00Z',
+          location: '',
+          organizer: 'Иван',
+          id: 'AAAA-1',
+          allDay: true,
+          cancelled: true
+        })
+      )
+    );
+
+    const meetings = await client.listMeetings(from, to);
+    expect(meetings[0].id).toBe('AAAA-1');
+    expect(meetings[0].allDay).toBe(true);
+    expect(meetings[0].cancelled).toBe(true);
   });
 
   it('одна встреча разбирается без ошибок', async () => {

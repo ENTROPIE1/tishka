@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { defaultCalendarConfig } from '../src/core/calendar/types';
 import type { GatewayCheckResult } from '../src/core/llm/check';
 import type { Config } from '../src/core/types';
 import { mountModelSection } from '../src/renderer/settings/model-section';
@@ -28,6 +29,7 @@ function makeConfig(): Config {
     },
     mcpServers: [],
     persona: { fyr: 'sometimes' },
+    calendar: defaultCalendarConfig(),
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },

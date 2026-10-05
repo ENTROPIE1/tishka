@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { defaultCalendarConfig } from '../src/core/calendar/types';
 import type { Config } from '../src/core/types';
 import type { SttService } from '../src/voice/stt-service';
 import { restartVoiceIfNeeded, voiceRestartNeeded } from '../src/main/voice-restart';
@@ -22,6 +23,7 @@ function config(mode: SttMode, exe = '', model = '', sttUrl = 'http://127.0.0.1:
     },
     mcpServers: [],
     persona: { fyr: 'sometimes' },
+    calendar: defaultCalendarConfig(),
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },

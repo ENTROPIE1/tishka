@@ -8,7 +8,7 @@ import { mark } from './timing-log';
 const WINDOW_WIDTH = 900;
 const WINDOW_HEIGHT = 640;
 
-export type MainScreen = 'chat' | 'connections' | 'memory' | 'voice' | 'persona' | 'automations';
+export type MainScreen = 'chat' | 'calendar' | 'connections' | 'memory' | 'voice' | 'persona' | 'automations';
 
 let mainWindow: BrowserWindow | undefined;
 

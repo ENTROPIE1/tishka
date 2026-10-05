@@ -13,6 +13,7 @@ import { createMemoryWatch, type MemoryWatch } from './memory-watch';
 import { createProcessMemory } from './process-memory';
 import { OPEN_CHAT_CHANNEL, PET_SPEAK_DONE_CHANNEL } from './ipc-channels';
 import { registerAutomationIpc } from './ipc-automations';
+import { registerCalendarIpc } from './ipc-calendar';
 import { broadcastConfigChanged, registerIpc } from './ipc';
 import { registerSettingsIpc } from './ipc-settings';
 import { registerSpeechIpc } from './ipc-speech';
@@ -143,6 +144,7 @@ app.whenReady().then(async () => {
   registerIpc(bus, tishka, secrets, () => petListen?.cancel());
   registerTimingIpc({ logPath: timingLogPath, openPath: (path) => shell.openPath(path) });
   registerAutomationIpc(tishka);
+  registerCalendarIpc({ calendar: () => tishka.calendar });
   registerSettingsIpc(tishka, secrets);
   ipcMain.handle(OPEN_CHAT_CHANNEL, () => {
     openMainWindow('chat');

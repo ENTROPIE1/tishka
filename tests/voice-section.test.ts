@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { defaultCalendarConfig } from '../src/core/calendar/types';
 import type { Config } from '../src/core/types';
 import type { VoiceStateView } from '../src/main/ipc-settings';
 import { mountVoiceSection } from '../src/renderer/settings/voice-section';
@@ -21,6 +22,7 @@ function makeConfig(): Config {
     },
     mcpServers: [],
     persona: { fyr: 'sometimes' },
+    calendar: defaultCalendarConfig(),
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },
