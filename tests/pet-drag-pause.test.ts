@@ -19,7 +19,8 @@ function harness(): Harness {
     stop: () => undefined,
     pause: (value) => {
       result.pauses.push(value);
-    }
+    },
+    reset: () => undefined
   };
   (window as unknown as { tishka: unknown }).tishka = {
     pet: {

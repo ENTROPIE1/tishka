@@ -39,14 +39,15 @@ function bytes(value: unknown): Uint8Array | undefined {
 // Режим разговора в окне чата: та же wake-flow, что и у питомца, но владелец —
 // чат. Состояние уходит в окна, а фразы и нажатия — в общий поток.
 export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
-  let busy = false;
   let paused = false;
 
   function state(): ChatTalkState {
     const voice = deps.getVoice();
     const mine = deps.flow.conversationOwner() === 'chat';
     return {
-      active: !paused && !busy && deps.isReady() && mine,
+      // Пока разговор свой, запись не гаснет и во время работы Тишки: голосом
+      // можно остановить текущую работу словом «стоп».
+      active: !paused && deps.isReady() && mine,
       conversation: mine,
       soon: mine && deps.flow.isLeavingSoon(),
       threshold: voice.mic.threshold
@@ -61,14 +62,10 @@ export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
   }
 
   const unsubscribe = deps.bus.on((event) => {
-    if (BUSY.has(event.type)) {
-      busy = true;
-    } else if (event.type === 'idle' || event.type === 'speak.end') {
-      busy = false;
-    } else {
-      return;
+    // Состояние меняется, когда Тишка начал или закончил работать и говорить.
+    if (BUSY.has(event.type) || event.type === 'idle' || event.type === 'speak.end') {
+      broadcast();
     }
-    broadcast();
   });
 
   ipcMain.on(CHAT_TALK_TOGGLE_CHANNEL, () => {
@@ -77,13 +74,14 @@ export function registerChatTalk(deps: ChatTalkDeps): ChatTalk {
     deps.onChange?.();
   });
 
-  ipcMain.on(CHAT_TALK_PHRASE_CHANNEL, (_event, value: unknown) => {
+  ipcMain.on(CHAT_TALK_PHRASE_CHANNEL, (_event, value: unknown, startedAt: unknown) => {
     if (paused) {
       return;
     }
     const data = bytes(value);
     if (data !== undefined) {
-      deps.flow.handlePhrase(data);
+      const started = typeof startedAt === 'number' ? startedAt : undefined;
+      deps.flow.handlePhrase(data, false, started);
     }
   });
 

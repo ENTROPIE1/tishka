@@ -38,6 +38,7 @@ import { checkSttUrl } from '../voice/stt-http';
 import { createCalibrationHint, CALIBRATION_HINT } from '../voice/calibration-hint';
 import { createThresholdHint, THRESHOLD_HINT } from '../voice/threshold-hint';
 import { UNHEARD_HINT } from '../voice/unheard';
+import { createStopPhrase, type StopPhrase } from '../voice/stop-phrase';
 
 const bus = createSourceBus();
 // Журнал времени заводится до всего остального: строка-разделитель с версией
@@ -220,6 +221,16 @@ app.whenReady().then(async () => {
   });
   registerPetIpc(pet, listen);
 
+  // Слова остановки голосом: пока Тишка думает, работает или говорит, «стоп»
+  // останавливает работу и речь, не уходя в ядро как реплика.
+  const stopPhrase: StopPhrase = createStopPhrase({
+    bus,
+    wakeWords: () => tishka.config().voice.wakeWords,
+    cancel: () => tishka.cancel('pet'),
+    stopSpeech: () => speech?.stopSpeaking(),
+    caption: (text) => pet?.caption(text)
+  });
+
   const wakeFlow = createWakeFlow({
     getVoice: () => tishka.config().voice,
     stt: sttService,
@@ -247,6 +258,7 @@ app.whenReady().then(async () => {
     onUnheardHint: () => bus.emit({ type: 'status', text: UNHEARD_HINT }),
     onWakeLimit: () => thresholdHint.limit(),
     onWakePhraseEnd: () => thresholdHint.ended(),
+    onBusyPhrase: (text) => stopPhrase.phrase(text),
     sendCommand: (command) => {
       if (command === 'listen') {
         pet?.listenCommand('start');

@@ -31,6 +31,7 @@ export interface ScenarioObservations {
   interactive(): boolean;         // строка принимает щелчки
   composerVisible(): boolean;     // строка ввода видна
   composerCollapsed(): boolean;   // строка свёрнута в полочку
+  sendIsStop(): boolean;          // кнопка отправки ежа показывает остановку
   eyeOn(): boolean;               // кнопка с глазом у ежа активна
   eyeHidden(): boolean;           // кнопка с глазом у ежа скрыта настройкой
   chatEyeOn(): boolean;           // кнопка с глазом в чате активна
@@ -43,6 +44,7 @@ export interface ScenarioObservations {
   sttRequests(): number;          // что ушло на распознавание
   ttsRequests(): number;          // что ушло в службу синтеза
   conversationOn(): boolean;      // включён ли режим разговора
+  dropped(): string[];            // причины отброшенных фраз (phrase.dropped)
 }
 
 export interface Scenario {
@@ -51,6 +53,7 @@ export interface Scenario {
   hotkeyCall(): void;                     // вызов клавишей
   trayCall(): void;                       // щелчок по значку
   micClick(): void;                       // щелчок по микрофону
+  chatTalkToggle(): void;                 // включение разговора в окне чата
   say(text?: string): boolean;            // произнесённая фраза, текст даёт распознавание
   hear(result: string | TranscribeResult, holdMs?: number): void;
                                           // что распознавание услышит в следующей фразе;
@@ -64,8 +67,11 @@ export interface Scenario {
   sendFromComposer(text: string): void;   // отправка текста из строки ежа
   sendFromChat(text: string): void;       // отправка текста из окна чата
   notifyFromSkill(title: string): void;   // уведомление от навыка
+  coreWillWork(holdMs: number): void;     // ядро занято: следующий ход держится holdMs
   stopFromChat(): void;                   // остановка из окна чата: строка только в ленте чата
   pressEye(question?: string): void;      // нажатие кнопки с глазом у ежа
+  pressPetSend(text?: string): void;      // кнопка отправки строки ежа: занятому Тишке — остановка
+  pressPetEscape(): void;                 // Escape в строке ежа: занятому Тишке — остановка
   coreLooksAtScreen(): void;              // ядро начало просмотр экрана: событие инструмента
   voiceReady(): void;                     // служба распознавания стала готова
   voiceFailed(message?: string): void;    // служба не поднялась

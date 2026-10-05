@@ -95,6 +95,12 @@
   opacity: 0.9;
 }
 
+/* Занятому Тишке кнопка отправки останавливает работу: цвет как у «Стоп» в чате. */
+.composer-send.stop {
+  background: #b3402e;
+  border-color: #b3402e;
+}
+
 .send-icon {
   width: 16px;
   height: 16px;

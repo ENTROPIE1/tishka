@@ -1,7 +1,9 @@
 import type { Config, EventBus } from '../core/types';
+import type { TimingMark } from '../main/timing-log';
 import type { SttStatus, TranscribeResult } from './stt-service';
 import { NOT_READY_MESSAGE, planToggle } from './talk-toggle';
 import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
+import { createPhraseClock } from './phrase-time';
 import { createPhraseQueue, routeStaleText, type StaleTextDeps } from './stale-phrase';
 import { createSilenceTimer } from './silence-timer';
 import { createUnheardFlow } from './unheard';
@@ -29,10 +31,13 @@ export interface WakeFlowDeps {
   onUnheardHint?(): void;              // три такие фразы подряд: подсказка про порог и микрофон
   onWakeLimit?(): void;                // отрезок упёрся в предел длины при прослушивании имени
   onWakePhraseEnd?(): void;            // фраза закончилась сама: серия отрезков прервана
+  onBusyPhrase?(text: string): boolean;   // Тишка занят: «стоп» останавливает работу, фраза в ядро не уходит
+  mark?: TimingMark;                   // журнал времени: отброшенные фразы и их причины
 }
 
 export interface WakeFlow {
-  handlePhrase(wav: Uint8Array, limitHit?: boolean): void;
+  // limitHit — отрезок упёрся в предел; startedAt — время начала фразы.
+  handlePhrase(wav: Uint8Array, limitHit?: boolean, startedAt?: number): void;
   toggleConversation(by?: TalkSurface): void;
   enableConversation(by?: TalkSurface): void;
   disableConversation(hide: boolean, by?: TalkSurface): void;
@@ -81,6 +86,12 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     report: () => deps.onUnheardHint?.()
   });
 
+  // Правило времени начала фразы: репликой становится только начавшаяся
+  // после готовности слушать. Тишка занят, пока думает, работает или говорит.
+  const clock = createPhraseClock({ mark: deps.mark });
+  const BUSY_START = new Set(['think.start', 'tool.start', 'speak.start']);
+  const BUSY_END = new Set(['idle', 'speak.end']);
+
   // Перед уходом по тишине значок мигает: состояние «скоро уйду» приходит за 5 секунд.
   function armTimer(): void {
     if (!conversation || answering) {
@@ -98,14 +109,6 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     deps.bus.emit({ type: 'error', message });
   }
 
-  function clearWaiting(): void {
-    if (waiting === null) {
-      return;
-    }
-    waiting = null;
-    deps.onWaitingChange?.();
-  }
-
   // Обращение без просьбы: показать запись и слушать дальше.
   function startListen(): void {
     deps.bus.emit({ type: 'listen.start' });
@@ -118,6 +121,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     conversation = true;
     owner = by;
     waiting = null;
+    clock.conversationEnabled();
     queue.conversationEnabled();
     deps.sendCommand('conversation-on');
     armTimer();
@@ -146,19 +150,13 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   // Появление человека: сбрасывает выключенный значок и, если разговор включён
   // по умолчанию, сразу переводит в режим разговора. Уведомление не в счёт.
   function appear(source: 'name' | 'hotkey' | 'click' | 'trigger'): void {
-    if (source === 'trigger') {
-      return;
-    }
-    if (source === 'name' && suppressed) {
-      // Реплика в том же появлении: разговор сам не включается до конца появления.
+    // Уведомление не появление; реплика в том же появлении разговор не включает.
+    if (source === 'trigger' || (source === 'name' && suppressed)) {
       return;
     }
     suppressed = false;
-    if (source === 'hotkey') {
-      // Горячую клавишу переключает вызывающий: это явное действие.
-      return;
-    }
-    if (deps.getVoice().talkByDefault && owner === null) {
+    // Горячую клавишу переключает вызывающий: это явное действие.
+    if (source !== 'hotkey' && deps.getVoice().talkByDefault && owner === null) {
       requestListen('pet');
     }
   }
@@ -169,6 +167,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     const surface = by ?? owner;
     conversation = false;
     owner = null;
+    clock.conversationDisabled();
     queue.conversationDisabled();
     silence.clear();
     deps.sendCommand('conversation-off');
@@ -187,6 +186,11 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   }
 
   function routeConversation(text: string): void {
+    // Во время работы слушаем ради остановки: «стоп» останавливает, остальные
+    // фразы в ядро не уходят.
+    if ((deps.onBusyPhrase?.(text) ?? false)) {
+      return;
+    }
     if (isDismiss(text, deps.getVoice().wakeWords)) {
       dismiss();
       return;
@@ -202,22 +206,27 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       });
   }
 
-  function routeWake(text: string): void {
+  // Обращение по имени: true — фраза обработана (показана запись или ушла
+  // просьба). Обращение без просьбы при включённом разговоре уже обработано.
+  function routeWake(text: string): boolean {
     const match = matchWake(text, deps.getVoice().wakeWords);
     if (!match.matched) {
-      return;
+      return false;
+    }
+    // Просьба с именем при занятом Тишке: остановка или молчаливое отбрасывание.
+    if (match.rest !== '' && (deps.onBusyPhrase?.(match.rest) ?? false)) {
+      return true;
     }
     deps.bus.emit({ type: 'wake', source: 'name' });
     if (match.rest === '') {
-      if (conversation) {
-        return;
+      if (!conversation) {
+        startListen();
       }
-      startListen();
-      return;
+      return true;
     }
     if (isDismiss(match.rest, deps.getVoice().wakeWords)) {
       dismiss();
-      return;
+      return true;
     }
     startListen();
     answering = true;
@@ -231,20 +240,29 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
         answering = false;
         armTimer();
       });
+    return true;
   }
 
-  // Текст направляется по состоянию разговора на момент фразы: сказанное при
-  // другом состоянии проверяется только на имя и репликой не становится.
-  function onResult(result: TranscribeResult, stale: boolean): void {
+  // Текст направляется по времени начала фразы: репликой становится только
+  // начавшаяся после готовности слушать. Сказанное раньше проверяется только на
+  // имя (разговор выключен) и на слово остановки (Тишка занят) — в ядро не уходит.
+  function onResult(result: TranscribeResult, stale: boolean, startedAt: number): void {
     if (result.ok) {
       // Речь распознана: серия неуверенных фраз прервана.
       unheard.heard();
       if (stale) {
         routeStaleText(staleDeps, result.text);
-      } else if (conversation) {
-        routeConversation(result.text);
       } else {
-        routeWake(result.text);
+        const decision = clock.decide(startedAt);
+        if (decision.kind === 'reply') {
+          routeConversation(result.text);
+        } else if (conversation) {
+          if (!(deps.onBusyPhrase?.(result.text) ?? false)) {
+            clock.drop(decision.reason);
+          }
+        } else if (!routeWake(result.text)) {
+          clock.drop(decision.reason);
+        }
       }
       armTimer();
       return;
@@ -273,11 +291,11 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     armTimer();
   }
 
-  // Фраза распознаётся, пока включён разговор или прослушивание имени,
-  // и человек в этот момент не получает ответ.
+  // Фраза распознаётся, пока включён разговор или прослушивание имени. Во время
+  // ответа в разговоре фразы всё ещё распознаются: среди них может быть «стоп».
   function acceptPhrase(): boolean {
     if (answering) {
-      return false;
+      return conversation;
     }
     return conversation || deps.getVoice().wakeEnabled;
   }
@@ -306,17 +324,23 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     if (event.type === 'wake') {
       appear(event.source);
     }
+    if (BUSY_START.has(event.type)) {
+      clock.busyChanged(true);
+    } else if (BUSY_END.has(event.type)) {
+      clock.busyChanged(false);
+    }
   });
 
   return {
-    // limitHit — отрезок упёрся в предел длины при прослушивании имени.
-    handlePhrase: (wav, limitHit = false) => {
+    // limitHit — отрезок упёрся в предел длины при прослушивании имени;
+    // startedAt — время начала фразы (момент первого звука).
+    handlePhrase: (wav, limitHit = false, startedAt = Date.now()) => {
       if (limitHit) {
         deps.onWakeLimit?.();
       } else {
         deps.onWakePhraseEnd?.();
       }
-      queue.add(wav);
+      queue.add(wav, startedAt);
     },
     isConversation: () => conversation,
     conversationOwner: () => owner,
@@ -372,7 +396,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       }
       if (waiting === by) {
         // Значок нажали, пока ждали службу: до конца появления не слушаем.
-        clearWaiting();
+        waiting = null;
+        deps.onWaitingChange?.();
         if (by === 'pet') {
           suppressed = true;
         }

@@ -9,9 +9,14 @@ const DEFAULT_MAX_PHRASE_MS = 12000;
 const PRE_ROLL_MS = 500;
 const SETTLE_MS = 300;
 const MIN_PHRASE_MS = 400;
+// Сброс во время речи не должен превращать хвост фразы в новую реплику: начало
+// запомненной фразы сохраняется для следующего отрезка, но не дольше паузы.
+const CARRY_MS = 2000;
 
 export interface PhraseListenerOptions {
-  onPhrase(wav: Uint8Array, limitHit: boolean): void;
+  // startedAt — время начала фразы (момент первого звука с учётом запаса
+  // перед речью). Главный процесс по нему решает, стала фраза репликой.
+  onPhrase(wav: Uint8Array, limitHit: boolean, startedAt: number): void;
   onLevel?(level: number): void;
   onError?(message: string): void;
   threshold?: number;
@@ -28,6 +33,10 @@ export interface PhraseListenerOptions {
 export interface PhraseListener {
   start(): Promise<boolean>;
   pause(active: boolean): void;
+  // Сброс идущей записи, запаса перед речью и детектора — как при паузе,
+  // но микрофон остаётся открыт. Нужен при включении разговора, появлении
+  // ежа и окончании ответа: сказанное до этого репликой не становится.
+  reset(): void;
   stop(): void;
 }
 
@@ -35,6 +44,7 @@ interface CapturedFrame {
   data: Float32Array;
   startMs: number;
   ms: number;
+  wallMs: number;   // время по часам окна, когда кадр пришёл
 }
 
 // Постоянное прослушивание: микрофон открыт, речь режется на фразы. Пока речь
@@ -58,6 +68,11 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
   let capturing = false;
   let phraseFrames: CapturedFrame[] = [];
   let phraseStartMs = 0;
+  let phraseStartWallMs = 0;
+  // Начало фразы, сброшенной во время речи: хвост той же фразы не становится
+  // репликой, начавшейся после сброса.
+  let carriedStartWallMs: number | undefined;
+  let carriedAtMs = 0;
 
   function makeVad(): Vad {
     return createVad({
@@ -104,12 +119,14 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
   function emit(activeVad: Vad, wake: boolean): void {
     const collected = phraseFrames;
     const startMs = phraseStartMs;
+    const startedAt = phraseStartWallMs;
     const tail = wake ? overlapTail(collected) : [];
     phraseFrames = tail;
     if (wake && tail.length > 0) {
       // Следующий отрезок считается от начала перекрытия, иначе он уйдёт
       // на распознавание сразу же, кадр за кадром.
       phraseStartMs = tail[0].startMs;
+      phraseStartWallMs = tail[0].wallMs;
     } else {
       capturing = false;
     }
@@ -124,7 +141,7 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     const normalized = normalizePeak(trimmed);
     const wav = encodeWav(resample(normalized, sourceRate, TARGET_RATE), TARGET_RATE);
     timingMark('phrase.end', { ms: Math.round((trimmed.length / sourceRate) * 1000), bytes: wav.length });
-    options.onPhrase(wav, wake);
+    options.onPhrase(wav, wake, startedAt);
   }
 
   function spanMs(): number {
@@ -139,11 +156,12 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     sourceRate = sampleRate;
     const frameMs = (frame.length / sampleRate) * 1000;
     const frameStartMs = nowMs;
+    const wallMs = Date.now();
     const verdict = vad.push(frame, frameMs);
     options.onLevel?.(vad.level());
 
     if (!capturing) {
-      preRoll.push({ data: frame, startMs: frameStartMs, ms: frameMs });
+      preRoll.push({ data: frame, startMs: frameStartMs, ms: frameMs, wallMs });
       preRollMs += frameMs;
       while (preRollMs > PRE_ROLL_MS && preRoll.length > 0) {
         const oldest = preRoll.shift();
@@ -155,13 +173,23 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
         capturing = true;
         timingMark('speech.detected');
         timingMark('phrase.start');
+        const first = preRoll[0];
         phraseFrames = preRoll;
-        phraseStartMs = preRoll.length > 0 ? preRoll[0].startMs : frameStartMs;
+        phraseStartMs = first !== undefined ? first.startMs : frameStartMs;
+        const fresh = first !== undefined ? first.wallMs : wallMs;
+        // Сброс во время речи: хвост продолжает прежнюю фразу, начало которой
+        // было до сброса. Затянувшаяся пауза сбрасывает память о начале.
+        const carried =
+          carriedStartWallMs !== undefined && wallMs - carriedAtMs <= CARRY_MS
+            ? carriedStartWallMs
+            : undefined;
+        phraseStartWallMs = carried ?? fresh;
+        carriedStartWallMs = undefined;
         preRoll = [];
         preRollMs = 0;
       }
     } else {
-      phraseFrames.push({ data: frame, startMs: frameStartMs, ms: frameMs });
+      phraseFrames.push({ data: frame, startMs: frameStartMs, ms: frameMs, wallMs });
     }
     nowMs += frameMs;
 
@@ -201,12 +229,23 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     preRollMs = 0;
     capturing = false;
     phraseFrames = [];
+    carriedStartWallMs = undefined;
     vad = makeVad();
     // Действующая пауза сохраняется: запуск при паузе (например, когда
     // человек печатает) не возобновляет запись раньше срока.
     active = true;
     timingMark('listen.start');
     return true;
+  }
+
+  // Идущая запись отбрасывается без распознавания: накопленные кадры и
+  // состояние детектора речи сбрасываются, микрофон остаётся открыт.
+  function clearCapture(): void {
+    capturing = false;
+    phraseFrames = [];
+    preRoll = [];
+    preRollMs = 0;
+    vad?.reset();
   }
 
   // Идущая запись отбрасывается без распознавания: при паузе сбрасываем и
@@ -217,12 +256,21 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     }
     paused = value;
     if (value) {
-      capturing = false;
-      phraseFrames = [];
-      preRoll = [];
-      preRollMs = 0;
-      vad?.reset();
+      clearCapture();
     }
+  }
+
+  function reset(): void {
+    if (!active) {
+      return;
+    }
+    // Фраза шла в момент сброса: её начало запоминается, чтобы хвост не стал
+    // репликой нового разговора. Запись при этом отбрасывается, микрофон открыт.
+    if (capturing) {
+      carriedStartWallMs = phraseStartWallMs;
+      carriedAtMs = Date.now();
+    }
+    clearCapture();
   }
 
   function stop(): void {
@@ -234,8 +282,9 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     preRollMs = 0;
     capturing = false;
     phraseFrames = [];
+    carriedStartWallMs = undefined;
     capture.stop();
   }
 
-  return { start, pause, stop };
+  return { start, pause, reset, stop };
 }

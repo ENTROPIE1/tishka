@@ -33,7 +33,8 @@ export interface PageObservations {
   interactive(): boolean;
   composerVisible(): boolean;
   composerCollapsed(): boolean;
-  eyeOn(): boolean;      // кнопка с глазом активна: Тишка смотрит на экран
+  sendIsStop(): boolean; // кнопка отправки стала кнопкой остановки
+  eyeOn(): boolean;      // кнопка с глазом у ежа активна: Тишка смотрит на экран
   eyeHidden(): boolean;  // кнопка скрыта: просмотр экрана выключен
 }
 
@@ -47,15 +48,21 @@ export interface Page {
   pointer(): void;
   setError(message: string): void;
   pressEye(question?: string): ScreenLookAction;
+  // Кнопка отправки в строке ежа: занятому Тишке она останавливает работу.
+  pressSend(text?: string): void;
+  // Escape в строке ежа: пока Тишка занят, останавливает работу.
+  pressEscape(): void;
   // Действующая пауза прослушивания: связка страницы с настоящим слушателем.
   listenPaused(): boolean;
 }
 
 export interface PageDeps {
-  onPhrase(wav: Uint8Array): void;
+  onPhrase(wav: Uint8Array, startedAt: number): void;
   onSpeakDone(id: number | undefined): void;
   onScreenLookSend(text: string): void;
   onScreenLookStop(): void;
+  onComposerSend(text: string): void;
+  onComposerStop(): void;
   screenLookAvailable(): boolean;
   // Пауза прослушивания изменилась: та же связка, что у слушателя окна ежа.
   onListenPause?(paused: boolean): void;
@@ -112,6 +119,7 @@ export function createPage(deps: PageDeps): PageControl {
     interactive: () => interactive,
     composerVisible: () => onScreen(model.state),
     composerCollapsed: () => composerCollapsed(model.state),
+    sendIsStop: () => composerBusy(model.state),
     eyeOn: () => eyeLooking,
     eyeHidden: () => !deps.screenLookAvailable()
   };
@@ -167,11 +175,12 @@ export function createPage(deps: PageDeps): PageControl {
     },
     // Человек произнёс фразу: уходит на распознавание, только если микрофон
     // пишет и не на паузе (паузу держат печать и удержание ежа мышью).
+    // Фраза несёт время начала — момент, когда человек начал говорить.
     say(): boolean {
       if (!listenerActive || pause.isPaused()) {
         return false;
       }
-      deps.onPhrase(PHRASE_WAV);
+      deps.onPhrase(PHRASE_WAV, Date.now());
       return true;
     },
     typeKey(): void {
@@ -202,6 +211,23 @@ export function createPage(deps: PageDeps): PageControl {
         deps.onScreenLookStop();
       }
       return action;
+    },
+    // Кнопка отправки строки: пока Тишка занят, нажатие останавливает работу,
+    // иначе отправляет набранный текст.
+    pressSend(text = ''): void {
+      if (composerBusy(model.state)) {
+        deps.onComposerStop();
+        return;
+      }
+      if (text !== '') {
+        deps.onComposerSend(text);
+      }
+    },
+    // Escape в строке ежа: пока Тишка занят, останавливает работу.
+    pressEscape(): void {
+      if (composerBusy(model.state)) {
+        deps.onComposerStop();
+      }
     },
     caption(text: string): void {
       stateCaption.show(text);

@@ -37,7 +37,8 @@ function harness(): {
         stop: () => {
           stopped += 1;
         },
-        pause: () => undefined
+        pause: () => undefined,
+        reset: () => undefined
       };
     }
   });

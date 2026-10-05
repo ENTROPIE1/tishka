@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { createEventBus } from '../src/core/events';
 import type { Config } from '../src/core/types';
 import type { TranscribeResult } from '../src/voice/stt-service';
+import { createStopPhrase, type StopPhrase } from '../src/voice/stop-phrase';
 import { createWakeFlow, type WakeFlow } from '../src/voice/wake-flow';
 
 export function voice(overrides: Partial<Config['voice']> = {}): Config['voice'] {
@@ -32,6 +33,7 @@ export interface Harness {
   errors: string[];
   spoken: string[];
   captions: string[];
+  stops: string[];
   hints: () => number;
   prompts: (string | undefined)[];
   soonChanges: boolean[];
@@ -63,6 +65,7 @@ export function makeHarness(
   const errors: string[] = [];
   const spoken: string[] = [];
   const captions: string[] = [];
+  const stops: string[] = [];
   let hints = 0;
   const prompts: (string | undefined)[] = [];
   const soonChanges: boolean[] = [];
@@ -80,14 +83,19 @@ export function makeHarness(
   });
 
   const core = {
+    // События те же, что у настоящего processUserText: по ним видно, что ядро занято.
     handleUserText: vi.fn(async (text: string): Promise<unknown> => {
       calls.push(text);
       history.push(text);
+      bus.emit({ type: 'listen.end', text });
+      bus.emit({ type: 'think.start' });
       if (blocked) {
         await new Promise<void>((resolve) => {
           releaseBlock = resolve;
         });
       }
+      bus.emit({ type: 'reply', reply: { say: 'ok' } });
+      bus.emit({ type: 'idle' });
       return { say: 'ok' };
     })
   };
@@ -99,6 +107,14 @@ export function makeHarness(
     } else if (event.type === 'speak.start') {
       spoken.push(event.text);
     }
+  });
+
+  const stopPhrase: StopPhrase = createStopPhrase({
+    bus,
+    wakeWords: () => voiceConfig.wakeWords,
+    cancel: () => stops.push('work'),
+    stopSpeech: () => stops.push('speech'),
+    caption: (text) => captions.push(text)
   });
 
   const flow = createWakeFlow({
@@ -117,7 +133,8 @@ export function makeHarness(
     onUnheard: (text) => captions.push(text),
     onUnheardHint: () => {
       hints += 1;
-    }
+    },
+    onBusyPhrase: (text) => stopPhrase.phrase(text)
   });
 
   return {
@@ -130,6 +147,7 @@ export function makeHarness(
     errors,
     spoken,
     captions,
+    stops,
     hints: () => hints,
     prompts,
     soonChanges,

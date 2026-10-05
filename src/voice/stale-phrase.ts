@@ -23,12 +23,13 @@ export interface PhraseQueueDeps {
   // и человек в этот момент не получает ответ.
   accept(): boolean;
   transcribe(wav: Uint8Array): Promise<TranscribeResult>;
-  // Распознанный текст; stale — сказан при другом состоянии разговора.
-  onResult(result: TranscribeResult, stale: boolean): void;
+  // Распознанный текст; stale — сказан при другом состоянии разговора;
+  // startedAt — время начала фразы для правила времени.
+  onResult(result: TranscribeResult, stale: boolean, startedAt: number): void;
 }
 
 export interface PhraseQueue {
-  add(wav: Uint8Array): void;
+  add(wav: Uint8Array, startedAt: number): void;
   // Разговор включён: ждущая фраза отбрасывается, идущее распознавание устарело.
   conversationEnabled(): void;
   // Разговор выключен: идущее распознавание устарело.
@@ -42,15 +43,15 @@ export interface PhraseQueue {
 // текст помечается устаревшим, если за время распознавания разговор переключили.
 export function createPhraseQueue(deps: PhraseQueueDeps): PhraseQueue {
   let recognizing = false;
-  let pending: { wav: Uint8Array; epoch: number } | undefined;
+  let pending: { wav: Uint8Array; epoch: number; startedAt: number } | undefined;
   const epoch = createEpoch();
 
-  function run(item: { wav: Uint8Array; epoch: number }): void {
+  function run(item: { wav: Uint8Array; epoch: number; startedAt: number }): void {
     recognizing = true;
     void deps
       .transcribe(item.wav)
       .then((result) => {
-        deps.onResult(result, item.epoch !== epoch.now());
+        deps.onResult(result, item.epoch !== epoch.now(), item.startedAt);
       })
       .finally(() => {
         recognizing = false;
@@ -65,15 +66,15 @@ export function createPhraseQueue(deps: PhraseQueueDeps): PhraseQueue {
   }
 
   return {
-    add(wav: Uint8Array): void {
+    add(wav: Uint8Array, startedAt: number): void {
       if (!deps.accept()) {
         return;
       }
       if (recognizing) {
-        pending = { wav, epoch: epoch.now() };
+        pending = { wav, epoch: epoch.now(), startedAt };
         return;
       }
-      run({ wav, epoch: epoch.now() });
+      run({ wav, epoch: epoch.now(), startedAt });
     },
     conversationEnabled(): void {
       pending = undefined;

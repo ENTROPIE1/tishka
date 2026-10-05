@@ -12,6 +12,10 @@ const MIC_PATHS = [
   'M12 18v3'
 ];
 const SEND_PATHS = ['M4 12h13', 'M11 6l6 6-6 6'];
+// Тот же знак остановки, что у кнопки «Стоп» в чате основного окна.
+const STOP_PATHS = ['M7 7h10v10H7z'];
+const SEND_TITLE = 'Отправить';
+const STOP_TITLE = 'Остановить';
 // Тот же глаз, что в кнопке чата: вид переключателя просмотра экрана.
 const EYE_PATHS = [
   'M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6z',
@@ -29,6 +33,7 @@ export interface ComposerActions {
   onFocus(): void;
   onSettings?(): void;
   onScreenLook?(action: ScreenLookAction): void;
+  onStop?(): void;   // Тишка занят: кнопка отправки и Escape останавливают работу
 }
 
 export interface Composer {
@@ -62,7 +67,8 @@ function svgIcon(className: string, paths: string[]): SVGSVGElement {
 }
 
 // Строка общения под ёжиком: микрофон, глаз, поле «Написать Тишке…» и отправка.
-// Отправка во время работы Тишки встаёт в очередь и уходит после ответа.
+// Пока Тишка занят, кнопка отправки становится кнопкой остановки (как в чате),
+// Escape делает то же; набранный по Enter текст встаёт в очередь до ответа.
 // Глаз — переключатель просмотра экрана, как кнопка с глазом в чате.
 export function createComposer(actions: ComposerActions): Composer {
   const element = document.createElement('form');
@@ -102,9 +108,16 @@ export function createComposer(actions: ComposerActions): Composer {
   send.id = 'send';
   send.className = 'composer-send';
   send.type = 'submit';
-  send.title = 'Отправить';
-  send.setAttribute('aria-label', 'Отправить');
+  send.title = SEND_TITLE;
+  send.setAttribute('aria-label', SEND_TITLE);
   send.append(svgIcon('send-icon', SEND_PATHS));
+  // Пока Тишка занят, кнопка отправки останавливает работу — как в чате.
+  send.addEventListener('click', (event) => {
+    if (busy) {
+      event.preventDefault();
+      actions.onStop?.();
+    }
+  });
 
   const settings = document.createElement('button');
   settings.id = 'settings';
@@ -139,6 +152,15 @@ export function createComposer(actions: ComposerActions): Composer {
   // Подсказка в поле: пока микрофон не готов, честно ждём; затем — говорите или пишите.
   function applyPlaceholder(): void {
     input.placeholder = waiting ? PLACEHOLDER_WAITING : listening ? PLACEHOLDER_LISTENING : PLACEHOLDER_IDLE;
+  }
+
+  // Вид кнопки отправки: занятому Тишке — остановка, как у «Стоп» в чате.
+  function applySend(): void {
+    const title = busy ? STOP_TITLE : SEND_TITLE;
+    send.classList.toggle('stop', busy);
+    send.title = title;
+    send.setAttribute('aria-label', title);
+    send.replaceChildren(svgIcon('send-icon', busy ? STOP_PATHS : SEND_PATHS));
   }
 
   // Вид кнопки с глазом ведут события ядра о просмотре экрана, не нажатия.
@@ -183,6 +205,7 @@ export function createComposer(actions: ComposerActions): Composer {
 
   function setBusy(value: boolean): void {
     busy = value;
+    applySend();
     if (value || queue.length === 0) {
       return;
     }
@@ -207,6 +230,11 @@ export function createComposer(actions: ComposerActions): Composer {
       return;
     }
     event.preventDefault();
+    // Пока Тишка занят, Escape останавливает работу, как кнопка остановки.
+    if (busy) {
+      actions.onStop?.();
+      return;
+    }
     if (input.value !== '') {
       input.value = '';
       return;

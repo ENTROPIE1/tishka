@@ -273,8 +273,8 @@ const api = {
     toggle(): void {
       ipcRenderer.send(CHAT_TALK_TOGGLE_CHANNEL);
     },
-    phrase(wav: Uint8Array): void {
-      ipcRenderer.send(CHAT_TALK_PHRASE_CHANNEL, wav);
+    phrase(wav: Uint8Array, startedAt?: number): void {
+      ipcRenderer.send(CHAT_TALK_PHRASE_CHANNEL, wav, startedAt);
     },
     escape(): void {
       ipcRenderer.send(CHAT_TALK_ESCAPE_CHANNEL);
@@ -335,8 +335,8 @@ const api = {
     listenResult(result: ListenResult): void {
       ipcRenderer.send(PET_LISTEN_RESULT_CHANNEL, result);
     },
-    wakePhrase(wav: Uint8Array, limitHit?: boolean): void {
-      ipcRenderer.send(PET_WAKE_PHRASE_CHANNEL, wav, limitHit === true);
+    wakePhrase(wav: Uint8Array, limitHit?: boolean, startedAt?: number): void {
+      ipcRenderer.send(PET_WAKE_PHRASE_CHANNEL, wav, limitHit === true, startedAt);
     },
     conversationToggle(): void {
       ipcRenderer.send(PET_CONVERSATION_TOGGLE_CHANNEL);

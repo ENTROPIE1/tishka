@@ -3,7 +3,7 @@ import { createSourceBus } from '../../src/main/source-bus';
 import { createPetLifecycle } from '../../src/main/pet-lifecycle';
 import { createWakeFlow } from '../../src/voice/wake-flow';
 import { UNHEARD_HINT } from '../../src/voice/unheard';
-import { createSpeechOutput } from '../../src/main/pet-speak';
+import { createSpeechOutput, type SpeechOutput } from '../../src/main/pet-speak';
 import { createPetSpeakPlay } from '../../src/main/pet-speak-play';
 import { registerPetWake, type PetWake } from '../../src/main/pet-wake';
 import type { PetActivation } from '../../src/main/pet-activation';
@@ -19,6 +19,7 @@ import { createPetFacade } from './pet-facade';
 import { buildConfig, type Scenario, type ScenarioObservations, type ScenarioOptions } from './scenario-types';
 import { createPhraseListener } from '../../src/renderer/shared/phrase-listener';
 import type { MicCapture } from '../../src/renderer/shared/mic-capture';
+import { createStopPhrase, type StopPhrase } from '../../src/voice/stop-phrase';
 
 // registerPetWake ставит обработчики ipcMain: в стенде каналы не используются,
 // сообщения человека идут напрямую в модули.
@@ -57,6 +58,7 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   const spoken: string[] = [];
   const errors: string[] = [];
   const statuses: string[] = [];
+  const marks: { event: string; details?: Record<string, string | number | boolean> }[] = [];
   bus.on((event) => {
     if (event.type === 'speak.start') {
       spoken.push(event.text);
@@ -79,17 +81,21 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
 
   let petWake: PetWake | undefined;
   // Ссылки на модули, которые создаются позже окна: фраза и конец звука.
-  let recognize: (wav: Uint8Array) => void = () => undefined;
+  let recognize: (wav: Uint8Array, startedAt: number) => void = () => undefined;
   let speakDone: (id: number | undefined) => void = () => undefined;
   // Пауза страницы управляет настоящим слушателем фраз, как в окне ежа.
   let pauseListener: (paused: boolean) => void = () => undefined;
   const win = createWindowEdge({
-    onPhrase: (wav) => recognize(wav),
+    onPhrase: (wav, startedAt) => recognize(wav, startedAt),
     onSpeakDone: (id) => speakDone(id),
     onScreenLookSend: (text) => {
       void bus.run('pet', () => core.handleUserText(text)).catch(() => undefined);
     },
     onScreenLookStop: () => core.cancel(),
+    onComposerSend: (text) => {
+      void bus.run('pet', () => core.handleUserText(text)).catch(() => undefined);
+    },
+    onComposerStop: () => core.cancel(),
     screenLookAvailable: () => config.screen.enabled,
     onListenPause: (value) => pauseListener(value)
   });
@@ -123,6 +129,17 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
 
   const pet = createPetFacade({ bus, lifecycle, win, layout, activation });
 
+  // Слова остановки голосом, как в main/index.ts: занятому Тишке «стоп»
+  // останавливает работу и речь, в ядро не уходит.
+  let speechOutput: SpeechOutput | undefined;
+  const stopPhrase: StopPhrase = createStopPhrase({
+    bus,
+    wakeWords: () => config.voice.wakeWords,
+    cancel: () => core.cancel(),
+    stopSpeech: () => speechOutput?.stopSpeaking(),
+    caption: (text) => pet.caption(text)
+  });
+
   const flow = createWakeFlow({
     getVoice: () => config.voice,
     stt: { transcribe: (wav, prompt) => stt.transcribe(wav, prompt) },
@@ -133,6 +150,11 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       if (command === 'listen') {
         pet.listenCommand('start');
       }
+      // Включение разговора сбрасывает идущую запись окна — та же связка,
+      // что в wake-listener страницы ежа при смене состояния.
+      if (command === 'conversation-on') {
+        audio?.reset();
+      }
       petWake?.broadcast();
     },
     hide: () => pet.leave(),
@@ -142,9 +164,11 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     onWaitingChange: () => petWake?.broadcast(),
     onSoonChange: () => petWake?.broadcast(),
     onUnheard: (text) => pet.caption(text),
-    onUnheardHint: () => bus.emit({ type: 'status', text: UNHEARD_HINT })
+    onUnheardHint: () => bus.emit({ type: 'status', text: UNHEARD_HINT }),
+    onBusyPhrase: (text) => stopPhrase.phrase(text),
+    mark: (event, details) => marks.push({ event, details })
   });
-  recognize = (wav) => flow.handlePhrase(wav);
+  recognize = (wav, startedAt) => flow.handlePhrase(wav, false, startedAt);
 
   // Звуковая дорожка окна-питомца: настоящий слушатель фраз с отрезками
   // прослушивания имени, микрофон подставной — звук подаёт feedMic.
@@ -155,10 +179,17 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     chunkOverlapMs: 500,
     inConversation: () => flow.isConversation(),
     capture: mic,
-    onPhrase: (wav, limitHit) => flow.handlePhrase(wav, limitHit)
+    onPhrase: (wav, limitHit, startedAt) => flow.handlePhrase(wav, limitHit, startedAt)
   });
   pauseListener = (value) => audio.pause(value);
   void audio.start();
+  // Появление ежа и конец речи сбрасывают идущую запись — то же, что делает
+  // wake-listener окна ежа по событиям.
+  bus.on((event) => {
+    if (event.type === 'wake' || event.type === 'speak.end') {
+      audio.reset();
+    }
+  });
 
   const speakPlay = createPetSpeakPlay({
     speak: (message) => pet.speak(message),
@@ -172,6 +203,7 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     play: (message, signal) => speakPlay.play(message, signal),
     fetch: tts.fetch
   });
+  speechOutput = speech;
 
   petWake = registerPetWake({
     pet,
@@ -195,7 +227,14 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     sttRequests: () => stt.requests(),
     ttsRequests: () => tts.requests(),
     conversationOn: () => flow.isConversation(),
-    chatEyeOn: () => chatLooking
+    chatEyeOn: () => chatLooking,
+    // Причины отброшенных фраз из журнала времени.
+    dropped: () =>
+      marks
+        .filter((item) => item.event === 'phrase.dropped')
+        .map((item) => String(item.details?.reason ?? '')),
+    // Кнопка отправки строки ежа: занятому Тишке она показывает остановку.
+    sendIsStop: () => page.observations.sendIsStop()
   };
 
   return {
@@ -213,6 +252,10 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     trayCall: () => pet.wake('name'),
     micClick(): void {
       flow.toggleConversation('pet');
+      petWake?.broadcast();
+    },
+    chatTalkToggle(): void {
+      flow.toggleConversation('chat');
       petWake?.broadcast();
     },
     say(text?: string): boolean {
@@ -247,6 +290,10 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       void bus.run('chat', () => core.handleUserText(text)).catch(() => undefined);
     },
     notifyFromSkill: (title: string): void => bus.emit({ type: 'notify', title }),
+    // Ядро занято: следующий ход держится holdMs, затем отвечает как обычно.
+    coreWillWork(holdMs: number): void {
+      core.willReply({ say: 'Работаю' }, holdMs);
+    },
     // Ядро сообщает об остановке из окна чата событием статуса, а не уведомлением:
     // строка видна в ленте чата, скрытого ежа не поднимает.
     stopFromChat(): void {
@@ -255,6 +302,14 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     },
     pressEye(question?: string): void {
       page.pressEye(question);
+    },
+    // Кнопка отправки строки ежа: занятому Тишке останавливает, иначе отправляет.
+    pressPetSend(text?: string): void {
+      page.pressSend(text);
+    },
+    // Escape в строке ежа: занятому Тишке останавливает работу.
+    pressPetEscape(): void {
+      page.pressEscape();
     },
     // Ядро начало просмотр экрана: событие инструмента видят кнопки в обоих окнах.
     coreLooksAtScreen(): void {
@@ -282,6 +337,7 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       audio.stop();
       petWake?.dispose();
       speech.dispose();
+      stopPhrase.dispose();
       flow.stop();
       pet.dispose();
     }

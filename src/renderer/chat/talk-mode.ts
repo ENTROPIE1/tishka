@@ -20,6 +20,8 @@ export interface TalkModeDeps {
 
 export interface TalkMode {
   button: HTMLButtonElement;
+  // Сброс идущей записи: появление ежа или конец ответа.
+  reset(): void;
   keyboard(): void;
   dispose(): void;
 }
@@ -84,7 +86,7 @@ export function createTalkMode(
     clearRetry();
     const options: PhraseListenerOptions = {
       threshold,
-      onPhrase: (wav) => window.tishka.chatTalk.phrase(wav),
+      onPhrase: (wav, _limitHit, startedAt) => window.tishka.chatTalk.phrase(wav, startedAt),
       onLevel: (level) => {
         elements.levelFill.style.width = `${Math.round(level * 100)}%`;
       },
@@ -111,8 +113,14 @@ export function createTalkMode(
     const nextThreshold = state.threshold ?? undefined;
     const thresholdChanged = nextThreshold !== threshold;
     threshold = nextThreshold;
+    const wasConversation = conversation;
     conversation = state.conversation;
     active = state.active;
+    // Включение разговора сбрасывает идущую запись: сказанное до этого
+    // репликой нового разговора не становится.
+    if (conversation && !wasConversation) {
+      listener?.reset();
+    }
     if (conversation && active) {
       // Новый порог применяется к идущей записи сразу: слушатель пересоздаётся.
       if (thresholdChanged && listener !== undefined) {
@@ -149,6 +157,9 @@ export function createTalkMode(
 
   return {
     button,
+    reset(): void {
+      listener?.reset();
+    },
     keyboard(): void {
       // Набор текста в поле: запись фраз на паузе, возобновление через 2 секунды
       // после последнего нажатия. Состояние значка микрофона не меняется.

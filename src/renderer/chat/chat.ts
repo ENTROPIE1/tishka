@@ -140,6 +140,13 @@ function initEvents(): void {
         composer.end();
         composer.setLooking(false);
         clearStatus();
+        // Конец ответа — граница записи: сказанное до него репликой не станет.
+        talkMode?.reset();
+        break;
+      case 'wake':
+      case 'speak.end':
+        // Появление ежа и конец речи — та же граница записи.
+        talkMode?.reset();
         break;
       default:
         break;
