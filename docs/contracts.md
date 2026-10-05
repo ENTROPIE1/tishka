@@ -97,9 +97,15 @@ interface MoodMark {
 
 Режим ответа (`voice` — вслух и текстом, `text` — только текстом) хранится в `Config.voice.tts.enabled` и переключается инструментом ядра `speech_mode` без перезапуска. В ядро источник реплики человека (`'voice'` или `'text'`) доводится необязательным параметром `handleUserText(text, source?)`; текущий режим и источник попадают в системную подсказку хода.
 
+## Озвучка реплики
+
+При `Config.voice.tts.bySentence` (по умолчанию включено) подготовленный текст реплики делится на части по границам предложений (`.`, `!`, `?`, `…`, перевод строки); точка внутри числа, сокращения и служебные слова («т. е.», «5.10», «и т. д.») границей не считаются. Предложение длиннее 300 знаков делится по запятой или точке с запятой; предложения короче 25 знаков присоединяются к соседнему, кроме первой части — она может остаться короткой, чтобы звук начался быстрее. Первая часть уходит на синтез сразу и звучит, как только готова; следующая синтезируется, пока звучит предыдущая, с опережением не больше одной части; пауза между частями при воспроизведении 150 мс. Остановка речи, вытеснение новой репликой и страховочный срок действуют на реплику целиком: остановка обрывает звук и отменяет ещё не синтезированные части. Ошибка синтеза одной части не обрывает остальные. Прогрев готовых фраз идёт по одному запросу и приостанавливается на время синтеза живой реплики; сохранение настроек, не менявшее адрес службы синтеза и не включавшее озвучку, прогрев не запускает. При выключенной настройке реплика уходит одним запросом, как раньше.
+
 ## Рот и эмоции
 
 Модуль `src/voice/lipsync.ts` (чистые функции) по тексту, ушедшему в синтез, и огибающей громкости его WAV строит дорожку форм рта (`m_closed`, `m_teeth`, `m_e`, `m_a`, `m_o`, `m_u`, `m_f`, `m_l`) и моменты смены эмоций. Главный процесс считает её из WAV перед воспроизведением и передаёт окну ежа вместе со звуком (`SpeakMessage.mouth`, `SpeakMessage.moods`); дорожка рта и эмоции идут по `audio.currentTime`. Если дорожки нет, рот ведётся по громкости, как раньше.
+
+Для реплики, разбитой на части, дорожка рта и моменты эмоций строятся по каждой части: дорожка — из её текста и её WAV. Метка эмоции (`Reply.moods`, позиция в знаках текста `say` до подготовки) попадает в ту часть, где лежит её позиция, с пересчётом позиции относительно начала части; позиция переводится по доле длины, так как части — это подготовленный текст.
 
 Переходник `Character` получает необязательные `setViseme(shape | null)` (форма рта из дорожки) и `setMood(name)` (эмоция из данных модели). Прежний ёж их не реализует и продолжает жить на `setMouth(level)`.
 
@@ -130,6 +136,7 @@ type TishkaEvent =
   | { type: 'background.tick'; tool: string }
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
+  | { type: 'calendar.changed' }   // календарь изменился: экран перечитывает
   | { type: 'skill.removed'; skillId: string }
   | { type: 'stats.changed' }          // счётчик выполненных дел изменился
   | { type: 'error'; message: string }
@@ -209,6 +216,37 @@ interface StatsSummary {
 
 Сэкономленные минуты навыка берутся из `Skill.manualMinutes`, по умолчанию 5. Для остальных дел действуют постоянные оценки: черновик письма — 8, событие календаря — 5, страница — 3, напоминание — 1. Завершение дела отправляет событие `stats.changed`. Повреждённый файл читается как пустой и не роняет ядро; запись атомарная. Инструмент ядра `stats_summary` отдаёт содержимое сводки.
 
+## Календарь
+
+Ядро хранит события в `calendar.json` в каталоге данных (`src/core/calendar/`).
+
+```ts
+type CalendarKind = 'meeting' | 'focus' | 'personal' | 'reminder' | 'away';
+type CalendarSource = 'local' | `exchange:${string}` | 'schedule';
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;                 // ISO со смещением
+  end: string;
+  allDay: boolean;
+  kind: CalendarKind;
+  source: CalendarSource;
+  externalId?: string;           // идентификатор в источнике загрузки
+  location?: string;
+  link?: string;                 // ссылка на подключение к встрече
+  note?: string;
+  remindMinutes: number | null;  // null — не напоминать
+  updatedAt: string;
+}
+```
+
+Свои события (`source: local`) человек правит и удаляет. Загруженные (`exchange:<имя>`) правятся только по `remindMinutes` и `note`; исчезнувшие в источнике удаляются следующей загрузкой. События `source: schedule` — напоминания и разовые запуски навыков — видны из хранилища расписания только для чтения, без копирования. Запись файла атомарная, повреждённый файл даёт пустой календарь и строку в журнале времени.
+
+Напоминание о событии — `notify` за `remindMinutes` до начала, одно на событие; после перезапуска пропущенное больше чем на пять минут не шлётся. Во время события `focus` уведомления навыков и слежения копятся и после его конца показываются строкой `note`.
+
+Инструменты Тишки: `calendar_agenda` (сегодня, завтра, неделя или даты), `calendar_add` (при пересечении событие всё равно создаётся, пересечение сообщается), `calendar_update` и `calendar_remove` (только свои события), `calendar_free` (свободные окна в рабочее время), `calendar_status` (обстановка сейчас). Разбор дат живёт отдельным модулем и понимает «завтра в 15», «в пятницу с 10 до 11», «через час на 30 минут». В системную подсказку каждого хода входит одна-две строки обстановки.
+
 ## Секреты и настройки
 
 ```ts
@@ -222,9 +260,15 @@ interface SecretStore {
 
 interface Config {
   llm: { baseUrl: string; model: string; visionModel: string; fallbackModel: string; visionFallbackModel: string; api: 'chat' | 'responses' };   // fallbackModel/visionFallbackModel — запасные модели на случай отказа основных (пусто — нет запасной); api — формат запросов к шлюзу: 'chat' (по умолчанию, /chat/completions) или 'responses' (/responses, формат OpenAI Responses)
-  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl
+  voice: { hotkey: string; wakeWords: string[]; wakeEnabled: boolean; talkByDefault: boolean; talkTimeoutSec: number; sensitivity: 'low' | 'normal' | 'high'; mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null }; sttUrl: string; stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' }; tts: { enabled: boolean; url: string; volume: number; bySentence: boolean } };   // stt.mode: local — запускать службу здесь; remote — готовая служба по sttUrl; bySentence — озвучивать по предложениям, не дожидаясь всего текста (по умолчанию включено)
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; показываемый персонаж: 'hedgehog' (прежний ёж, по умолчанию) или 'tishka' (костная модель)
+  calendar: {
+    workHours: { days: Partial<Record<'mon'|'tue'|'wed'|'thu'|'fri'|'sat'|'sun', { start: string; end: string } | null>>; lunch?: { start: string; end: string } };   // рабочее время по дням недели, null — выходной; по умолчанию пн–пт 09:00–18:00
+    defaultRemindMinutes: number;   // за сколько минут напоминать по умолчанию
+    quietOutsideWork: boolean;      // вне рабочего времени не напоминать вслух о рабочих встречах
+    sources?: Record<string, boolean>;   // имя подключения Exchange — загружать встречи (задача 106)
+  };
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран, по умолчанию true

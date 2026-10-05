@@ -1,5 +1,13 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import {
+  defaultCalendarConfig,
+  defaultWorkHours,
+  WEEKDAYS,
+  type CalendarDayHours,
+  type CalendarWeekday,
+  type CalendarWorkHours
+} from './calendar/types';
 import type { Config, McpServerConfig } from './types';
 
 export const CONFIG_FILE = 'config.json';
@@ -30,10 +38,11 @@ export function defaultConfig(): Config {
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: 'http://127.0.0.1:8178',
       stt: { exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' },
-      tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1 }
+      tts: { enabled: false, url: 'http://127.0.0.1:8179', volume: 1, bySentence: true }
     },
     mcpServers: [],
     persona: { fyr: 'sometimes', character: 'hedgehog' },
+    calendar: defaultCalendarConfig(),
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },
@@ -118,6 +127,53 @@ function pickNullableString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
+function pickTime(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (match === null) {
+    return undefined;
+  }
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) {
+    return undefined;
+  }
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function parseDayHours(value: unknown): CalendarDayHours | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const start = pickTime(value.start);
+  const end = pickTime(value.end);
+  return start !== undefined && end !== undefined ? { start, end } : null;
+}
+
+// Дни недели сливаются со значениями по умолчанию: частичный файл не теряет
+// рабочие дни, которые в нём не упомянуты.
+function parseWorkHours(value: unknown): CalendarWorkHours {
+  const fallback = defaultWorkHours();
+  if (!isRecord(value)) {
+    return fallback;
+  }
+  const source = isRecord(value.days) ? value.days : {};
+  const days: Partial<Record<CalendarWeekday, CalendarDayHours | null>> = { ...fallback.days };
+  for (const day of WEEKDAYS) {
+    if (source[day] !== undefined) {
+      days[day] = parseDayHours(source[day]);
+    }
+  }
+  const result: CalendarWorkHours = { days };
+  const lunch = parseDayHours(value.lunch);
+  if (lunch !== null) {
+    result.lunch = lunch;
+  }
+  return result;
+}
+
 function parseMic(value: unknown, fallback: Config['voice']['mic']): Config['voice']['mic'] {
   if (!isRecord(value)) {
     return fallback;
@@ -128,6 +184,19 @@ function parseMic(value: unknown, fallback: Config['voice']['mic']): Config['voi
     speech: pickNullableNumber(value.speech),
     calibratedAt: pickNullableString(value.calibratedAt)
   };
+}
+
+function parseBooleanRecord(value: unknown): Record<string, boolean> {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const result: Record<string, boolean> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'boolean') {
+      result[key] = item;
+    }
+  }
+  return result;
 }
 
 function optionalStringRecord(value: unknown): Record<string, string> | undefined {
@@ -218,6 +287,7 @@ export function mergeConfig(value: unknown): Config {
   const tts = isRecord(voice.tts) ? voice.tts : {};
   const mic = isRecord(voice.mic) ? voice.mic : {};
   const persona = isRecord(value.persona) ? value.persona : {};
+  const calendar = isRecord(value.calendar) ? value.calendar : {};
   const pet = isRecord(value.pet) ? value.pet : {};
   const screen = isRecord(value.screen) ? value.screen : {};
   const web = isRecord(value.web) ? value.web : {};
@@ -254,13 +324,23 @@ export function mergeConfig(value: unknown): Config {
       tts: {
         enabled: pickBoolean(tts.enabled, defaults.voice.tts.enabled),
         url: pickString(tts.url, defaults.voice.tts.url),
-        volume: pickVolume(tts.volume, defaults.voice.tts.volume)
+        volume: pickVolume(tts.volume, defaults.voice.tts.volume),
+        bySentence: pickBoolean(tts.bySentence, defaults.voice.tts.bySentence)
       }
     },
     mcpServers: parseMcpServers(value.mcpServers),
     persona: {
       fyr: pickFyr(persona.fyr, defaults.persona.fyr),
       character: pickCharacter(persona.character, defaults.persona.character)
+    },
+    calendar: {
+      workHours: parseWorkHours(calendar.workHours),
+      defaultRemindMinutes: Math.max(
+        0,
+        pickNumber(calendar.defaultRemindMinutes, defaults.calendar.defaultRemindMinutes)
+      ),
+      quietOutsideWork: pickBoolean(calendar.quietOutsideWork, defaults.calendar.quietOutsideWork),
+      sources: parseBooleanRecord(calendar.sources)
     },
     pet: { x: pickPetX(pet.x, defaults.pet.x) },
     petMode: pickBoolean(value.petMode, defaults.petMode),

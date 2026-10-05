@@ -1,7 +1,9 @@
 import type { SkillOverview } from '../../../core/skills/overview';
 import type { PresetInfo } from '../../../core/skills/presets';
+import type { SourceState } from '../../../main/ipc-calendar';
 import type { ConnectionView } from '../../../main/ipc-settings';
 import { clear, el } from '../../settings/dom';
+import { calendarAutomationCard } from './calendar-card';
 import { renderMyTab } from './my-tab';
 import { renderPresetsTab } from './presets-tab';
 
@@ -18,7 +20,7 @@ function tabButton(label: string, name: TabName): HTMLButtonElement {
   return node;
 }
 
-const RELOAD_EVENTS = new Set(['background.tick', 'skill.saved', 'skill.removed']);
+const RELOAD_EVENTS = new Set(['background.tick', 'skill.saved', 'skill.removed', 'calendar.changed']);
 
 export function mountAutomationsScreen(root: HTMLElement): AutomationsScreen {
   clear(root);
@@ -36,6 +38,44 @@ export function mountAutomationsScreen(root: HTMLElement): AutomationsScreen {
   let overview: SkillOverview[] = [];
   let presets: PresetInfo[] = [];
   let connections: ConnectionView[] = [];
+  let calendarSources: Record<string, boolean> = {};
+  let syncState: Record<string, SourceState> = {};
+
+  function calendarCard(): HTMLElement {
+    return calendarAutomationCard({
+      connections,
+      sources: calendarSources,
+      state: syncState,
+      onToggle: saveCalendarToggle,
+      onRun: runCalendarSync
+    });
+  }
+
+  function saveCalendarToggle(name: string, enabled: boolean): void {
+    void (async () => {
+      try {
+        const view = await window.tishka.config.get();
+        await window.tishka.config.save({
+          ...view.config,
+          calendar: { ...view.config.calendar, sources: { ...calendarSources, [name]: enabled } }
+        });
+      } catch {
+        /* настройки недоступны — состояние карточки перечитается */
+      }
+      await refresh();
+    })();
+  }
+
+  function runCalendarSync(): void {
+    void (async () => {
+      try {
+        await window.tishka.calendar.sync();
+      } catch {
+        /* ошибку покажет состояние загрузки */
+      }
+      await refresh();
+    })();
+  }
 
   function markTabs(): void {
     myButton.classList.toggle('active', active === 'my');
@@ -46,13 +86,19 @@ export function mountAutomationsScreen(root: HTMLElement): AutomationsScreen {
     markTabs();
     clear(body);
     if (active === 'my') {
-      renderMyTab(body, overview, connections, {
-        api: window.tishka.automations,
-        confirm: (message) => window.confirm(message),
-        onChanged: () => {
-          void refresh();
-        }
-      });
+      renderMyTab(
+        body,
+        overview,
+        connections,
+        {
+          api: window.tishka.automations,
+          confirm: (message) => window.confirm(message),
+          onChanged: () => {
+            void refresh();
+          }
+        },
+        calendarCard()
+      );
       return;
     }
     renderPresetsTab(body, presets, {
@@ -78,6 +124,17 @@ export function mountAutomationsScreen(root: HTMLElement): AutomationsScreen {
       overview = [];
       presets = [];
       connections = [];
+    }
+    try {
+      const view = await window.tishka.config.get();
+      calendarSources = view.config.calendar.sources ?? {};
+    } catch {
+      calendarSources = {};
+    }
+    try {
+      syncState = await window.tishka.calendar.syncState();
+    } catch {
+      syncState = {};
     }
     paint();
   }

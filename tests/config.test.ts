@@ -36,7 +36,7 @@ describe('defaultConfig', () => {
     expect(config.voice.wakeWords).toEqual(['тишка']);
     expect(config.voice.sttUrl).toBe('http://127.0.0.1:8178');
     expect(config.voice.stt).toEqual({ exe: '', model: '', audioCtx: 768, threads: 4, mode: 'remote' });
-    expect(config.voice.tts).toEqual({ enabled: false, url: 'http://127.0.0.1:8179', volume: 1 });
+    expect(config.voice.tts).toEqual({ enabled: false, url: 'http://127.0.0.1:8179', volume: 1, bySentence: true });
     expect(config.mcpServers).toEqual([]);
     expect(config.petMode).toBe(false);
     expect(config.web).toEqual({ enabled: true });
@@ -169,7 +169,7 @@ describe('loadConfig', () => {
       JSON.stringify({ voice: { ttsEngine: 'silero', tts: { enabled: true, url: 'http://1.2.3.4:9000', volume: 0.5 } } }) as never
     );
     const config = await loadConfig(dir);
-    expect(config.voice.tts).toEqual({ enabled: true, url: 'http://1.2.3.4:9000', volume: 0.5 });
+    expect(config.voice.tts).toEqual({ enabled: true, url: 'http://1.2.3.4:9000', volume: 0.5, bySentence: true });
   });
 });
 

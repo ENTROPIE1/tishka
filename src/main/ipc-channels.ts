@@ -41,6 +41,15 @@ export const SKILL_EXPORT_CHANNEL = 'tishka:skills:export';
 
 export const STATS_SUMMARY_CHANNEL = 'tishka:stats:summary';
 
+export const CALENDAR_EVENTS_CHANNEL = 'tishka:calendar:events';
+export const CALENDAR_ADD_CHANNEL = 'tishka:calendar:add';
+export const CALENDAR_UPDATE_CHANNEL = 'tishka:calendar:update';
+export const CALENDAR_REMOVE_CHANNEL = 'tishka:calendar:remove';
+export const CALENDAR_FREE_CHANNEL = 'tishka:calendar:free';
+export const CALENDAR_STATUS_CHANNEL = 'tishka:calendar:status';
+export const CALENDAR_SYNC_CHANNEL = 'tishka:calendar:sync';
+export const CALENDAR_SYNC_STATE_CHANNEL = 'tishka:calendar:syncState';
+
 export const MEMORY_LIST_CHANNEL = 'tishka:memory:list';
 export const MEMORY_SEARCH_CHANNEL = 'tishka:memory:search';
 export const MEMORY_UPDATE_CHANNEL = 'tishka:memory:update';

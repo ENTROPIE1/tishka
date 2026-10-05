@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { InstallPresetResult, SaveSkillResult } from '../core/app';
+import type { CalendarSituation } from '../core/calendar/situation';
+import type { AddEventInput, CalendarEvent, CalendarRange, UpdateEventPatch } from '../core/calendar/types';
 import type { ConnectionDraft } from '../core/connections';
 import type { HistoryEntry } from '../core/history';
 import type { GatewayCheckResult } from '../core/llm/check';
@@ -24,8 +26,17 @@ import type {
   SttCheckView,
   VoiceStateView
 } from './ipc-settings';
+import type { CalendarSyncResult, SourceState } from './ipc-calendar';
 import type { ExportSkillResult, ImportSkillResult } from './ipc-automations';
 import {
+  CALENDAR_ADD_CHANNEL,
+  CALENDAR_EVENTS_CHANNEL,
+  CALENDAR_FREE_CHANNEL,
+  CALENDAR_REMOVE_CHANNEL,
+  CALENDAR_STATUS_CHANNEL,
+  CALENDAR_SYNC_CHANNEL,
+  CALENDAR_SYNC_STATE_CHANNEL,
+  CALENDAR_UPDATE_CHANNEL,
   CANCEL_CHANNEL,
   CHAT_TALK_ESCAPE_CHANNEL,
   CHAT_TALK_KEYBOARD_CHANNEL,
@@ -245,6 +256,32 @@ const api = {
     },
     exportFile(id: string): Promise<ExportSkillResult> {
       return ipcRenderer.invoke(SKILL_EXPORT_CHANNEL, id);
+    }
+  },
+  calendar: {
+    events(range?: CalendarRange): Promise<CalendarEvent[]> {
+      return ipcRenderer.invoke(CALENDAR_EVENTS_CHANNEL, range);
+    },
+    add(event: AddEventInput): Promise<CalendarEvent> {
+      return ipcRenderer.invoke(CALENDAR_ADD_CHANNEL, event);
+    },
+    update(id: string, patch: UpdateEventPatch): Promise<CalendarEvent | undefined> {
+      return ipcRenderer.invoke(CALENDAR_UPDATE_CHANNEL, { id, ...patch });
+    },
+    remove(id: string): Promise<boolean> {
+      return ipcRenderer.invoke(CALENDAR_REMOVE_CHANNEL, id);
+    },
+    free(day: string | undefined, durationMinutes: number): Promise<{ start: string; end: string }[]> {
+      return ipcRenderer.invoke(CALENDAR_FREE_CHANNEL, { day, durationMinutes });
+    },
+    situation(): Promise<CalendarSituation> {
+      return ipcRenderer.invoke(CALENDAR_STATUS_CHANNEL);
+    },
+    sync(enable?: boolean): Promise<CalendarSyncResult> {
+      return ipcRenderer.invoke(CALENDAR_SYNC_CHANNEL, { enable });
+    },
+    syncState(): Promise<Record<string, SourceState>> {
+      return ipcRenderer.invoke(CALENDAR_SYNC_STATE_CHANNEL);
     }
   },
   openSettings(): Promise<void> {

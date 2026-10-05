@@ -24,6 +24,13 @@ const WEB_RULE = [
 const STATS_RULE =
   'На вопросы «что ты сегодня сделал», «сколько времени ты мне сэкономил», «сколько дел ты сделал» вызывай stats_summary и отвечай коротко: вслух — одна фраза, подробности и разбивку по навыкам — в карточке.';
 
+const CALENDAR_RULE = [
+  '«занеси», «поставь в календарь», «запланируй», «я занят до», «не беспокой час» — calendar_add.',
+  '«что у меня сегодня», «когда я свободен» — calendar_agenda и calendar_free.',
+  '«обнови календарь» — calendar_sync; «переноси мои встречи из почты в календарь» включает перенос (calendar_sync, enable=true), «перестань» выключает (enable=false).',
+  'О встречах из почты, если загрузка не настроена, — прежние инструменты подключения.'
+].join('\n');
+
 const SPEECH_MODE_RULE = [
   'Режим ответа переключается инструментом speech_mode по явной просьбе: «говори голосом», «отвечай вслух», «озвучивай» — mode=voice; «пиши текстом», «не говори вслух», «помолчи», «без звука» — mode=text.',
   'На вопрос «ты сейчас говоришь или пишешь?» отвечай по текущему режиму ответа и по тому, как пришла реплика человека.'
@@ -62,7 +69,8 @@ export function buildSystemPrompt(
   fyr: FyrLevel = 'sometimes',
   skillGuideSection?: string,
   memorySection?: string,
-  context?: PromptContext
+  context?: PromptContext,
+  situation?: string
 ): string {
   const date = DATE.format(now);
   const weekday = WEEKDAY.format(now);
@@ -98,9 +106,14 @@ export function buildSystemPrompt(
       '',
       STATS_RULE,
       '',
+      CALENDAR_RULE,
+      '',
       MEMORY_RULES
     ].join('\n')
   ];
+  if (situation !== undefined && situation !== '') {
+    sections.push(`Обстановка в календаре: ${situation}`);
+  }
   if (skillGuideSection !== undefined && skillGuideSection !== '') {
     sections.push(skillGuideSection);
   }

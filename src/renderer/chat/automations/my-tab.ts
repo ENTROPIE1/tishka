@@ -86,9 +86,13 @@ export function renderMyTab(
   container: HTMLElement,
   entries: SkillOverview[],
   connections: ConnectionView[],
-  deps: MyTabDeps
+  deps: MyTabDeps,
+  builtin?: HTMLElement
 ): void {
   clear(container);
+  if (builtin !== undefined) {
+    container.append(builtin);
+  }
   const reload = deps.onChanged;
   const self = entries.filter((entry) => entry.description.kind !== 'phrase');
   const ask = entries.filter((entry) => entry.description.kind === 'phrase');

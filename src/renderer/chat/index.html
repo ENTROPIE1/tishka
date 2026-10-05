@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="../settings/settings.css" />
     <link rel="stylesheet" href="./automations/automations.css" />
     <link rel="stylesheet" href="./done/done.css" />
+    <link rel="stylesheet" href="./calendar/calendar.css" />
     <link rel="stylesheet" href="./shell.css" />
   </head>
   <body>
@@ -21,13 +22,17 @@
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
         <span>Чат</span>
       </button>
-      <button class="nav-item" data-screen="done" type="button">
-        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
-        <span>Сделано</span>
-      </button>
       <button class="nav-item" data-screen="automations" type="button">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 108 8M12 8v4l3 2M20 4v4h-4" /></svg>
         <span>Автоматизации</span>
+      </button>
+      <button class="nav-item" data-screen="calendar" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v15H4zM4 9h16M8 3v4M16 3v4" /></svg>
+        <span>Календарь</span>
+      </button>
+      <button class="nav-item" data-screen="done" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+        <span>Сделано</span>
       </button>
       <button class="nav-item" data-screen="connections" type="button">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6-6M8 8l-2 2a4 4 0 000 6l2 2M16 16l2-2a4 4 0 000-6l-2-2" /></svg>
@@ -142,6 +147,7 @@
 
       <section id="screen-automations" class="screen settings-screen" hidden></section>
 
+      <section id="screen-calendar" class="screen settings-screen" hidden></section>
       <section id="screen-done" class="screen settings-screen" hidden></section>
     </div>
 

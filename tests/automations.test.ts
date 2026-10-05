@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ConnectionView } from '../src/main/ipc-settings';
 import { describeSkill } from '../src/core/skills/describe';
 import type { SkillOverview } from '../src/core/skills/overview';
 import { validateSkill } from '../src/core/skills/validate';
 import type { Skill } from '../src/core/types';
+import { calendarAutomationCard } from '../src/renderer/chat/automations/calendar-card';
 import { renderMyTab, type MyTabDeps } from '../src/renderer/chat/automations/my-tab';
 import { mountAutomationsScreen } from '../src/renderer/chat/automations/screen';
 
@@ -154,6 +156,68 @@ describe('renderMyTab: форма «Изменить»', () => {
   });
 });
 
+function exchangeConnection(name: string): ConnectionView {
+  return {
+    name,
+    template: 'exchange',
+    address: 'https://mail.example.org ivan',
+    fields: {},
+    secrets: [],
+    state: 'connected',
+    tools: 4
+  };
+}
+
+describe('calendarAutomationCard: встроенная карточка', () => {
+  it('показывает подключение, состояние загрузки и переключатель', () => {
+    const card = calendarAutomationCard({
+      connections: [exchangeConnection('work')],
+      sources: { work: true },
+      state: { work: { ok: true, loadedAt: '2026-10-07T09:00:00.000Z', added: 2, updated: 1, removed: 3 } },
+      onToggle: vi.fn(),
+      onRun: vi.fn()
+    });
+
+    expect(card.textContent).toContain('Встречи из почты в календарь');
+    expect(card.textContent).toContain('включена');
+    expect(card.textContent).toContain('Загружать встречи');
+    expect(card.textContent).toContain('добавлено 2, изменено 1, убрано 3');
+    const checkbox = card.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    expect(checkbox?.checked).toBe(true);
+  });
+
+  it('переключатель и «Запустить сейчас» зовут обработчики', () => {
+    const onToggle = vi.fn();
+    const onRun = vi.fn();
+    const card = calendarAutomationCard({
+      connections: [exchangeConnection('work')],
+      sources: { work: true },
+      state: {},
+      onToggle,
+      onRun
+    });
+
+    const checkbox = card.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change'));
+    expect(onToggle).toHaveBeenCalledWith('work', false);
+
+    [...card.querySelectorAll('button')].find((item) => item.textContent === 'Запустить сейчас')!.click();
+    expect(onRun).toHaveBeenCalled();
+  });
+
+  it('без подключений Exchange показывает подсказку', () => {
+    const card = calendarAutomationCard({
+      connections: [],
+      sources: {},
+      state: {},
+      onToggle: vi.fn(),
+      onRun: vi.fn()
+    });
+    expect(card.textContent).toContain('Подключений Exchange нет');
+  });
+});
+
 describe('mountAutomationsScreen', () => {
   it('переключает вкладки и показывает пресеты', async () => {
     const skill = makeSkill({ id: 'morning', name: 'Утро', description: 'Приветствие' });
@@ -186,5 +250,35 @@ describe('mountAutomationsScreen', () => {
     await flush();
 
     expect(root.textContent).toContain('Готовый');
+  });
+
+  it('показывает встроенную карточку встреч из почты', async () => {
+    const api = {
+      overview: vi.fn(async () => []),
+      presets: vi.fn(async () => []),
+      save: vi.fn(),
+      remove: vi.fn(),
+      run: vi.fn(),
+      exportFile: vi.fn(),
+      importFile: vi.fn(),
+      setEnabled: vi.fn(),
+      installPreset: vi.fn()
+    };
+    (window as unknown as { tishka: unknown }).tishka = {
+      automations: api,
+      connections: { status: vi.fn(async () => [exchangeConnection('work')]) },
+      config: {
+        get: vi.fn(async () => ({ config: { calendar: { sources: { work: true } } } }))
+      },
+      calendar: { syncState: vi.fn(async () => ({ work: { added: 1, updated: 0, removed: 0 } })) },
+      onEvent: () => () => undefined
+    };
+
+    const root = document.createElement('div');
+    mountAutomationsScreen(root);
+    await flush();
+
+    expect(root.textContent).toContain('Встречи из почты в календарь');
+    expect(root.textContent).toContain('work');
   });
 });

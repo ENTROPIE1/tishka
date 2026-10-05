@@ -1,3 +1,5 @@
+import type { CalendarConfig } from './calendar/types';
+
 export interface ToolDef {
   name: string;                 // для MCP: "<сервер>__<инструмент>"
   description: string;
@@ -103,6 +105,7 @@ export type TishkaEvent =
   | { type: 'background.tick'; tool: string }
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
+  | { type: 'calendar.changed' }
   | { type: 'skill.removed'; skillId: string }
   | { type: 'stats.changed' }   // счётчик выполненных дел изменился
   | { type: 'error'; message: string }
@@ -159,10 +162,11 @@ export interface Config {
     mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null };   // порог громкости и результат калибровки; threshold null — порог по умолчанию
     sttUrl: string;                      // адрес службы распознавания
     stt: { exe: string; model: string; audioCtx: number; threads: number; mode: 'local' | 'remote' };   // local — запускать службу на этом компьютере; remote — готовая служба по sttUrl; пустой exe — не запускать
-    tts: { enabled: boolean; url: string; volume: number };   // синтез речи: говорить вслух
+    tts: { enabled: boolean; url: string; volume: number; bySentence: boolean };   // синтез речи: говорить вслух; bySentence — начинать по предложениям, не дожидаясь всей реплики
   };
   mcpServers: McpServerConfig[];
   persona: { fyr: 'off' | 'sometimes' | 'often'; character: 'hedgehog' | 'tishka' };   // как часто Тишка говорит «фыр»; какой персонаж показывается
+  calendar: CalendarConfig;   // рабочее время, напоминания календаря
   pet: { x: number | null };   // положение окна-питомца по горизонтали, null — у правого края
   petMode: boolean;
   screen: { enabled: boolean };   // разрешено ли смотреть на экран

@@ -45,6 +45,12 @@ function userTextElement(text: string): HTMLElement {
   return wrap;
 }
 
+// Ссылку в системной строке (напоминание о встрече) показываем кнопкой.
+function firstUrl(text: string): string | undefined {
+  const match = /https?:\/\/\S+/.exec(text);
+  return match === null ? undefined : match[0];
+}
+
 export function messageElement(entry: HistoryEntry): HTMLElement {
   const message = document.createElement('div');
   message.dataset['id'] = entry.id;
@@ -104,6 +110,15 @@ export function messageElement(entry: HistoryEntry): HTMLElement {
     text.className = 'msg-text';
     text.textContent = entry.text;
     content.append(text);
+    const url = firstUrl(entry.text);
+    if (url !== undefined) {
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'msg-link';
+      open.textContent = 'Подключиться';
+      open.addEventListener('click', () => void window.tishka.openExternal(url));
+      content.append(open);
+    }
   }
 
   if (entry.from === 'tishka' && entry.panel !== undefined) {

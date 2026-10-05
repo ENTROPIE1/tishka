@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { defaultCalendarConfig } from '../src/core/calendar/types';
 import type { Config } from '../src/core/types';
 import type { VoiceStateView } from '../src/main/ipc-settings';
 import { mountVoiceSection } from '../src/renderer/settings/voice-section';
@@ -17,10 +18,11 @@ function makeConfig(): Config {
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: '',
       stt: { exe: '', model: '', audioCtx: 0, threads: 0, mode: 'remote' },
-      tts: { enabled: false, url: '', volume: 1 }
+      tts: { enabled: false, url: '', volume: 1, bySentence: true }
     },
     mcpServers: [],
     persona: { fyr: 'sometimes', character: 'hedgehog' },
+    calendar: defaultCalendarConfig(),
     pet: { x: null },
     petMode: false,
     screen: { enabled: true },
