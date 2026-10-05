@@ -8,6 +8,8 @@ import { checkGateway as runGatewayCheck, type GatewayCheckResult } from './llm/
 import { runTriggered } from './idle';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
+import type { McpConnectionFactory } from './mcp/connection';
+import { resolveSecrets } from './secrets/resolve';
 import { createMemoryReviewer, type MemoryReviewer } from './memory/review';
 import { createMemoryStore, type MemoryRecord, type MemoryStore, type UpdateMemoryPatch } from './memory/store';
 import { registerMemoryTools } from './memory/tools';
@@ -49,6 +51,7 @@ export interface CoreDeps {
   fetch?: typeof fetch;            // для тестов
   captureScreen?(target: ScreenTarget): Promise<CaptureResult>;   // снимок экрана из главного процесса
   readWeb?: WebReader;             // чтение страниц из скрытого окна Electron
+  createMcpConnection?: McpConnectionFactory;   // подключение MCP, подменяется в тестах
   stopSpeaking?(): void;           // остановить звучащую речь (инструмент speech_mode)
   voiceAvailable?(): Promise<boolean>;   // доступна ли служба синтеза
   onConfigChanged?(previous: Config, next: Config): void;   // настройки сохранены ядром
@@ -138,7 +141,8 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let reviewer: MemoryReviewer | undefined;
   let memory: MemoryStore | undefined;
   let mcp: McpManager | undefined;
-  let mcpTask: Promise<void> | undefined;
+  let mcpApply: Promise<void> = Promise.resolve();
+  const appliedMcp = new Map<string, string>();   // имя сервера — подпись подключения
   let agent: Agent | undefined;
   let started = false;
   let starting: Promise<void> | undefined;
@@ -174,6 +178,23 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     }
   }
 
+  // Подпись подключения: подготовленная конфигурация плюс раскрытые секреты.
+  // Если она не изменилась, сервер не трогаем — перезапуск нужен только при
+  // смене адреса, команды, аргументов, окружения или самого секрета.
+  async function mcpSignature(server: McpServerConfig): Promise<string> {
+    const prepared = prepareMcpServer(server, deps.appRoot);
+    const raw = prepared.transport === 'http' ? prepared.headers : prepared.env;
+    let resolved: Record<string, string> | undefined;
+    if (raw !== undefined) {
+      try {
+        resolved = await resolveSecrets(raw, deps.secrets);
+      } catch {
+        resolved = raw;
+      }
+    }
+    return JSON.stringify({ prepared, resolved });
+  }
+
   async function applyMcpServers(servers: McpServerConfig[]): Promise<void> {
     if (mcp === undefined || router === undefined) {
       return;
@@ -182,12 +203,30 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     for (const status of mcp.status()) {
       if (!wanted.has(status.name)) {
         await mcp.disconnect(status.name);
+        appliedMcp.delete(status.name);
       }
     }
+    let changed = false;
     for (const server of servers) {
+      const signature = await mcpSignature(server);
+      if (appliedMcp.get(server.name) === signature) {
+        continue;
+      }
       await mcp.reconnect(prepareMcpServer(server, deps.appRoot));
+      appliedMcp.set(server.name, signature);
+      changed = true;
+    }
+    if (changed) {
       await router.refreshSkills();
     }
+  }
+
+  // Применения настроек идут строго по очереди: сохранение, случившееся во время
+  // стартового подключения, должно видеть уже применённые подписи серверов.
+  function scheduleMcpServers(servers: McpServerConfig[]): Promise<void> {
+    const run = mcpApply.then(() => applyMcpServers(servers));
+    mcpApply = run.catch(() => undefined);
+    return run;
   }
 
   async function scrubMessage(message: string): Promise<string> {
@@ -445,8 +484,13 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     await reviewer.start();
 
     // Подключение серверов MCP не задерживает запуск: идёт в фоне.
-    mcp = createMcpManager({ registry, secrets: deps.secrets, mark: deps.mark });
-    mcpTask = applyMcpServers(config.mcpServers).catch(() => undefined);
+    mcp = createMcpManager({
+      registry,
+      secrets: deps.secrets,
+      mark: deps.mark,
+      createConnection: deps.createMcpConnection
+    });
+    void scheduleMcpServers(config.mcpServers).catch(() => undefined);
 
     // Ядро считается проснувшимся, только когда все обязательные шаги прошли:
     // при сбое повторный start() выполнится заново.
@@ -458,21 +502,25 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     scheduler?.stop();
     watcher?.stop();
     reviewer?.stop();
-    const task = mcpTask;
-    mcpTask = undefined;
-    if (task !== undefined) {
-      await task;
-    }
+    await mcpApply.catch(() => undefined);
     await mcp?.closeAll();
   }
 
   async function reloadConfig(): Promise<void> {
+    const previous = config;
     config = await loadConfig(deps.dataDir);
-    if (started) {
-      webTools?.setEnabled(config.web.enabled);
-      screenTools?.setEnabled(config.screen.enabled);
-      await applyMcpServers(config.mcpServers);
+    if (!started) {
+      return;
     }
+    // Группы инструментов пересобираются только при смене своей настройки:
+    // сохранение голоса, характера или окна их не трогает.
+    if (previous.web.enabled !== config.web.enabled) {
+      webTools?.setEnabled(config.web.enabled);
+    }
+    if (previous.screen.enabled !== config.screen.enabled) {
+      screenTools?.setEnabled(config.screen.enabled);
+    }
+    await scheduleMcpServers(config.mcpServers);
   }
 
   async function saveConfig(next: Config): Promise<void> {

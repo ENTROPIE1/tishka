@@ -90,6 +90,7 @@ export interface CoreSetupOptions {
   now?: () => Date;
   captureScreen?: CoreDeps['captureScreen'];
   readWeb?: CoreDeps['readWeb'];
+  createMcpConnection?: CoreDeps['createMcpConnection'];
   stopSpeaking?: CoreDeps['stopSpeaking'];
   voiceAvailable?: CoreDeps['voiceAvailable'];
   onConfigChanged?: CoreDeps['onConfigChanged'];
@@ -101,6 +102,7 @@ export interface CoreHandle {
   events: TishkaEvent[];
   openExternal: ReturnType<typeof vi.fn>;
   dataDir: string;
+  secrets: SecretStore;
 }
 
 export async function setupCore(options: CoreSetupOptions = {}): Promise<CoreHandle> {
@@ -113,12 +115,13 @@ export async function setupCore(options: CoreSetupOptions = {}): Promise<CoreHan
   const events: TishkaEvent[] = [];
   bus.on((event) => events.push(event));
   const openExternal = vi.fn(async () => undefined);
+  const secrets = fakeSecrets(options.secrets ?? { DKS_API_KEY: 'test-key' });
 
   const core = createTishkaCore({
     dataDir,
     presetsDir,
     appRoot: root,
-    secrets: fakeSecrets(options.secrets ?? { DKS_API_KEY: 'test-key' }),
+    secrets,
     events: bus,
     openExternal,
     showPanel: () => undefined,
@@ -126,11 +129,12 @@ export async function setupCore(options: CoreSetupOptions = {}): Promise<CoreHan
     fetch: options.fetch,
     captureScreen: options.captureScreen,
     readWeb: options.readWeb,
+    createMcpConnection: options.createMcpConnection,
     stopSpeaking: options.stopSpeaking,
     voiceAvailable: options.voiceAvailable,
     onConfigChanged: options.onConfigChanged
   });
   cores.push(core);
   await core.start();
-  return { core, bus, events, openExternal, dataDir };
+  return { core, bus, events, openExternal, dataDir, secrets };
 }
