@@ -2,7 +2,7 @@ import type { ToolRegistry, ToolResult } from '../types';
 import { eventSubtitle, eventTimeLabel } from './format';
 import { situation, situationLine } from './situation';
 import { addEvent, updateEvent } from './tool-actions';
-import { addTool, agendaTool, freeTool, removeTool, statusTool, updateTool } from './tool-defs';
+import { addTool, agendaTool, freeTool, removeTool, statusTool, syncTool, updateTool } from './tool-defs';
 import {
   agendaPanel,
   eventClock,
@@ -84,4 +84,30 @@ export function registerCalendarTools(registry: ToolRegistry, deps: CalendarTool
     const line = situationLine(state, now);
     return ok(line, state, { say: line });
   });
+
+  registry.register(syncTool, async (args): Promise<ToolResult> => {
+    if (deps.sync === undefined) {
+      return fail('Перенос встреч из почты не настроен: добавьте подключение Exchange');
+    }
+    const enable = args.enable;
+    if (enable !== undefined && typeof enable !== 'boolean') {
+      return fail('Поле enable должно быть true или false');
+    }
+    const result = await deps.sync(enable);
+    if (!result.ok) {
+      return fail(result.error ?? 'Не удалось загрузить встречи из почты');
+    }
+    const content = `Добавлено ${result.added}, изменено ${result.updated}, убрано ${result.removed}`;
+    return ok(content, result, { say: syncSay(enable) });
+  });
+}
+
+function syncSay(enable?: boolean): string {
+  if (enable === true) {
+    return 'Включила перенос встреч из почты в календарь';
+  }
+  if (enable === false) {
+    return 'Больше не переношу встречи из почты';
+  }
+  return 'Обновила встречи из почты';
 }

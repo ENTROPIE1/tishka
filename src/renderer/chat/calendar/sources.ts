@@ -57,10 +57,13 @@ function describeState(state: SourceState | undefined): string {
   if (state === undefined) {
     return 'Ещё не загружалось';
   }
+  const time =
+    state.loadedAt === undefined
+      ? ''
+      : `Последняя удачная загрузка: ${new Date(state.loadedAt).toLocaleString('ru-RU')}`;
   if (state.error !== undefined) {
-    return `Ошибка: ${state.error}`;
+    return time === '' ? `Ошибка: ${state.error}` : `Ошибка: ${state.error}. ${time}`;
   }
-  const time = state.loadedAt === undefined ? '' : `Последняя загрузка: ${new Date(state.loadedAt).toLocaleString('ru-RU')}`;
   const counts = `добавлено ${state.added ?? 0}, изменено ${state.updated ?? 0}, убрано ${state.removed ?? 0}`;
   return `${time}. ${counts}`;
 }

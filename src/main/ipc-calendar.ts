@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import type { CalendarService } from '../core/app';
+import type { CalendarSyncResult, SourceState } from '../core/calendar/sync';
 import type { AddEventInput, CalendarEvent, CalendarRange, UpdateEventPatch } from '../core/calendar/types';
 import {
   CALENDAR_ADD_CHANNEL,
@@ -8,8 +9,11 @@ import {
   CALENDAR_REMOVE_CHANNEL,
   CALENDAR_STATUS_CHANNEL,
   CALENDAR_SYNC_CHANNEL,
+  CALENDAR_SYNC_STATE_CHANNEL,
   CALENDAR_UPDATE_CHANNEL
 } from './ipc-channels';
+
+export type { CalendarSyncResult, SourceState } from '../core/calendar/sync';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -29,17 +33,8 @@ function rangeArg(value: unknown): CalendarRange | undefined {
   return range;
 }
 
-export interface CalendarSyncResult {
-  ok: boolean;
-  added: number;
-  updated: number;
-  removed: number;
-  error?: string;
-}
-
 export interface CalendarIpcDeps {
   calendar: () => CalendarService;
-  sync?: (enable?: boolean) => Promise<CalendarSyncResult>;
 }
 
 export function registerCalendarIpc(deps: CalendarIpcDeps): void {
@@ -78,10 +73,11 @@ export function registerCalendarIpc(deps: CalendarIpcDeps): void {
   ipcMain.handle(CALENDAR_STATUS_CHANNEL, () => deps.calendar().situation());
 
   ipcMain.handle(CALENDAR_SYNC_CHANNEL, async (_event, value: unknown): Promise<CalendarSyncResult> => {
-    if (deps.sync === undefined) {
-      return { ok: false, added: 0, updated: 0, removed: 0, error: 'Загрузка не настроена' };
-    }
     const enable = isRecord(value) && typeof value.enable === 'boolean' ? value.enable : undefined;
-    return deps.sync(enable);
+    return deps.calendar().sync(enable);
   });
+
+  ipcMain.handle(CALENDAR_SYNC_STATE_CHANNEL, (): Record<string, SourceState> =>
+    deps.calendar().syncState()
+  );
 }

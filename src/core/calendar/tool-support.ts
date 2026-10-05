@@ -2,6 +2,7 @@ import type { Panel, ToolResult } from '../types';
 import { eventSubtitle, eventTimeLabel, resolveRange } from './format';
 import { parseWhen, type ParsedWhen } from './parse';
 import type { CalendarStore } from './store';
+import type { CalendarSyncResult } from './sync';
 import type { CalendarConfig, CalendarEvent, CalendarRange } from './types';
 import { toLocalIso } from './time';
 
@@ -11,6 +12,7 @@ export interface CalendarToolDeps {
   config: () => CalendarConfig;
   now: () => Date;
   emitChanged?: () => void;
+  sync?: (enable?: boolean) => Promise<CalendarSyncResult>;
 }
 
 export function ok(content: string, data?: unknown, reply?: ToolResult['reply']): ToolResult {

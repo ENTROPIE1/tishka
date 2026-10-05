@@ -103,3 +103,18 @@ export const statusTool: ToolDef = {
   source: 'builtin',
   readOnly: true
 };
+
+export const syncTool: ToolDef = {
+  name: 'calendar_sync',
+  description:
+    'Переносит встречи из почтового календаря Exchange в календарь Тишки. С параметром enable=true включает перенос, с enable=false выключает. Без параметра просто обновляет встречи сейчас.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      enable: { type: 'boolean', description: 'true — включить перенос встреч из почты, false — выключить' }
+    },
+    additionalProperties: false
+  },
+  source: 'builtin',
+  readOnly: false
+};

@@ -66,6 +66,11 @@ export function mountCalendarScreen(root: HTMLElement, deps: CalendarScreenDeps 
     } catch {
       connections = [];
     }
+    try {
+      sourceState = typeof api.syncState === 'function' ? await api.syncState() : {};
+    } catch {
+      /* состояние загрузки недоступно — покажем «ещё не загружалось» */
+    }
     paint();
     matchBar();
   }

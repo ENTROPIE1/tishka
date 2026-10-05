@@ -7,7 +7,7 @@ import type {
   UpdateEventPatch
 } from '../../../core/calendar/types';
 import type { Config, TishkaEvent } from '../../../core/types';
-import type { CalendarSyncResult } from '../../../main/ipc-calendar';
+import type { CalendarSyncResult, SourceState } from '../../../main/ipc-calendar';
 import type { ConfigView, ConnectionView } from '../../../main/ipc-settings';
 
 export interface CalendarApi {
@@ -18,6 +18,7 @@ export interface CalendarApi {
   free(day: string | undefined, durationMinutes: number): Promise<{ start: string; end: string }[]>;
   situation(): Promise<CalendarSituation>;
   sync?(enable?: boolean): Promise<CalendarSyncResult>;
+  syncState?(): Promise<Record<string, SourceState>>;
 }
 
 export interface CalendarConfigApi {

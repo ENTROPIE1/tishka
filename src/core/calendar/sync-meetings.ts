@@ -27,7 +27,12 @@ export function externalIdOf(server: string, meeting: SyncMeeting): string {
     : `${server}:${meeting.start}:${meeting.subject}`;
 }
 
-export function toInput(server: string, meeting: SyncMeeting, existing?: CalendarEvent): AddEventInput {
+export function toInput(
+  server: string,
+  meeting: SyncMeeting,
+  existing?: CalendarEvent,
+  defaultRemind?: number
+): AddEventInput {
   const source: CalendarSource = `exchange:${server}`;
   const input: AddEventInput = {
     title: meeting.subject.trim() === '' ? 'Встреча' : meeting.subject,
@@ -44,17 +49,35 @@ export function toInput(server: string, meeting: SyncMeeting, existing?: Calenda
   if (meeting.joinUrl !== undefined && meeting.joinUrl !== '') {
     input.link = meeting.joinUrl;
   }
-  if (existing !== undefined) {
-    input.note = existing.note;
-    input.remindMinutes = existing.remindMinutes;
+  // Напоминание и заметку человека сохраняем: загрузка их не трогает.
+  input.note = existing?.note;
+  input.remindMinutes = existing !== undefined ? existing.remindMinutes : defaultRemind;
+  return input;
+}
+
+export function eventToInput(event: CalendarEvent): AddEventInput {
+  const input: AddEventInput = {
+    title: event.title,
+    start: event.start,
+    end: event.end,
+    allDay: event.allDay,
+    source: event.source,
+    externalId: event.externalId,
+    remindMinutes: event.remindMinutes
+  };
+  if (event.location !== undefined) {
+    input.location = event.location;
+  }
+  if (event.link !== undefined) {
+    input.link = event.link;
   }
   return input;
 }
 
-function signature(input: AddEventInput): string {
+export function inputSignature(input: AddEventInput): string {
   return JSON.stringify([input.externalId, input.title, input.start, input.end, input.allDay, input.location ?? '', input.link ?? '']);
 }
 
 export function listSignature(inputs: AddEventInput[]): string {
-  return inputs.map(signature).sort().join('|');
+  return inputs.map(inputSignature).sort().join('|');
 }

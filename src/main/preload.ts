@@ -26,7 +26,7 @@ import type {
   SttCheckView,
   VoiceStateView
 } from './ipc-settings';
-import type { CalendarSyncResult } from './ipc-calendar';
+import type { CalendarSyncResult, SourceState } from './ipc-calendar';
 import type { ExportSkillResult, ImportSkillResult } from './ipc-automations';
 import {
   CALENDAR_ADD_CHANNEL,
@@ -35,6 +35,7 @@ import {
   CALENDAR_REMOVE_CHANNEL,
   CALENDAR_STATUS_CHANNEL,
   CALENDAR_SYNC_CHANNEL,
+  CALENDAR_SYNC_STATE_CHANNEL,
   CALENDAR_UPDATE_CHANNEL,
   CANCEL_CHANNEL,
   CHAT_TALK_ESCAPE_CHANNEL,
@@ -277,6 +278,9 @@ const api = {
     },
     sync(enable?: boolean): Promise<CalendarSyncResult> {
       return ipcRenderer.invoke(CALENDAR_SYNC_CHANNEL, { enable });
+    },
+    syncState(): Promise<Record<string, SourceState>> {
+      return ipcRenderer.invoke(CALENDAR_SYNC_STATE_CHANNEL);
     }
   },
   openSettings(): Promise<void> {

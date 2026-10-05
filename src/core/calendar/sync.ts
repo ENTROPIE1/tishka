@@ -3,7 +3,16 @@ import type { TimingMark } from '../../main/timing-log';
 import type { McpServerConfig } from '../types';
 import { isWorkTime } from './situation';
 import type { CalendarStore } from './store';
-import { dateArg, exchangeServers, externalIdOf, listSignature, toInput, type SyncMeeting } from './sync-meetings';
+import {
+  dateArg,
+  eventToInput,
+  exchangeServers,
+  externalIdOf,
+  inputSignature,
+  listSignature,
+  toInput,
+  type SyncMeeting
+} from './sync-meetings';
 import { toLocalIso } from './time';
 import type { CalendarConfig, CalendarSource } from './types';
 
@@ -42,10 +51,27 @@ const SYNC_DAYS = 14;
 const WORK_INTERVAL_MS = 10 * 60_000;
 const REST_INTERVAL_MS = 30 * 60_000;
 
+export function syncIntervalMs(isWork: boolean): number {
+  return isWork ? WORK_INTERVAL_MS : REST_INTERVAL_MS;
+}
+
+// Время последней удачной загрузки не теряется при ошибке: источник
+// показывает и её, и текст ошибки.
+function withState(previous: SourceState | undefined, result: CalendarSyncResult, at: string): SourceState {
+  const next: SourceState = { ...result };
+  if (result.ok) {
+    next.loadedAt = at;
+  } else if (previous?.loadedAt !== undefined) {
+    next.loadedAt = previous.loadedAt;
+  }
+  return next;
+}
+
 export function createCalendarSync(deps: CalendarSyncDeps): CalendarSync {
   const states: Record<string, SourceState> = {};
   let timer: ReturnType<typeof setInterval> | undefined;
   let lastSync = 0;
+  let running = false;
 
   async function syncSource(server: string, config: CalendarConfig): Promise<CalendarSyncResult> {
     const source: CalendarSource = `exchange:${server}`;
@@ -59,57 +85,68 @@ export function createCalendarSync(deps: CalendarSyncDeps): CalendarSync {
 
     const current = deps.store.all().filter((event) => event.source === source);
     const byExternal = new Map(current.map((event) => [event.externalId ?? event.id, event]));
-    const desired = meetings.map((meeting) => toInput(server, meeting, byExternal.get(externalIdOf(server, meeting))));
+    const desired = meetings.map((meeting) =>
+      toInput(server, meeting, byExternal.get(externalIdOf(server, meeting)), config.defaultRemindMinutes)
+    );
 
-    if (listSignature(desired) === listSignature(current.map((event) => ({
-      title: event.title,
-      start: event.start,
-      end: event.end,
-      allDay: event.allDay,
-      source,
-      externalId: event.externalId,
-      location: event.location,
-      link: event.link,
-      remindMinutes: event.remindMinutes
-    })))) {
+    if (listSignature(desired) === listSignature(current.map(eventToInput))) {
       return { ok: true, added: 0, updated: 0, removed: 0 };
     }
 
+    const currentById = new Map(current.map((event) => [event.externalId ?? event.id, eventToInput(event)]));
     const desiredIds = new Set(desired.map((input) => input.externalId));
-    const currentIds = new Set(current.map((event) => event.externalId ?? event.id));
-    const added = desired.filter((input) => !currentIds.has(input.externalId ?? '')).length;
+    let added = 0;
+    let updated = 0;
+    for (const input of desired) {
+      const previous = currentById.get(input.externalId ?? '');
+      if (previous === undefined) {
+        added += 1;
+      } else if (inputSignature(previous) !== inputSignature(input)) {
+        updated += 1;
+      }
+    }
     const removed = current.filter((event) => !desiredIds.has(event.externalId ?? event.id)).length;
-    const updated = desired.length - added;
 
     await deps.store.replaceSource(source, desired);
-    void config;
     return { ok: true, added, updated, removed };
   }
 
   async function sync(): Promise<CalendarSyncResult> {
+    if (running) {
+      return { ok: true, added: 0, updated: 0, removed: 0 };
+    }
+    running = true;
     const config = deps.config();
     const sources = config.sources ?? {};
     const servers = exchangeServers(deps.servers()).filter((server) => sources[server.name] === true);
     deps.mark?.('calendar.sync.start', { sources: servers.length });
     const startedAt = deps.now().getTime();
     let total: CalendarSyncResult = { ok: true, added: 0, updated: 0, removed: 0 };
-    for (const server of servers) {
-      try {
-        const result = await syncSource(server.name, config);
-        states[server.name] = { ...result, loadedAt: deps.now().toISOString() };
-        total = {
-          ok: total.ok && result.ok,
-          added: total.added + result.added,
-          updated: total.updated + result.updated,
-          removed: total.removed + result.removed,
-          error: result.error ?? total.error
-        };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        states[server.name] = { ok: false, added: 0, updated: 0, removed: 0, error: message, loadedAt: deps.now().toISOString() };
-        total.ok = false;
-        total.error = message;
+    try {
+      for (const server of servers) {
+        try {
+          const result = await syncSource(server.name, config);
+          states[server.name] = withState(states[server.name], result, deps.now().toISOString());
+          total = {
+            ok: total.ok && result.ok,
+            added: total.added + result.added,
+            updated: total.updated + result.updated,
+            removed: total.removed + result.removed,
+            error: result.error ?? total.error
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          states[server.name] = withState(
+            states[server.name],
+            { ok: false, added: 0, updated: 0, removed: 0, error: message },
+            deps.now().toISOString()
+          );
+          total.ok = false;
+          total.error = message;
+        }
       }
+    } finally {
+      running = false;
     }
     if (total.added + total.updated + total.removed > 0) {
       deps.emitChanged?.();
@@ -134,8 +171,8 @@ export function createCalendarSync(deps: CalendarSyncDeps): CalendarSync {
       }
       timer = setInterval(() => {
         const config = deps.config();
-        const gap = isWorkTime(config, deps.now()) ? WORK_INTERVAL_MS : REST_INTERVAL_MS;
-        if (deps.now().getTime() - lastSync >= gap) {
+        const gap = syncIntervalMs(isWorkTime(config, deps.now()));
+        if (!running && deps.now().getTime() - lastSync >= gap) {
           void sync();
         }
       }, 60_000);

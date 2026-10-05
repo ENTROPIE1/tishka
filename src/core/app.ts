@@ -6,6 +6,8 @@ import { createCalendarReminders, createFocusGate } from './calendar/reminders';
 import { scheduleEvents } from './calendar/schedule';
 import { situation, situationLine, type CalendarSituation } from './calendar/situation';
 import { createCalendarStore, type CalendarStore } from './calendar/store';
+import { createCalendarSync, type CalendarSync, type CalendarSyncResult, type SourceState } from './calendar/sync';
+import { exchangeServers } from './calendar/sync-meetings';
 import { registerCalendarTools } from './calendar/tools';
 import type { AddEventInput, CalendarEvent, CalendarRange, UpdateEventPatch } from './calendar/types';
 import { freeWindows } from './calendar/windows';
@@ -88,6 +90,8 @@ export interface CalendarService {
   remove(id: string): Promise<boolean>;
   free(day: string | undefined, durationMinutes: number): Promise<{ start: string; end: string }[]>;
   situation(): CalendarSituation;
+  sync(enable?: boolean): Promise<CalendarSyncResult>;
+  syncState(): Record<string, SourceState>;
 }
 
 export interface TishkaCore {
@@ -172,7 +176,9 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let screenTools: ToolGroup | undefined;
   let calendarStore: CalendarStore | undefined;
   let calendarEvents: (() => Promise<CalendarEvent[]>) | undefined;
+  let calendarSync: CalendarSync | undefined;
   let calendarTimer: ReturnType<typeof setInterval> | undefined;
+  let halted = false;
   let stopSource: StopSource = 'pet';
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
   const conversation = createConversationClock();
@@ -391,6 +397,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
 
   async function runStart(): Promise<void> {
     const stepError = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+    halted = false;
 
     config = await loadConfig(deps.dataDir);
 
@@ -529,12 +536,22 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       const skillList = await skills.list();
       return [...calendar.all(), ...scheduleEvents(await state.load(), skillList)];
     };
+    calendarSync = createCalendarSync({
+      store: calendar,
+      registry,
+      now: deps.now,
+      config: () => config.calendar,
+      servers: () => config.mcpServers,
+      mark: deps.mark,
+      emitChanged: () => deps.events.emit({ type: 'calendar.changed' })
+    });
     registerCalendarTools(registry, {
       store: calendar,
       provider: () => calendarEvents?.() ?? Promise.resolve([]),
       config: () => config.calendar,
       now: deps.now,
-      emitChanged: () => deps.events.emit({ type: 'calendar.changed' })
+      emitChanged: () => deps.events.emit({ type: 'calendar.changed' }),
+      sync: (enable) => syncCalendar(enable)
     });
     registerSkillTools(registry, { store: skills, registry, events: deps.events });
     registerPresetTools(registry, { presetsDir: deps.presetsDir, store: skills, events: deps.events });
@@ -585,7 +602,17 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       mark: deps.mark,
       createConnection: deps.createMcpConnection
     });
-    void scheduleMcpServers(config.mcpServers).catch(() => undefined);
+    // Загрузка встреч стартует только после подключения серверов: иначе
+    // инструмента list_meetings ещё нет в реестре.
+    void scheduleMcpServers(config.mcpServers)
+      .catch(() => undefined)
+      .then(() => {
+        if (halted) {
+          return;
+        }
+        void calendarSync?.sync();
+        calendarSync?.start();
+      });
 
     // Ядро считается проснувшимся, только когда все обязательные шаги прошли:
     // при сбое повторный start() выполнится заново.
@@ -593,10 +620,12 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   }
 
   async function stop(): Promise<void> {
+    halted = true;
     historyStore.stop();
     scheduler?.stop();
     watcher?.stop();
     reviewer?.stop();
+    calendarSync?.stop();
     if (calendarTimer !== undefined) {
       clearInterval(calendarTimer);
       calendarTimer = undefined;
@@ -737,6 +766,23 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     }
   };
 
+  // Общий переключатель «Загружать встречи»: карточка автоматизации и «Источники»
+  // календаря пишут одну и ту же настройку sources, поэтому включение через
+  // инструмент меняет её для всех Exchange-подключений разом.
+  async function syncCalendar(enable?: boolean): Promise<CalendarSyncResult> {
+    if (calendarSync === undefined) {
+      return { ok: false, added: 0, updated: 0, removed: 0, error: 'Ядро не запущено' };
+    }
+    if (enable !== undefined) {
+      const sources = { ...(config.calendar.sources ?? {}) };
+      for (const server of exchangeServers(config.mcpServers)) {
+        sources[server.name] = enable;
+      }
+      await saveConfig({ ...config, calendar: { ...config.calendar, sources } });
+    }
+    return calendarSync.sync();
+  }
+
   const calendarService: CalendarService = {
     async events(range?: CalendarRange): Promise<CalendarEvent[]> {
       const list = calendarEvents === undefined ? [] : await calendarEvents();
@@ -799,6 +845,14 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
 
     situation(): CalendarSituation {
       return situation(calendarStore?.all() ?? [], config.calendar, deps.now());
+    },
+
+    async sync(enable?: boolean): Promise<CalendarSyncResult> {
+      return syncCalendar(enable);
+    },
+
+    syncState(): Record<string, SourceState> {
+      return calendarSync?.state() ?? {};
     }
   };
 
