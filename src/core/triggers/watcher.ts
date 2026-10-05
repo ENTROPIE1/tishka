@@ -1,6 +1,6 @@
 import type { EventBus, Skill, ToolResult, ToolRegistry } from '../types';
 import { runTriggered } from '../idle';
-import type { RunResult } from '../skills/runner';
+import type { RunResult, SkillRunOptions } from '../skills/runner';
 import { renderTemplate, type TemplateContext } from '../skills/template';
 import { skillState, type createTriggerState, type TriggerState } from './state';
 
@@ -15,7 +15,7 @@ type WatchTrigger = Extract<Skill['trigger'], { type: 'watch' }>;
 export interface WatcherDeps {
   skills: { list(): Promise<Skill[]> };
   registry: ToolRegistry;
-  runner: { run(skill: Skill, inputs?: Record<string, unknown>): Promise<RunResult> };
+  runner: { run(skill: Skill, inputs?: Record<string, unknown>, opts?: SkillRunOptions): Promise<RunResult> };
   state: ReturnType<typeof createTriggerState>;
   events: EventBus;
   now: () => Date;
@@ -193,7 +193,7 @@ export function createWatcher(deps: WatcherDeps): Watcher {
       deps.events.emit({ type: 'wake', source: 'trigger' });
       const runState = skillState(state, skill.id);
       try {
-        const run = await deps.runner.run(skill, { previous, current: value });
+        const run = await deps.runner.run(skill, { previous, current: value }, { background: true });
         runState.lastRunAt = deps.now().toISOString();
         runState.runCount += 1;
         runState.lastResult = run.ok ? 'ok' : run.error ?? `Навык не выполнен: ${skill.name}`;

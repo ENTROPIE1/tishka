@@ -39,6 +39,8 @@ export const SKILL_INSTALL_CHANNEL = 'tishka:skills:install';
 export const SKILL_IMPORT_CHANNEL = 'tishka:skills:import';
 export const SKILL_EXPORT_CHANNEL = 'tishka:skills:export';
 
+export const STATS_SUMMARY_CHANNEL = 'tishka:stats:summary';
+
 export const MEMORY_LIST_CHANNEL = 'tishka:memory:list';
 export const MEMORY_SEARCH_CHANNEL = 'tishka:memory:search';
 export const MEMORY_UPDATE_CHANNEL = 'tishka:memory:update';

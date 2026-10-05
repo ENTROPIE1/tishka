@@ -556,3 +556,16 @@ body {
 .send-button.stop {
   background: #b3402e;
 }
+
+.stats-block {
+  margin: 0;
+  padding: 8px 18px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-block[hidden] {
+  display: none;
+}

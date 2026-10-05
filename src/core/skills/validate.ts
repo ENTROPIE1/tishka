@@ -311,6 +311,9 @@ export function validateSkill(input: unknown, knownTools?: string[]): Validation
   if (typeof input.enabled === 'boolean') {
     skill.enabled = input.enabled;
   }
+  if (typeof input.manualMinutes === 'number' && Number.isFinite(input.manualMinutes) && input.manualMinutes > 0) {
+    skill.manualMinutes = Math.round(input.manualMinutes);
+  }
 
   return { ok: true, skill };
 }

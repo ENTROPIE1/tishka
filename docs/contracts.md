@@ -32,7 +32,7 @@ tishka/
   docs/            документация
 ```
 
-Каталог данных пользователя: `app.getPath('userData')`. В нём `config.json`, `secrets.bin`, `skills/`, `history.jsonl`, `triggers.json`.
+Каталог данных пользователя: `app.getPath('userData')`. В нём `config.json`, `secrets.bin`, `skills/`, `history.jsonl`, `triggers.json`, `stats.json`.
 
 ## Инструменты
 
@@ -131,6 +131,7 @@ type TishkaEvent =
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
   | { type: 'skill.removed'; skillId: string }
+  | { type: 'stats.changed' }          // счётчик выполненных дел изменился
   | { type: 'error'; message: string }
   | { type: 'idle' };
 
@@ -156,6 +157,7 @@ interface Skill {
   steps: Step[];
   requires?: string[];           // имена серверов из mcpServers: "confluence", "exchange"
   enabled?: boolean;             // нет поля — включён; выключенный не запускается сам и не идёт агенту
+  manualMinutes?: number;        // сколько минут дело занимает руками, по умолчанию 5
 }
 
 type Trigger =
@@ -174,6 +176,38 @@ type Step =
 Подстановки в строках `args`, `ask`, `say`: `{{inputs.имя}}`, `{{steps.id.content}}`, `{{steps.id.data.путь}}`, `{{now}}`, `{{today}}`.
 
 В файле навыка не бывает секретов.
+
+## Счётчик дел
+
+Ядро ведёт счётчик выполненных дел в `stats.json` каталога данных. Дело — выполненный навык, сработавшая автоматизация, созданный черновик письма, найденная страница, событие календаря или напоминание.
+
+```ts
+type DeedKind = 'skill' | 'automation' | 'draft' | 'page' | 'event' | 'reminder';
+
+interface Deed {
+  id: string;
+  kind: DeedKind;
+  title: string;
+  at: string;                 // ISO момента выполнения
+  minutes: number;            // сколько минут это заняло бы руками
+  durationMs?: number;        // сколько заняло у Тишки (навык)
+  steps?: number;             // сколько шагов в навыке
+  skillId?: string;
+}
+
+interface StatsPeriod { deeds: number; minutes: number }
+
+interface StatsSummary {
+  today: StatsPeriod;
+  week: StatsPeriod;          // текущая неделя, с понедельника
+  total: StatsPeriod;
+  bySkill: { skillId: string; name: string; deeds: number; minutes: number }[];
+  byWeekday: StatsPeriod[];   // текущая неделя, 0 — понедельник … 6 — воскресенье
+  recent: Deed[];             // последние дела, новые первыми
+}
+```
+
+Сэкономленные минуты навыка берутся из `Skill.manualMinutes`, по умолчанию 5. Для остальных дел действуют постоянные оценки: черновик письма — 8, событие календаря — 5, страница — 3, напоминание — 1. Завершение дела отправляет событие `stats.changed`. Повреждённый файл читается как пустой и не роняет ядро; запись атомарная. Инструмент ядра `stats_summary` отдаёт содержимое сводки.
 
 ## Секреты и настройки
 

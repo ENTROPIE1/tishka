@@ -30,7 +30,10 @@ import { createToolRegistry } from './tools/registry';
 import { registerScreenTools } from './tools/screen';
 import { registerSpeechModeTool } from './tools/speech-mode';
 import { registerWebTools } from './tools/web';
-import type { Config, EventBus, InputSource, McpServerConfig, Panel, Reply, SecretStore, Skill, TishkaEvent } from './types';
+import { createStatsRecorder } from './stats/recorder';
+import { createStatsStore } from './stats/store';
+import { registerStatsTools } from './stats/tool';
+import type { Config, EventBus, InputSource, McpServerConfig, Panel, Reply, SecretStore, Skill, StatsSummary, TishkaEvent } from './types';
 import { isCancelled } from './cancel';
 import { CANCELLED_REPLY, createTurnQueue, REPLACED_NOTE } from './turn-queue';
 import { STOPPED_TITLE } from './stopped';
@@ -94,6 +97,7 @@ export interface TishkaCore {
   memory(): MemoryRecord[];
   memorySearch(query: string): MemoryRecord[];
   memoryName(): string | undefined;   // текст записи с меткой «имя»
+  statsSummary(): StatsSummary;       // сводка счётчика выполненных дел
   memoryUpdate(id: string, patch: UpdateMemoryPatch): Promise<MemoryRecord | undefined>;
   memoryRemove(id: string): Promise<boolean>;
   memoryClear(): Promise<void>;
@@ -155,6 +159,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
   let screenTools: ToolGroup | undefined;
   let stopSource: StopSource = 'pet';
   const historyStore = createHistory(join(deps.dataDir, 'history.jsonl'), deps.events, deps.now);
+  const statsStore = createStatsStore({ filePath: join(deps.dataDir, 'stats.json'), now: deps.now });
   const conversation = createConversationClock();
   const turns = createTurnQueue({
     run: (text, signal, source) => processUserText(text, signal, source),
@@ -382,6 +387,14 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       deps.events.emit({ type: 'error', message: `Не удалось открыть историю: ${stepError(error)}` });
     }
 
+    // Счётчик дел — тоже необязательный шаг: повреждённый файл читается как пустой.
+    try {
+      await statsStore.load();
+    } catch (error) {
+      deps.events.emit({ type: 'error', message: `Не удалось открыть счётчик дел: ${stepError(error)}` });
+    }
+    const recorder = createStatsRecorder(statsStore, deps.events);
+
     const skills = createSkillStore(join(deps.dataDir, 'skills'));
     skillStore = skills;
     // Пресеты — тоже необязательный шаг: сбой одного файла не мешает старту.
@@ -391,7 +404,10 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       deps.events.emit({ type: 'error', message: `Не удалось загрузить пресеты: ${stepError(error)}` });
     }
 
-    const registry = createToolRegistry(deps.events);
+    const registry = createToolRegistry(deps.events, {
+      onResult: (name, result) => recorder.fromTool(name, result)
+    });
+    registerStatsTools(registry, { summary: () => statsStore.summary() });
     registerBuiltinTools(registry, {
       openExternal: deps.openExternal,
       showPanel: deps.showPanel,
@@ -477,12 +493,28 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
         return response.text ?? '';
       },
       events: deps.events,
-      now: deps.now
+      now: deps.now,
+      onRun: (report) =>
+        recorder.deed({
+          kind: report.background ? 'automation' : 'skill',
+          title: report.skill.name,
+          skillId: report.skill.id,
+          minutes: report.skill.manualMinutes,
+          durationMs: report.durationMs,
+          steps: report.steps
+        })
     });
     skillRunner = runner;
 
     const state = createTriggerState(join(deps.dataDir, 'triggers.json'));
-    scheduler = createScheduler({ skills, runner, state, events: deps.events, now: deps.now });
+    scheduler = createScheduler({
+      skills,
+      runner,
+      state,
+      events: deps.events,
+      now: deps.now,
+      onReminder: (reminder) => recorder.deed({ kind: 'reminder', title: reminder.text })
+    });
     watcher = createWatcher({ skills, registry, runner, state, events: deps.events, now: deps.now });
     registerTriggerTools(registry, scheduler, deps.now);
     registerSkillTools(registry, { store: skills, registry, events: deps.events });
@@ -708,6 +740,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
         await memory.clear();
         deps.events.emit({ type: 'memory.changed' });
       }
-    }
+    },
+    statsSummary: () => statsStore.summary()
   };
 }

@@ -10,11 +10,19 @@ export interface RunResult {
   error?: string;
 }
 
+export interface SkillRunReport {
+  skill: Skill;
+  background: boolean;
+  steps: number;                // сколько шагов выполнено
+  durationMs: number;
+}
+
 export interface SkillRunnerDeps {
   registry: ToolRegistry;
   ask(prompt: string): Promise<string>;
   events: EventBus;
   now: () => Date;
+  onRun?(report: SkillRunReport): void | Promise<void>;   // успешное выполнение навыка
 }
 
 export interface SkillRunOptions {
@@ -88,6 +96,7 @@ export function createSkillRunner(deps: SkillRunnerDeps): SkillRunner {
     const steps: Record<string, TemplateStepResult> = {};
     let lastReply: Reply | undefined;
     const signal = opts?.signal;
+    const startedAt = deps.now().getTime();
 
     for (const step of skill.steps) {
       if (signal?.aborted) {
@@ -126,6 +135,20 @@ export function createSkillRunner(deps: SkillRunnerDeps): SkillRunner {
           throw error;
         }
         return fail(step.id, errorMessage(error), steps);
+      }
+    }
+
+    if (deps.onRun !== undefined) {
+      const report: SkillRunReport = {
+        skill,
+        background: opts?.background === true,
+        steps: Object.keys(steps).length,
+        durationMs: Math.max(0, deps.now().getTime() - startedAt)
+      };
+      try {
+        await deps.onRun(report);
+      } catch {
+        // Отчёт о выполнении не меняет исход самого навыка.
       }
     }
 

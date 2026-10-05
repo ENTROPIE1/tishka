@@ -8,7 +8,7 @@ import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import { nextScreenLooking } from '../core/screen-look';
 import type { PresetInfo } from '../core/skills/presets';
 import type { SkillOverview } from '../core/skills/overview';
-import type { Config, Reply, Skill, TishkaEvent } from '../core/types';
+import type { Config, Reply, Skill, StatsSummary, TishkaEvent } from '../core/types';
 import type { PetLayoutView } from '../pet/layout';
 import type { PetModel } from '../pet/state';
 import type { ListenCommand, ListenResult } from '../voice/listen';
@@ -54,6 +54,7 @@ import {
   MEMORY_REMOVE_CHANNEL,
   MEMORY_SEARCH_CHANNEL,
   MEMORY_UPDATE_CHANNEL,
+  STATS_SUMMARY_CHANNEL,
   NAVIGATE_CHANNEL,
   NEW_CONVERSATION_CHANNEL,
   OPEN_CHAT_CHANNEL,
@@ -265,6 +266,11 @@ const api = {
       ipcRenderer.invoke(MEMORY_UPDATE_CHANNEL, { id, ...patch }),
     remove: (id: string): Promise<boolean> => ipcRenderer.invoke(MEMORY_REMOVE_CHANNEL, id),
     clear: (): Promise<void> => ipcRenderer.invoke(MEMORY_CLEAR_CHANNEL)
+  },
+  stats: {
+    summary(): Promise<StatsSummary> {
+      return ipcRenderer.invoke(STATS_SUMMARY_CHANNEL);
+    }
   },
   openChat(): Promise<void> {
     return ipcRenderer.invoke(OPEN_CHAT_CHANNEL);

@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="./search.css" />
     <link rel="stylesheet" href="../settings/settings.css" />
     <link rel="stylesheet" href="./automations/automations.css" />
+    <link rel="stylesheet" href="./done/done.css" />
     <link rel="stylesheet" href="./shell.css" />
   </head>
   <body>
@@ -19,6 +20,10 @@
       <button class="nav-item active" data-screen="chat" type="button">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" /></svg>
         <span>Чат</span>
+      </button>
+      <button class="nav-item" data-screen="done" type="button">
+        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+        <span>Сделано</span>
       </button>
       <button class="nav-item" data-screen="automations" type="button">
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 108 8M12 8v4l3 2M20 4v4h-4" /></svg>
@@ -62,6 +67,8 @@
             <button id="clear-history" type="button" class="ghost-button">Очистить историю</button>
           </div>
         </header>
+
+        <div id="stats-block" class="stats-block" hidden></div>
 
         <div id="search-panel" class="search-panel" hidden>
           <input id="search-input" class="search-input" type="search" placeholder="Поиск по всей истории…" />
@@ -134,6 +141,8 @@
       </section>
 
       <section id="screen-automations" class="screen settings-screen" hidden></section>
+
+      <section id="screen-done" class="screen settings-screen" hidden></section>
     </div>
 
     <script type="module" src="./chat.ts"></script>

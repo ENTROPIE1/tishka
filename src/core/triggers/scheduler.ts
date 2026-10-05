@@ -14,6 +14,7 @@ export interface SchedulerDeps {
   state: ReturnType<typeof createTriggerState>;
   events: EventBus;
   now: () => Date;
+  onReminder?(reminder: Reminder): void | Promise<void>;   // напоминание сработало
 }
 
 export interface Scheduler {
@@ -46,12 +47,17 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   let timer: ReturnType<typeof setInterval> | undefined;
   const firedMinutes = new Set<string>();
 
-  function emitReminder(reminder: Reminder): Promise<void> {
-    return runTriggered(deps.events, async () => {
+  async function emitReminder(reminder: Reminder): Promise<void> {
+    await runTriggered(deps.events, async () => {
       deps.events.emit({ type: 'wake', source: 'trigger' });
       deps.events.emit({ type: 'notify', title: reminder.text });
       deps.events.emit({ type: 'reply', reply: { say: reminder.text } });
     });
+    try {
+      await deps.onReminder?.(reminder);
+    } catch {
+      // Счётчик дел не влияет на показ напоминания.
+    }
   }
 
   function setNext(state: TriggerState, id: string, value: string | undefined): boolean {

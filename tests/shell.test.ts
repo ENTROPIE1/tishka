@@ -21,13 +21,15 @@ function setup(onShow?: (name: ScreenName) => void): { shell: Shell; screens: Re
       <button data-screen="voice"></button>
       <button data-screen="persona"></button>
       <button data-screen="automations"></button>
+      <button data-screen="done"></button>
     </nav>
     <section id="screen-chat"></section>
     <section id="screen-connections" hidden></section>
     <section id="screen-memory" hidden></section>
     <section id="screen-voice" hidden></section>
     <section id="screen-persona" hidden></section>
-    <section id="screen-automations" hidden></section>`;
+    <section id="screen-automations" hidden></section>
+    <section id="screen-done" hidden></section>`;
 
   const screens: Record<ScreenName, HTMLElement> = {
     chat: document.getElementById('screen-chat') as HTMLElement,
@@ -35,7 +37,8 @@ function setup(onShow?: (name: ScreenName) => void): { shell: Shell; screens: Re
     memory: document.getElementById('screen-memory') as HTMLElement,
     voice: document.getElementById('screen-voice') as HTMLElement,
     persona: document.getElementById('screen-persona') as HTMLElement,
-    automations: document.getElementById('screen-automations') as HTMLElement
+    automations: document.getElementById('screen-automations') as HTMLElement,
+    done: document.getElementById('screen-done') as HTMLElement
   };
 
   let navigate = (_name: string): void => undefined;

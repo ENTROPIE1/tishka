@@ -7,6 +7,7 @@ import { createChatFeed } from './feed';
 import { createComposer } from './composer';
 import { initAppShell } from './navigation';
 import { appendSkillSaveCard } from './skill-card';
+import { mountStatsBlock } from './stats-block';
 import { createTalkMode, type TalkMode } from './talk-mode';
 import { mountChatToolbar } from './toolbar';
 
@@ -23,6 +24,7 @@ const dictation = document.getElementById('dictation') as HTMLElement;
 const dictationLevel = document.getElementById('dictation-level') as HTMLElement;
 const dictationLabel = dictation.querySelector('.dictation-label') as HTMLElement;
 const keyDot = document.getElementById('key-dot') as HTMLElement;
+const statsBlock = document.getElementById('stats-block') as HTMLElement;
 
 const view = createChatFeed(feed);
 let talkMode: TalkMode | undefined;
@@ -232,6 +234,7 @@ window.tishka.config.onChanged(() => {
 });
 
 initAppShell();
+mountStatsBlock(statsBlock);
 initEvents();
 initFeed();
 initComposer();

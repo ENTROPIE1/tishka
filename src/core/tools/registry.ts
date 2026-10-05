@@ -24,7 +24,12 @@ export interface MutableToolRegistry extends ToolRegistry {
   remove(name: string): void;
 }
 
-export function createToolRegistry(bus: EventBus): MutableToolRegistry {
+// Наблюдатель за результатом вызова: счётчик дел и подобные слушатели.
+export interface ToolRegistryHooks {
+  onResult?(name: string, result: ToolResult): void | Promise<void>;
+}
+
+export function createToolRegistry(bus: EventBus, hooks?: ToolRegistryHooks): MutableToolRegistry {
   const tools = new Map<string, { def: ToolDef; handler: ToolHandler }>();
 
   return {
@@ -71,6 +76,11 @@ export function createToolRegistry(bus: EventBus): MutableToolRegistry {
 
       if (!background) {
         bus.emit({ type: 'tool.end', tool: name, ok: result.ok });
+        try {
+          await hooks?.onResult?.(name, result);
+        } catch {
+          // Слушатель результата не должен менять исход вызова инструмента.
+        }
       }
       return result;
     }

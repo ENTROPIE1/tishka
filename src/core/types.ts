@@ -56,6 +56,35 @@ export interface Reply {
   moods?: MoodMark[];   // эмоции, отмеченные метками [имя] внутри say
 }
 
+// Вид выполненного дела в счётчике: навык, сработавшая автоматизация,
+// черновик письма, найденная страница, событие календаря, напоминание.
+export type DeedKind = 'skill' | 'automation' | 'draft' | 'page' | 'event' | 'reminder';
+
+export interface Deed {
+  id: string;
+  kind: DeedKind;
+  title: string;
+  at: string;                 // ISO момента выполнения
+  minutes: number;            // сколько минут это заняло бы руками
+  durationMs?: number;        // сколько заняло у Тишки
+  steps?: number;             // сколько шагов в навыке
+  skillId?: string;
+}
+
+export interface StatsPeriod {
+  deeds: number;
+  minutes: number;
+}
+
+export interface StatsSummary {
+  today: StatsPeriod;
+  week: StatsPeriod;
+  total: StatsPeriod;
+  bySkill: { skillId: string; name: string; deeds: number; minutes: number }[];
+  byWeekday: StatsPeriod[];   // текущая неделя, 0 — понедельник … 6 — воскресенье
+  recent: Deed[];             // последние дела, новые первыми
+}
+
 export type TishkaEvent =
   | { type: 'wake'; source: 'name' | 'hotkey' | 'click' | 'trigger' }
   | { type: 'listen.start' }
@@ -75,6 +104,7 @@ export type TishkaEvent =
   | { type: 'skill.saved'; skillId: string; source?: 'dialog' | 'screen' }   // 'dialog' — сохранён в разговоре, 'screen' — на экране автоматизаций
   | { type: 'memory.changed' }
   | { type: 'skill.removed'; skillId: string }
+  | { type: 'stats.changed' }   // счётчик выполненных дел изменился
   | { type: 'error'; message: string }
   | { type: 'idle' };
 
@@ -94,6 +124,7 @@ export interface Skill {
   steps: Step[];
   requires?: string[];           // имена серверов из mcpServers: "confluence", "exchange"
   enabled?: boolean;             // нет поля — включён; выключенный не запускается сам и не идёт агенту
+  manualMinutes?: number;        // сколько минут дело занимает руками, по умолчанию 5
 }
 
 export type Trigger =

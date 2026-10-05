@@ -21,6 +21,7 @@ import {
   SECRETS_HAS_CHANNEL,
   SECRETS_NAMES_CHANNEL,
   SECRETS_SET_CHANNEL,
+  STATS_SUMMARY_CHANNEL,
   USER_TEXT_CHANNEL
 } from './ipc-channels';
 
@@ -93,6 +94,8 @@ export function registerIpc(
   ipcMain.handle(HISTORY_CLEAR_CHANNEL, async () => {
     await core.clearHistory();
   });
+
+  ipcMain.handle(STATS_SUMMARY_CHANNEL, () => core.statsSummary());
 
   ipcMain.handle(NEW_CONVERSATION_CHANNEL, () => {
     core.newConversation();

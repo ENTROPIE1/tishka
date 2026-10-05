@@ -70,6 +70,7 @@ interface FormValues {
   time: string;
   day: string;
   every: string;
+  manual: string;
   inputs: string[];
 }
 
@@ -80,6 +81,7 @@ function readValues(controls: {
   time: HTMLInputElement;
   day: HTMLSelectElement;
   every: HTMLInputElement;
+  manual: HTMLInputElement;
   inputs: HTMLInputElement[];
 }): FormValues {
   return {
@@ -89,6 +91,7 @@ function readValues(controls: {
     time: controls.time.value,
     day: controls.day.value,
     every: controls.every.value,
+    manual: controls.manual.value,
     inputs: controls.inputs.map((input) => input.value)
   };
 }
@@ -109,6 +112,7 @@ export function openSkillForm(deps: SkillFormDeps): void {
 
   const name = textInput(deps.skill.name);
   const description = textarea(deps.skill.description);
+  const manual = textInput(deps.skill.manualMinutes === undefined ? '5' : String(deps.skill.manualMinutes), 'number');
   const phrases = textarea(phraseList(deps.skill));
   const { fields: trigFields, build } = triggerFields(deps.skill.trigger);
   const inputFields: HTMLInputElement[] = [];
@@ -130,6 +134,8 @@ export function openSkillForm(deps: SkillFormDeps): void {
     form.append(field('Фразы через запятую', phrases));
   }
   form.append(...trigFields);
+  // Поле минут идёт после триггера: числовое поле наблюдения должно оставаться первым.
+  form.append(field('Сколько минут занимает руками', manual, 'Оценка для счётчика сэкономленного времени'));
   if (inputFields.length > 0) {
     form.append(inputsBlock);
   }
@@ -159,6 +165,7 @@ export function openSkillForm(deps: SkillFormDeps): void {
       time: form.querySelector<HTMLInputElement>('input[type="time"]') ?? textInput(),
       day: form.querySelector<HTMLSelectElement>('select') ?? selectInput([], ''),
       every: form.querySelector<HTMLInputElement>('input[type="number"]') ?? textInput(),
+      manual,
       inputs: inputFields
     });
     const next: Skill = {
@@ -168,6 +175,12 @@ export function openSkillForm(deps: SkillFormDeps): void {
       phrases: parsePhrases(values.phrases),
       trigger: build(values)
     };
+    const manualMinutes = Number(values.manual);
+    if (Number.isFinite(manualMinutes) && manualMinutes > 0) {
+      next.manualMinutes = Math.round(manualMinutes);
+    } else {
+      delete next.manualMinutes;
+    }
     const inputs = withInputs(deps.skill, values.inputs);
     if (inputs !== undefined) {
       next.inputs = inputs;
