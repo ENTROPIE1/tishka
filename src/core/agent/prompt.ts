@@ -1,5 +1,6 @@
 import { MEMORY_RULES } from '../memory/prompt';
 import type { InputSource, SpeechMode } from '../types';
+import { moodNames } from './moods';
 import type { FyrLevel } from './persona';
 import { personaPrompt } from './persona';
 
@@ -34,6 +35,18 @@ const SPEECH_MODE_RULE = [
 export interface PromptContext {
   speechMode: SpeechMode;    // как Тишка отвечает сейчас
   userSource: InputSource;   // как пришла реплика человека
+  character?: 'hedgehog' | 'tishka';   // показываемый персонаж: метки эмоций важны только для Тишки
+}
+
+function moodMarkRule(character: 'hedgehog' | 'tishka' | undefined): string[] {
+  if (character !== 'tishka') {
+    return [];
+  }
+  const names = moodNames();
+  if (names.length === 0) {
+    return [];
+  }
+  return [`Эмоции: ${names.join(', ')}. Метку [эмоция] можно поставить внутри реплики say, не чаще одной на предложение.`];
 }
 
 function modeLine(context: PromptContext): string {
@@ -67,6 +80,7 @@ export function buildSystemPrompt(
       ...mode,
       'Любой ответ пользователю, включая уточняющий вопрос, отдавай вызовом инструмента reply — обычным текстом не отвечай:',
       '- mood — настроение ответа: neutral, happy или confused.',
+      ...moodMarkRule(context?.character),
       '- show — подробности в карточке: то, что человеку нужно прочитать или скопировать;',
       '- ask — просьба прислать текст: если для дела нужен текст, которого человек ещё не дал (заметки, письмо, список, черновик), не проси диктовать и не выдумывай его — коротко попроси вслух и передай ask с заголовком, что именно прислать; проси только сам текст, шаблон или формат не требуй. ask и show в одном ответе допустимы.',
       'Когда текст из карточки приходит, результат целиком клади в show вида text, а в markdown пиши только сам результат: без вступлений «Вот ваш текст», без пояснений и вопросов; пояснение, если нужно, — в say.',

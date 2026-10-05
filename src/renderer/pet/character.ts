@@ -30,6 +30,10 @@ export interface Character {
   mount(container: HTMLElement): Promise<void>;
   setClip(name: ClipName): void;
   setMouth(level: number): void;
+  // Новый персонаж умеет формы рта из дорожки речи; прежний ёж их не реализует.
+  setViseme?(shape: string | null): void;
+  // Смена эмоции по имени из данных модели; прежний ёж не реализует.
+  setMood?(name: string): void;
   setFlip(flipped: boolean): void;
   clips(): ClipName[];
   // Пропорции персонажа на экране: раскладка окна ежа учитывает их.

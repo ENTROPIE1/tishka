@@ -1,10 +1,13 @@
-import type { Config, EventBus, TishkaEvent } from '../core/types';
+import type { Config, EventBus, Mood, MoodMark, TishkaEvent } from '../core/types';
 import type { TimingMark } from './timing-log';
 import type { TalkSource } from '../pet/state';
 import { CANNED, CANNED_TEXTS, greetingFor } from '../voice/canned';
+import { envelope } from '../voice/envelope';
+import { buildMouthTrack, moodTimeMarks, MOUTH_FPS } from '../voice/lipsync';
 import { createSpeechQueue, type SpeakMessage, type SpeechItem } from '../voice/speech-queue';
 import { prepareForSpeech } from '../voice/speech-text';
 import { createTtsClient, type TtsHealth } from '../voice/tts-client';
+import { decodeWav } from '../voice/wav';
 
 // Шина с источником обращения: озвучка реплики несёт её источник.
 type SpeechBus = EventBus & {
@@ -39,7 +42,11 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
   const now = deps.now ?? ((): number => Date.now());
   const cache = new Map<string, Uint8Array>();
   const queue = createSpeechQueue({
-    play: (item, signal) => deps.play({ wav: item.wav, volume: volume() }, signal),
+    play: (item, signal) =>
+      deps.play(
+        { wav: item.wav, volume: volume(), mood: item.mood, mouth: item.mouth, moods: item.moods },
+        signal
+      ),
     onStart: (item) => emitStart(item),
     onEnd: () => deps.bus.emit({ type: 'speak.end' })
   });
@@ -114,7 +121,31 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     return result.wav;
   }
 
-  async function speak(text: string, force: boolean, source: TalkSource): Promise<void> {
+  // Дорожка рта и моменты эмоций строятся из готового WAV той же раскладкой
+  // букв, что ушла в синтез. Непонятный WAV — прежний режим рта по громкости.
+  function trackFor(prepared: string, wav: Uint8Array, moods: MoodMark[] | undefined): {
+    mouth?: SpeechItem['mouth'];
+    moods?: SpeechItem['moods'];
+  } {
+    const decoded = decodeWav(wav);
+    if (decoded === null) {
+      return {};
+    }
+    const values = envelope(decoded.samples, decoded.sampleRate, 1000 / MOUTH_FPS);
+    const mouth = buildMouthTrack(prepared, values, MOUTH_FPS);
+    if (moods === undefined || moods.length === 0) {
+      return { mouth };
+    }
+    return { mouth, moods: moodTimeMarks(prepared, moods, values, MOUTH_FPS) };
+  }
+
+  async function speak(
+    text: string,
+    force: boolean,
+    source: TalkSource,
+    moods?: MoodMark[],
+    mood?: Mood
+  ): Promise<void> {
     if (!force && !deps.getConfig().voice.tts.enabled) {
       return;
     }
@@ -131,12 +162,12 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
     if (wav === undefined || token !== stopToken) {
       return;
     }
-    queue.enqueue({ text: prepared, wav, source });
+    queue.enqueue({ text: prepared, wav, source, mood, ...trackFor(prepared, wav, moods) });
   }
 
-  function schedule(text: string, force: boolean): void {
+  function schedule(text: string, force: boolean, moods?: MoodMark[], mood?: Mood): void {
     const source = currentSource();
-    chain = chain.then(() => speak(text, force, source)).catch(() => undefined);
+    chain = chain.then(() => speak(text, force, source, moods, mood)).catch(() => undefined);
   }
 
   const unsubscribe = deps.bus.on((event) => {
@@ -148,7 +179,7 @@ export function createSpeechOutput(deps: SpeechOutputDeps): SpeechOutput {
         if (event.reply.say === CANNED.farewell) {
           halt();
         }
-        schedule(event.reply.say, false);
+        schedule(event.reply.say, false, event.reply.moods, event.reply.mood);
         return;
       }
       case 'wake':

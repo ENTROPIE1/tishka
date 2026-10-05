@@ -1,4 +1,5 @@
-import type { Mood, Panel, Reply, ToolDef } from '../types';
+import type { Mood, MoodMark, Panel, Reply, ToolDef } from '../types';
+import { isKnownMood } from './moods';
 
 export const REPLY_TOOL_NAME = 'reply';
 
@@ -85,22 +86,61 @@ export const replyTool: ToolDef = {
   readOnly: true
 };
 
+// Меты эмоции — только [слово] из 2–20 латинских букв или подчёркиваний и не
+// перед круглой скобкой: так ссылки [текст](адрес) и сноски [1] остаются как
+// есть. Известное имя становится сменой эмоции с позицией в знаках очищенного
+// текста, неизвестное слово такого вида просто убирается.
+const MOOD_MARK = /\[([A-Za-z_]{2,20})\](?!\()/g;
+
+export function stripMoodMarks(text: string): { text: string; moods: MoodMark[] } {
+  const moods: MoodMark[] = [];
+  let clean = '';
+  let index = 0;
+  const mark = new RegExp(MOOD_MARK.source, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = mark.exec(text)) !== null) {
+    clean += text.slice(index, match.index);
+    const name = match[1];
+    let next = match.index + match[0].length;
+    if (text[next] === ' ') {
+      next += 1;
+    }
+    if (isKnownMood(name)) {
+      moods.push({ at: clean.length, mood: name });
+    }
+    index = next;
+    mark.lastIndex = next;
+  }
+  clean += text.slice(index);
+  const trimmed = clean.trim();
+  const lead = clean.length - clean.trimStart().length;
+  for (const item of moods) {
+    item.at = Math.min(Math.max(0, item.at - lead), trimmed.length);
+  }
+  return { text: trimmed, moods };
+}
+
 function splitSentences(text: string): string[] {
   const parts = text.match(/[^.!?…]*[.!?…]+["»')\]]*\s*|[^.!?…]+$/g) ?? [];
   return parts.map((part) => part.trim()).filter((part) => part.length > 0);
 }
 
 export function replyFromText(text: string): Reply {
-  const trimmed = text.trim();
+  const stripped = stripMoodMarks(text);
+  const trimmed = stripped.text;
   if (trimmed.length === 0) {
     return { ...EMPTY_REPLY };
   }
   const sentences = splitSentences(trimmed);
   if (sentences.length <= 2) {
-    return { say: trimmed, mood: 'neutral' };
+    return attachMoods({ say: trimmed, mood: 'neutral' }, stripped.moods);
   }
   const say = sentences.slice(0, 2).join(' ');
-  return { say, show: { kind: 'text', title: 'Ответ', markdown: trimmed }, mood: 'neutral' };
+  return attachMoods({ say, show: { kind: 'text', title: 'Ответ', markdown: trimmed }, mood: 'neutral' }, stripped.moods);
+}
+
+function attachMoods(reply: Reply, moods: MoodMark[]): Reply {
+  return moods.length > 0 ? { ...reply, moods } : reply;
 }
 
 function parseMood(value: unknown): Mood {
@@ -139,14 +179,16 @@ function parseAsk(value: unknown): { title: string; placeholder?: string } | und
 }
 
 export function replyFromToolArgs(args: Record<string, unknown>, fallbackText: string | null): Reply {
-  const say = typeof args.say === 'string' && args.say.length > 0 ? args.say : (fallbackText ?? '').trim();
+  const raw = typeof args.say === 'string' && args.say.length > 0 ? args.say : (fallbackText ?? '').trim();
+  const stripped = stripMoodMarks(raw);
+  const say = stripped.text;
   const show = parsePanel(args.show);
   const ask = parseAsk(args.ask);
   if (say.length === 0 && show === undefined && ask === undefined) {
     return { ...EMPTY_REPLY };
   }
   const mood = parseMood(args.mood);
-  const reply: Reply = { say, mood };
+  const reply: Reply = attachMoods({ say, mood }, stripped.moods);
   if (show !== undefined) {
     reply.show = show;
   }

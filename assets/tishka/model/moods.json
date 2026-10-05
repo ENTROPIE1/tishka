@@ -1,0 +1,5 @@
+{
+  "neutral": { "eyeShape": "orig", "brows": "orig", "iris": "orig", "mouth": "closed", "fx": [] },
+  "happy": { "eyeShape": "smiling", "brows": "kind", "iris": "orig", "mouth": "closed", "fx": ["blush"] },
+  "confused": { "eyeShape": "neutral", "brows": "worried", "iris": "orig", "mouth": "grumpy", "fx": ["sweat"] }
+}

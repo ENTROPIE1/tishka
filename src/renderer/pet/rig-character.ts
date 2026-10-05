@@ -23,6 +23,8 @@ export interface RigCharacterPlayer {
   clips(): string[];
   play(name: string): void;
   setMouth(shape: string | null): void;
+  // Смена эмоции из данных модели; необязательна для подставного проигрывателя.
+  setMood?(name: string): void;
   setFlip(flipped: boolean): void;
   dispose(): void;
 }
@@ -30,6 +32,9 @@ export interface RigCharacterPlayer {
 export class RigCharacter implements Character {
   private clip: ClipName = 'idle';
   private mouth: number | null = null;
+  private viseme: string | null = null;
+  private hasViseme = false;
+  private mood: string | null = null;
   private flipped = false;
   private mounted = false;
 
@@ -42,6 +47,9 @@ export class RigCharacter implements Character {
     this.applyClip();
     this.player.setFlip(this.flipped);
     this.applyMouth();
+    if (this.mood !== null) {
+      this.player.setMood?.(this.mood);
+    }
   }
 
   setClip(name: ClipName): void {
@@ -51,7 +59,22 @@ export class RigCharacter implements Character {
 
   setMouth(level: number): void {
     this.mouth = Number.isFinite(level) ? Math.min(1, Math.max(0, level)) : 0;
+    this.hasViseme = false;
     this.applyMouth();
+  }
+
+  // Рот по дорожке речи: форма из данных модели, null — закрытый рот покоя.
+  setViseme(shape: string | null): void {
+    this.viseme = shape;
+    this.hasViseme = true;
+    this.applyMouth();
+  }
+
+  setMood(name: string): void {
+    this.mood = name;
+    if (this.mounted) {
+      this.player.setMood?.(name);
+    }
   }
 
   setFlip(flipped: boolean): void {
@@ -85,8 +108,13 @@ export class RigCharacter implements Character {
   }
 
   private applyMouth(): void {
-    if (this.mounted) {
-      this.player.setMouth(this.mouth === null ? null : rigMouthShape(this.mouth));
+    if (!this.mounted) {
+      return;
     }
+    if (this.hasViseme) {
+      this.player.setMouth(this.viseme);
+      return;
+    }
+    this.player.setMouth(this.mouth === null ? null : rigMouthShape(this.mouth));
   }
 }

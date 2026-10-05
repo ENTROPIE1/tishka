@@ -1,15 +1,23 @@
+import type { Mood } from '../core/types';
 import type { TalkSource } from '../pet/state';
+import type { MoodTimeMark, MouthTrack } from './lipsync';
 
 export interface SpeechItem {
   text: string;
   wav: Uint8Array;
   source?: TalkSource;   // источник реплики: сопровождает и её озвучку
+  mood?: Mood;           // настроение ответа в начале звука
+  mouth?: MouthTrack;    // дорожка рта по времени звука
+  moods?: MoodTimeMark[];   // смены эмоций по времени звука
 }
 
 export interface SpeakMessage {
   wav: Uint8Array;
   volume: number;
   id?: number;
+  mood?: Mood;
+  mouth?: MouthTrack;
+  moods?: MoodTimeMark[];
 }
 
 export interface SpeechQueueDeps {

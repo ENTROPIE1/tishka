@@ -35,6 +35,7 @@ export class RigPlayer {
   private readonly physics = new RigPhysics();
   private baseShow: RigShow = emptyShow();
   private mouthOverride: string | null = null;
+  private pendingMood: string | null = null;
   private flipped = false;
   private readonly blinker = new Blinker();
   private nextBlinkAt = 0;
@@ -64,6 +65,10 @@ export class RigPlayer {
     this.animator = new RigPoseAnimator(model.clips);
     this.physics.reset();
     this.baseShow = cloneShow(model.show);
+    if (this.pendingMood !== null) {
+      this.setMood(this.pendingMood);
+      this.pendingMood = null;
+    }
     for (const layer of model.layers) {
       this.image(layer.src);
     }
@@ -95,6 +100,16 @@ export class RigPlayer {
 
   setMouth(shape: string | null): void {
     this.mouthOverride = shape;
+  }
+
+  // Эмоция из данных модели: меняет слои лица и эффекты, не трогая клип и речь.
+  setMood(name: string): void {
+    const mood = this.model?.moods[name];
+    if (mood === undefined) {
+      this.pendingMood = name;
+      return;
+    }
+    this.setShow(mood);
   }
 
   setFlip(flipped: boolean): void {
