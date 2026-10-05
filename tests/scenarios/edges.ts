@@ -10,27 +10,42 @@ export interface FakeStt {
   status(): SttStatus;
   setStatus(status: SttStatus): void;
   transcribe(wav: Uint8Array, prompt?: string): Promise<TranscribeResult>;
-  willHear(result: TranscribeResult | string): void;
+  willHear(result: TranscribeResult | string, holdMs?: number): void;
   requests(): number;
 }
 
+interface ScriptItem {
+  result: TranscribeResult;
+  holdMs: number;
+}
+
 // Служба распознавания: управляемое состояние и заданный текст ответа.
-// Без сценария распознавание отвечает пустотой (шум).
+// Без сценария распознавание отвечает пустотой (шум). holdMs — сколько
+// миллисекунд служба «думает» перед ответом.
 export function createFakeStt(initial: SttStatus): FakeStt {
   let state = initial;
-  const script: TranscribeResult[] = [];
+  const script: ScriptItem[] = [];
   let requests = 0;
   return {
     status: () => state,
     setStatus(status: SttStatus): void {
       state = status;
     },
-    willHear(result: TranscribeResult | string): void {
-      script.push(typeof result === 'string' ? { ok: true, text: result } : result);
+    willHear(result: TranscribeResult | string, holdMs = 0): void {
+      script.push({ result: typeof result === 'string' ? { ok: true, text: result } : result, holdMs });
     },
     async transcribe(): Promise<TranscribeResult> {
       requests += 1;
-      return script.shift() ?? NOISE;
+      const item = script.shift();
+      if (item === undefined) {
+        return NOISE;
+      }
+      if (item.holdMs > 0) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, item.holdMs);
+        });
+      }
+      return item.result;
     },
     requests: () => requests
   };

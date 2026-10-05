@@ -3,6 +3,8 @@ import type { SttStatus, TranscribeResult } from './stt-service';
 import { NOT_READY_MESSAGE, planToggle } from './talk-toggle';
 import { DISMISS_REPLY, isDismiss, matchWake, wakePrompt } from './wake';
 import { createPhraseQueue, routeStaleText, type StaleTextDeps } from './stale-phrase';
+import { createSilenceTimer } from './silence-timer';
+import { createUnheardFlow } from './unheard';
 
 export type WakeCommand = 'listen' | 'conversation-on' | 'conversation-off';
 
@@ -23,6 +25,8 @@ export interface WakeFlowDeps {
   onWaitingChange?(): void;            // изменилось ожидание готовности службы
   memoryName?(): string | undefined;   // имя человека из памяти для подсказки
   onMissedSpeech?(): void;             // «Не расслышал» — повод для подсказки о калибровке
+  onUnheard?(text: string): void;      // тихая фраза отброшена по уверенности: подпись «не разобрал»
+  onUnheardHint?(): void;              // три такие фразы подряд: подсказка про порог и микрофон
   onWakeLimit?(): void;                // отрезок упёрся в предел длины при прослушивании имени
   onWakePhraseEnd?(): void;            // фраза закончилась сама: серия отрезков прервана
 }
@@ -46,15 +50,11 @@ export interface WakeFlow {
 
 const ERROR_COOLDOWN_MS = 30000;
 const DEFAULT_TIMEOUT_SEC = 30;
-const SOON_MS = 5000;
 
 export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   let conversation = false;
   let owner: TalkSurface | null = null;
   let answering = false;
-  let soon = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let soonTimer: ReturnType<typeof setTimeout> | undefined;
   let lastErrorAt = -Infinity;
   // Человек выключил микрофон значком: до конца этого появления не слушаем.
   let suppressed = false;
@@ -67,35 +67,26 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     return Math.max(1, Number.isFinite(seconds) ? seconds : DEFAULT_TIMEOUT_SEC) * 1000;
   }
 
-  function setSoon(value: boolean): void {
-    if (soon === value) {
-      return;
-    }
-    soon = value;
-    deps.onSoonChange?.();
-  }
+  // Тишина разговора: на время распознавания фразы отсчёт стоит.
+  const silence = createSilenceTimer({
+    totalMs: timeoutMs,
+    fire: () => disableConversation(true),
+    onSoonChange: () => deps.onSoonChange?.()
+  });
 
-  function clearTimer(): void {
-    if (timer !== undefined) {
-      clearTimeout(timer);
-      timer = undefined;
-    }
-    if (soonTimer !== undefined) {
-      clearTimeout(soonTimer);
-      soonTimer = undefined;
-    }
-    setSoon(false);
-  }
+  // Тихая фраза, отброшенная по уверенности: подпись «не разобрал», три
+  // подряд — подсказка про порог и микрофон.
+  const unheard = createUnheardFlow({
+    onCaption: (text) => deps.onUnheard?.(text),
+    report: () => deps.onUnheardHint?.()
+  });
 
   // Перед уходом по тишине значок мигает: состояние «скоро уйду» приходит за 5 секунд.
   function armTimer(): void {
     if (!conversation || answering) {
       return;
     }
-    clearTimer();
-    const total = timeoutMs();
-    soonTimer = setTimeout(() => setSoon(true), Math.max(0, total - SOON_MS));
-    timer = setTimeout(() => disableConversation(true), total);
+    silence.arm();
   }
 
   function reportError(message: string): void {
@@ -179,7 +170,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     conversation = false;
     owner = null;
     queue.conversationDisabled();
-    clearTimer();
+    silence.clear();
     deps.sendCommand('conversation-off');
     // Скрывается только окно-питомец: уход по тишине или просьбе в чате
     // выключает разговор, но не прячет питомца.
@@ -200,7 +191,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       dismiss();
       return;
     }
-    clearTimer();
+    silence.clear();
     answering = true;
     void deps.core
       .handleUserText(text)
@@ -246,6 +237,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   // другом состоянии проверяется только на имя и репликой не становится.
   function onResult(result: TranscribeResult, stale: boolean): void {
     if (result.ok) {
+      // Речь распознана: серия неуверенных фраз прервана.
+      unheard.heard();
       if (stale) {
         routeStaleText(staleDeps, result.text);
       } else if (conversation) {
@@ -256,9 +249,20 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       armTimer();
       return;
     }
+    // Тихая фраза: текст был, но уверенность ниже порога. В разговоре ёж
+    // коротко показывает подписью «не разобрал».
+    if (result.unreliable === true) {
+      if (conversation) {
+        unheard.dropped();
+      }
+      armTimer();
+      return;
+    }
     // Пустой или шумовой отклик распознавания человеку не показываем:
     // запись сработала на стук клавиш, прослушивание продолжается.
     if (result.empty === true) {
+      // Фраза не распознана: отсчёт тишины продолжается с места остановки.
+      silence.resume();
       return;
     }
     if (result.error !== 'Не расслышал') {
@@ -278,7 +282,10 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     return conversation || deps.getVoice().wakeEnabled;
   }
 
+  // Пока фраза распознаётся, таймер тишины разговора стоит: медленное
+  // распознавание не закрывает разговор и фраза не пропадает.
   function transcribe(wav: Uint8Array): Promise<TranscribeResult> {
+    silence.pause();
     return deps.stt.transcribe(wav, wakePrompt(deps.getVoice().wakeWords, deps.memoryName?.()));
   }
 
@@ -313,7 +320,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     },
     isConversation: () => conversation,
     conversationOwner: () => owner,
-    isLeavingSoon: () => soon,
+    isLeavingSoon: () => silence.soon(),
     isWaiting: () => waiting !== null,
     reportError,
     // Служба стала готова: одно отложенное включение записи за появление.
@@ -389,7 +396,7 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       disableConversation(false);
     },
     stop(): void {
-      clearTimer();
+      silence.clear();
       waiting = null;
       queue.dropPending();
       unsubscribe();

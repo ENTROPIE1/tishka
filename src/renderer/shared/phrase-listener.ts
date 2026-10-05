@@ -202,7 +202,8 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     capturing = false;
     phraseFrames = [];
     vad = makeVad();
-    paused = false;
+    // Действующая пауза сохраняется: запуск при паузе (например, когда
+    // человек печатает) не возобновляет запись раньше срока.
     active = true;
     timingMark('listen.start');
     return true;

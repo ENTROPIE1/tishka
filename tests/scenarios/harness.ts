@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { createSourceBus } from '../../src/main/source-bus';
 import { createPetLifecycle } from '../../src/main/pet-lifecycle';
 import { createWakeFlow } from '../../src/voice/wake-flow';
+import { UNHEARD_HINT } from '../../src/voice/unheard';
 import { createSpeechOutput } from '../../src/main/pet-speak';
 import { createPetSpeakPlay } from '../../src/main/pet-speak-play';
 import { registerPetWake, type PetWake } from '../../src/main/pet-wake';
@@ -55,11 +56,14 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   const commands: string[] = [];
   const spoken: string[] = [];
   const errors: string[] = [];
+  const statuses: string[] = [];
   bus.on((event) => {
     if (event.type === 'speak.start') {
       spoken.push(event.text);
     } else if (event.type === 'error') {
       errors.push(event.message);
+    } else if (event.type === 'status') {
+      statuses.push(event.text);
     }
   });
 
@@ -77,6 +81,8 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
   // Ссылки на модули, которые создаются позже окна: фраза и конец звука.
   let recognize: (wav: Uint8Array) => void = () => undefined;
   let speakDone: (id: number | undefined) => void = () => undefined;
+  // Пауза страницы управляет настоящим слушателем фраз, как в окне ежа.
+  let pauseListener: (paused: boolean) => void = () => undefined;
   const win = createWindowEdge({
     onPhrase: (wav) => recognize(wav),
     onSpeakDone: (id) => speakDone(id),
@@ -84,7 +90,8 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       void bus.run('pet', () => core.handleUserText(text)).catch(() => undefined);
     },
     onScreenLookStop: () => core.cancel(),
-    screenLookAvailable: () => config.screen.enabled
+    screenLookAvailable: () => config.screen.enabled,
+    onListenPause: (value) => pauseListener(value)
   });
   const { page } = win;
   // События ядра приходят во все окна, как broadcastEvent в ipc.ts.
@@ -133,7 +140,9 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     getStatus: () => stt.status(),
     isVisible: (surface) => (surface === 'pet' ? pet.isVisible() : true),
     onWaitingChange: () => petWake?.broadcast(),
-    onSoonChange: () => petWake?.broadcast()
+    onSoonChange: () => petWake?.broadcast(),
+    onUnheard: (text) => pet.caption(text),
+    onUnheardHint: () => bus.emit({ type: 'status', text: UNHEARD_HINT })
   });
   recognize = (wav) => flow.handlePhrase(wav);
 
@@ -148,6 +157,7 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     capture: mic,
     onPhrase: (wav, limitHit) => flow.handlePhrase(wav, limitHit)
   });
+  pauseListener = (value) => audio.pause(value);
   void audio.start();
 
   const speakPlay = createPetSpeakPlay({
@@ -179,6 +189,7 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
     bounds: () => win.bounds(),
     spoken: () => spoken,
     errors: () => errors,
+    statuses: () => statuses,
     commands: () => commands,
     coreCalls: () => core.calls(),
     sttRequests: () => stt.requests(),
@@ -210,8 +221,17 @@ export function createScenario(options: ScenarioOptions = {}): Scenario {
       }
       return page.say();
     },
-    hear(text: string): void {
-      stt.willHear(text);
+    hear(text: string, holdMs?: number): void {
+      stt.willHear(text, holdMs);
+    },
+    // Прослушивание запускается заново, пока действует пауза: та же связка,
+    // что в окне ежа при смене состояния значка.
+    restartListen(): void {
+      audio.stop();
+      if (page.listenPaused()) {
+        audio.pause(true);
+      }
+      void audio.start();
     },
     feedMic(value: number, ms: number): void {
       mic.feed(value, ms);

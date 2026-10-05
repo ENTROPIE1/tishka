@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron';
 import { join } from 'node:path';
-import { PET_LISTEN_COMMAND_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
+import { PET_CAPTION_CHANNEL, PET_LISTEN_COMMAND_CHANNEL, PET_SPEAK_CHANNEL, PET_SPEAK_STOP_CHANNEL, PET_WAKE_STATE_CHANNEL } from './ipc-channels';
 import { guardNavigation } from './navigation-guard';
 import { createPetActivation } from './pet-activation';
 import { createPetLifecycle, type PetLifecycle } from './pet-lifecycle';
@@ -88,6 +88,9 @@ export function createPetWindow(deps: PetWindowDeps): PetWindow {
     },
     wakeState(state): void {
       send(PET_WAKE_STATE_CHANNEL, state);
+    },
+    caption(text): void {
+      send(PET_CAPTION_CHANNEL, text);
     },
     speak(message): void {
       send(PET_SPEAK_CHANNEL, message);
