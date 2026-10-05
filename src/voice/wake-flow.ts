@@ -29,6 +29,7 @@ export interface WakeFlowDeps {
   onUnheardHint?(): void;              // три такие фразы подряд: подсказка про порог и микрофон
   onWakeLimit?(): void;                // отрезок упёрся в предел длины при прослушивании имени
   onWakePhraseEnd?(): void;            // фраза закончилась сама: серия отрезков прервана
+  onBusyPhrase?(text: string): boolean;   // Тишка занят: «стоп» останавливает работу, фраза в ядро не уходит
 }
 
 export interface WakeFlow {
@@ -98,14 +99,6 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     deps.bus.emit({ type: 'error', message });
   }
 
-  function clearWaiting(): void {
-    if (waiting === null) {
-      return;
-    }
-    waiting = null;
-    deps.onWaitingChange?.();
-  }
-
   // Обращение без просьбы: показать запись и слушать дальше.
   function startListen(): void {
     deps.bus.emit({ type: 'listen.start' });
@@ -146,19 +139,13 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   // Появление человека: сбрасывает выключенный значок и, если разговор включён
   // по умолчанию, сразу переводит в режим разговора. Уведомление не в счёт.
   function appear(source: 'name' | 'hotkey' | 'click' | 'trigger'): void {
-    if (source === 'trigger') {
-      return;
-    }
-    if (source === 'name' && suppressed) {
-      // Реплика в том же появлении: разговор сам не включается до конца появления.
+    // Уведомление не появление; реплика в том же появлении разговор не включает.
+    if (source === 'trigger' || (source === 'name' && suppressed)) {
       return;
     }
     suppressed = false;
-    if (source === 'hotkey') {
-      // Горячую клавишу переключает вызывающий: это явное действие.
-      return;
-    }
-    if (deps.getVoice().talkByDefault && owner === null) {
+    // Горячую клавишу переключает вызывающий: это явное действие.
+    if (source !== 'hotkey' && deps.getVoice().talkByDefault && owner === null) {
       requestListen('pet');
     }
   }
@@ -187,6 +174,11 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   }
 
   function routeConversation(text: string): void {
+    // Во время работы слушаем ради остановки: «стоп» останавливает, остальные
+    // фразы в ядро не уходят.
+    if ((deps.onBusyPhrase?.(text) ?? false)) {
+      return;
+    }
     if (isDismiss(text, deps.getVoice().wakeWords)) {
       dismiss();
       return;
@@ -205,6 +197,10 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
   function routeWake(text: string): void {
     const match = matchWake(text, deps.getVoice().wakeWords);
     if (!match.matched) {
+      return;
+    }
+    // Просьба с именем при занятом Тишке: остановка или молчаливое отбрасывание.
+    if (match.rest !== '' && (deps.onBusyPhrase?.(match.rest) ?? false)) {
       return;
     }
     deps.bus.emit({ type: 'wake', source: 'name' });
@@ -273,11 +269,11 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
     armTimer();
   }
 
-  // Фраза распознаётся, пока включён разговор или прослушивание имени,
-  // и человек в этот момент не получает ответ.
+  // Фраза распознаётся, пока включён разговор или прослушивание имени. Во время
+  // ответа в разговоре фразы всё ещё распознаются: среди них может быть «стоп».
   function acceptPhrase(): boolean {
     if (answering) {
-      return false;
+      return conversation;
     }
     return conversation || deps.getVoice().wakeEnabled;
   }
@@ -372,7 +368,8 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       }
       if (waiting === by) {
         // Значок нажали, пока ждали службу: до конца появления не слушаем.
-        clearWaiting();
+        waiting = null;
+        deps.onWaitingChange?.();
         if (by === 'pet') {
           suppressed = true;
         }

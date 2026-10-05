@@ -263,3 +263,17 @@ export function isDismiss(text: string, wakeWords: string[] = ['тишка']): b
   }
   return isDismissByMeaning(text);
 }
+
+// Слова остановки текущей работы: короткая отдельная фраза, сказанная в
+// разговоре, пока Тишка думает, работает или говорит.
+const STOP_PHRASES = ['стоп', 'хватит', 'остановись', 'отмена'];
+const STOP_KEYS = new Set(STOP_PHRASES.map((phrase) => squashed(phrase)));
+
+// Стоп-слово сказано отдельной короткой фразой: целиком или сразу после имени.
+export function isStopPhrase(text: string, wakeWords: string[] = ['тишка']): boolean {
+  if (STOP_KEYS.has(squashed(text))) {
+    return true;
+  }
+  const match = matchWake(text, wakeWords);
+  return match.matched && match.rest !== '' && STOP_KEYS.has(squashed(match.rest));
+}

@@ -31,6 +31,7 @@ export interface ScenarioObservations {
   interactive(): boolean;         // строка принимает щелчки
   composerVisible(): boolean;     // строка ввода видна
   composerCollapsed(): boolean;   // строка свёрнута в полочку
+  sendIsStop(): boolean;          // кнопка отправки ежа показывает остановку
   eyeOn(): boolean;               // кнопка с глазом у ежа активна
   eyeHidden(): boolean;           // кнопка с глазом у ежа скрыта настройкой
   chatEyeOn(): boolean;           // кнопка с глазом в чате активна
@@ -64,8 +65,11 @@ export interface Scenario {
   sendFromComposer(text: string): void;   // отправка текста из строки ежа
   sendFromChat(text: string): void;       // отправка текста из окна чата
   notifyFromSkill(title: string): void;   // уведомление от навыка
+  coreWillWork(holdMs: number): void;     // ядро занято: следующий ход держится holdMs
   stopFromChat(): void;                   // остановка из окна чата: строка только в ленте чата
   pressEye(question?: string): void;      // нажатие кнопки с глазом у ежа
+  pressPetSend(text?: string): void;      // кнопка отправки строки ежа: занятому Тишке — остановка
+  pressPetEscape(): void;                 // Escape в строке ежа: занятому Тишке — остановка
   coreLooksAtScreen(): void;              // ядро начало просмотр экрана: событие инструмента
   voiceReady(): void;                     // служба распознавания стала готова
   voiceFailed(message?: string): void;    // служба не поднялась

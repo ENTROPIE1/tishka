@@ -60,7 +60,9 @@ export function registerPetWake(deps: PetWakeDeps): PetWake {
       now: Date.now(),
       warmMinutes: deps.getWarmMinutes?.() ?? DEFAULT_WARM_MINUTES
     });
-    listening = !paused && !busy && deps.isReady() && (mine || warm);
+    // Пока разговор свой, запись не гаснет и во время работы Тишки: голосом
+    // можно остановить текущую работу словом «стоп».
+    listening = !paused && deps.isReady() && (mine || (!busy && warm));
     deps.pet.wakeState({
       active: listening,
       conversation: mine,

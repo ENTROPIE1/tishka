@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { WAKE_PROMPT, isDismiss, matchWake, wakePrompt } from '../src/voice/wake';
+import { WAKE_PROMPT, isDismiss, isStopPhrase, matchWake, wakePrompt } from '../src/voice/wake';
 import { flush, makeHarness, voice, wav, type Harness } from './wake-test-helpers';
 
 // Источники обращений по имени, увиденные шиной.
@@ -202,7 +202,7 @@ describe('wake-flow: связка', () => {
     expect(h.flow.isConversation()).toBe(false);
   });
 
-  it('во время ответа фразы не распознаются', async () => {
+  it('во время ответа фраза не уходит в модель, пока идёт ответ', async () => {
     const h = makeHarness(['раз', 'два']);
     h.flow.enableConversation();
     const gate = h.deferHandle();
@@ -210,7 +210,8 @@ describe('wake-flow: связка', () => {
     await flush();
     h.flow.handlePhrase(wav);
     await flush();
-    expect(h.transcribe).toHaveBeenCalledTimes(1);
+    // Фраза распознаётся, чтобы услышать среди них «стоп», но в ядро не уходит.
+    expect(h.transcribe).toHaveBeenCalledTimes(2);
     gate.resolve();
     await flush();
     expect(h.calls).toEqual(['раз']);
@@ -221,6 +222,96 @@ describe('wake-flow: связка', () => {
     h.flow.handlePhrase(wav);
     await flush();
     expect(h.transcribe).not.toHaveBeenCalled();
+  });
+});
+
+describe('isStopPhrase', () => {
+  it('распознаёт слова остановки отдельной короткой фразой', () => {
+    for (const text of ['стоп', 'Стоп!', 'хватит', 'остановись', 'отмена', ' Тишка, стоп ']) {
+      expect(isStopPhrase(text)).toBe(true);
+    }
+  });
+
+  it('допускает имя в начале', () => {
+    expect(isStopPhrase('Тишка, стоп')).toBe(true);
+    expect(isStopPhrase('тишка хватит')).toBe(true);
+    expect(isStopPhrase('ёжик, отмена', ['ёжик'])).toBe(true);
+  });
+
+  it('фраза с продолжением остановкой не считается', () => {
+    for (const text of ['стоп-кадр', 'хватит ли времени', 'стоп, а потом сделай вот это', 'наступил на стоп-сигнал']) {
+      expect(isStopPhrase(text)).toBe(false);
+    }
+  });
+});
+
+describe('wake-flow: остановка голосом', () => {
+  it('«стоп» во время ответа останавливает работу и не уходит в модель', async () => {
+    const h = makeHarness(['сделай отчёт', 'стоп']);
+    h.flow.enableConversation();
+    const gate = h.deferHandle();
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual(['сделай отчёт']);
+
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual(['сделай отчёт']);
+    expect(h.stops).toEqual(['work', 'speech']);
+    expect(h.captions).toContain('остановил');
+    // Ёж остаётся слушать: разговор включён.
+    expect(h.flow.isConversation()).toBe(true);
+    gate.resolve();
+    await flush();
+    expect(h.calls).toEqual(['сделай отчёт']);
+  });
+
+  it('стоп с именем останавливает работу', async () => {
+    const h = makeHarness(['сделай отчёт', 'Тишка, стоп']);
+    h.flow.enableConversation();
+    const gate = h.deferHandle();
+    h.flow.handlePhrase(wav);
+    await flush();
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual(['сделай отчёт']);
+    expect(h.stops).toEqual(['work', 'speech']);
+    gate.resolve();
+    await flush();
+  });
+
+  it('«стоп» в покое уходит в ядро как обычная реплика', async () => {
+    const h = makeHarness(['стоп']);
+    h.flow.enableConversation();
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual(['стоп']);
+    expect(h.stops).toEqual([]);
+    expect(h.captions).toEqual([]);
+    expect(h.flow.isConversation()).toBe(true);
+  });
+
+  it('«хватит» во время работы останавливает работу, а не просит уйти', async () => {
+    const h = makeHarness(['работай', 'хватит']);
+    h.flow.enableConversation();
+    const gate = h.deferHandle();
+    h.flow.handlePhrase(wav);
+    await flush();
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual(['работай']);
+    expect(h.hidden()).toBe(0);
+    expect(h.flow.isConversation()).toBe(true);
+    gate.resolve();
+  });
+
+  it('просьба с именем при занятом Тишке останавливает работу и не уходит в модель', async () => {
+    const h = makeHarness(['Тишка, стоп']);
+    h.bus.emit({ type: 'think.start' });
+    h.flow.handlePhrase(wav);
+    await flush();
+    expect(h.calls).toEqual([]);
+    expect(h.stops).toEqual(['work', 'speech']);
   });
 });
 
