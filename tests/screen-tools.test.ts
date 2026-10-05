@@ -150,6 +150,10 @@ describe('registerScreenTools', () => {
     expect(shots).toEqual([{ title: 'Снимок экрана', path: savedPath }]);
     expect(result.ok).toBe(true);
     expect(result.reply).toBeUndefined();
+    const data = result.data as Record<string, unknown>;
+    expect(data).not.toHaveProperty('png');
+    expect(data.source).toBe('Монитор');
+    expect(data.path).toBe(savedPath);
   });
 
   it('ошибка снимка возвращается понятной строкой', async () => {
