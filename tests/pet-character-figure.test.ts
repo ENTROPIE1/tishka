@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  PET_COMPOSER_HEIGHT,
   PET_HEDGEHOG_SIZE,
   PET_TISHKA_ARM_RESERVE,
   PET_TISHKA_CANVAS_HEIGHT,
@@ -11,7 +12,9 @@ import {
   PET_TISHKA_FEET_WIDTH,
   PET_TISHKA_HEIGHT,
   PET_TISHKA_SIZE,
+  PET_TISHKA_STAND,
   TISHKA_CANVAS_WIDTH,
+  TISHKA_FEET_BOTTOM,
   TISHKA_MODEL_HEIGHT,
   petCharacterContent,
   petCharacterSize
@@ -48,6 +51,21 @@ describe('размеры холста нового Тишки', () => {
     expect(PET_TISHKA_FEET_WIDTH).toBeGreaterThan(0);
     expect(PET_TISHKA_FEET_WIDTH).toBeLessThan(PET_TISHKA_SIZE.width);
   });
+
+  it('посадка не меньше высоты строки, ступни ложатся на её верхнюю половину', () => {
+    expect(PET_TISHKA_STAND).toBeGreaterThan(8);
+    expect(PET_TISHKA_STAND).toBeGreaterThanOrEqual(PET_COMPOSER_HEIGHT);
+    // Рамка уходит на посадку с вычетом подписи под персонажем (16 точек и
+    // промежуток 2), под ступнями в модели остаётся пустота: глубина ступней
+    // на строке = посадка - 18 - пустота модели под ступнями.
+    const underFeet = Math.round(
+      (PET_TISHKA_HEIGHT * (TISHKA_MODEL_HEIGHT - TISHKA_FEET_BOTTOM)) / TISHKA_MODEL_HEIGHT
+    );
+    const feetDepth = PET_TISHKA_STAND - 18 - underFeet;
+    expect(feetDepth).toBeGreaterThan(0);
+    // Верхняя половина строки: поля 8 и 10, кнопки 30 и рамка 2 — около 50 точек.
+    expect(feetDepth).toBeLessThanOrEqual((PET_COMPOSER_HEIGHT + 2) / 2);
+  });
 });
 
 describe('раскладка окна с широким холстом', () => {
@@ -72,11 +90,13 @@ describe('раскладка окна с широким холстом', () => {
     expect(layout.window.x).toBeGreaterThanOrEqual(screen.x);
   });
 
-  it('строка ввода короче на ширину ступней, место под кнопки остаётся', () => {
+  it('поле строки уводится на ширину ступней, кнопки помещаются', () => {
     const content = petCharacterContent('tishka');
     const layout = petLayout(screen, defaultPetX(screen, content), content);
 
     expect(layout.feet).toBe(PET_TISHKA_FEET_WIDTH);
+    // Строка во всю ширину окна, поле и кнопки уходят из-под ступней
+    // внутренним полем строки.
     const visible = layout.window.width - layout.feet;
     expect(visible).toBeGreaterThan(PET_LAYOUT_DEFAULTS.columnMinWidth);
     // Поле и обе кнопки (микрофон, отправка, настройки) помещаются.
@@ -115,16 +135,17 @@ describe('вид раскладки в окне', () => {
 });
 
 describe('строка ввода и ступни', () => {
-  it('строка короче на ширину ступней и зеркалится на другую сторону', () => {
+  it('строка во всю ширину окна, без урезания на ширину ступней', () => {
     const host = cssBlock('\\.composer-host');
-    expect(host).toContain('var(--pet-feet, 0px)');
-    expect(host).toContain('calc(100% -');
-    const mirrored = cssBlock('\\.pet\\.mirrored \\.composer-host');
-    expect(mirrored).toContain('var(--pet-feet, 0px)');
-    expect(mirrored).toContain('margin-left');
+    expect(host).not.toBe('');
+    expect(host).not.toContain('calc(100% -');
+    expect(host).not.toContain('var(--pet-feet');
+    expect(composerCss).not.toContain('.pet.mirrored .composer-host');
   });
 
-  it('правый отступ строки уводит кнопки из-под ног', () => {
+  it('внутреннее поле строки уводит кнопки из-под ног в обеих раскладках', () => {
     expect(cssBlock('\\.composer')).toContain('var(--pet-feet, 0px)');
+    const mirrored = cssBlock('\\.pet\\.mirrored \\.composer');
+    expect(mirrored).toContain('var(--pet-feet, 0px)');
   });
 });

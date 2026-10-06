@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   PET_TISHKA_ARM_RESERVE,
   PET_TISHKA_CANVAS_WIDTH,
+  PET_TISHKA_FEET_WIDTH,
+  PET_TISHKA_STAND,
   petCharacterContent
 } from '../../src/pet/character-size';
 import { defaultPetX, petLayout, rectWithinAny, type WorkArea } from '../../src/pet/layout';
@@ -39,6 +41,23 @@ describe('Сценарий: окно ежа с новым Тишкой', () => {
       const right = axis + PET_TISHKA_CANVAS_WIDTH / 2;
       expect(left).toBeGreaterThanOrEqual(layout.window.x);
       expect(right).toBeLessThanOrEqual(layout.window.x + layout.window.width);
+    }
+  });
+
+  it('персонаж стоит на строке ввода, а не висит над ней', () => {
+    const content = petCharacterContent('tishka');
+    for (const petX of [SCREEN.x + 16, SCREEN.width]) {
+      const layout = petLayout(SCREEN, petX, content);
+
+      // Посадка не меньше высоты строки ввода (поля 8+10 и кнопки 30): холст
+      // опускается на строку, низ ступней ложится на её верхнюю половину.
+      expect(layout.stand).toBe(PET_TISHKA_STAND);
+      expect(layout.stand).toBeGreaterThanOrEqual(48);
+      // Поле строки уводится из-под ступней внутренним полем на их ширину,
+      // окно остаётся целиком на экране.
+      expect(layout.feet).toBe(PET_TISHKA_FEET_WIDTH);
+      expect(layout.window.width - layout.feet).toBeGreaterThan(3 * 30 + 6 * 3);
+      expect(rectWithinAny([SCREEN], layout.window)).toBe(true);
     }
   });
 });
