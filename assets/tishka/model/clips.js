@@ -44,7 +44,7 @@ window.CLIPS = {
       brow_l: [[0, 0, 0, -3], [2, 0, 0, -3]], brow_r: [[0, 0, 0, -3], [2, 0, 0, -3]],
       torso: [[0, 0, 0, 0, 1], [1, 0, 0, 0, 1.01], [2, 0, 0, 0, 1]],
     },
-    set: [[0, { brows: 'kind', eyeShape: 'neutral', hand_l: 'relaxed', hand_r: 'relaxed' }]] },
+    set: [[0, { brows: 'kind', eyeShape: 'orig', hand_l: 'relaxed', hand_r: 'relaxed' }]] },
 
   talk: { len: 2, loop: true,
     bones: {
@@ -71,8 +71,8 @@ window.CLIPS = {
   work: { len: 1.6, loop: true, tabletY: -50, underTablet: ['arm_l_lower', 'hand_l', 'arm_r_lower', 'hand_r'],
     bones: {
       head: [[0, 0, 0, 3], [0.8, 1, 0, 4], [1.6, 0, 0, 3]],
-      arm_l_upper: [[0, -6], [1.6, -6]], arm_l_lower: [[0, -164.7, 0, 0, 0.24], [1.6, -164.7, 0, 0, 0.24]], hand_l: [[0, 0, 0, 0, 4.17], [1.6, 0, 0, 0, 4.17]],
-      arm_r_upper: [[0, 6], [1.6, 6]], arm_r_lower: [[0, 164.7, 0, 0, 0.24], [1.6, 164.7, 0, 0, 0.24]], hand_r: [[0, 0, 0, 0, 4.17], [1.6, 0, 0, 0, 4.17]],
+      arm_l_upper: [[0, -6], [1.6, -6]], arm_l_lower: [[0, -141.0, 0, 0, 0.45], [1.6, -141.0, 0, 0, 0.45]], hand_l: [[0, 0, 0, 0, 2.22], [1.6, 0, 0, 0, 2.22]],
+      arm_r_upper: [[0, 6], [1.6, 6]], arm_r_lower: [[0, 141.0, 0, 0, 0.45], [1.6, 141.0, 0, 0, 0.45]], hand_r: [[0, 0, 0, 0, 2.22], [1.6, 0, 0, 0, 2.22]],
       iris_l: [[0, 0, 0, 3], [1.6, 0, 0, 3]], iris_r: [[0, 0, 0, 3], [1.6, 0, 0, 3]],
     },
     set: [[0, { tablet: 'back', glow: true, hand_l: 'fist', hand_r: 'fist', brows: 'focused', fx: ['gear'] }]] },
@@ -106,14 +106,14 @@ window.CLIPS = {
     },
     set: [[0, { hand_l: 'palm', hand_r: 'palm', eyeShape: 'happy', mouth: 'laugh', fx: ['sparkles'] }], [1.05, { hand_l: 'relaxed', hand_r: 'relaxed', fx: [] }]] },
 
-  confused: { len: 1.8, next: 'idle', front: ['hand_r'],
+  confused: { len: 1.8, next: 'idle', front: ['arm_r_lower', 'hand_r'],
     bones: {
       head: [[0, 0], [0.3, -8, 0, 2], [1.5, -8, 0, 2], [1.8, 0]],
-      arm_r_upper: [[0, 0], [0.35, -150], [1.45, -150], [1.8, 0]],
-      arm_r_lower: [[0, 0], [0.35, -60], [0.55, -53], [0.75, -67], [0.95, -53], [1.15, -67], [1.45, -60], [1.8, 0]],
+      arm_r_upper: [[0, 0], [0.35, -127], [1.45, -127], [1.8, 0]],
+      arm_r_lower: [[0, 0], [0.35, -86], [0.55, -80], [0.75, -92], [0.95, -80], [1.15, -92], [1.45, -86], [1.8, 0]],
       ear_l: [[0, 0], [0.4, 6], [1.5, 6], [1.8, 0]],
     },
-    set: [[0, { hand_r: 'relaxed', brows: 'worried', mouth: 'grumpy', fx: ['question', 'sweat'] }], [1.7, { fx: [] }]] },
+    set: [[0, { hand_r: 'point', brows: 'worried', mouth: 'grumpy', fx: ['question', 'sweat'] }], [1.7, { hand_r: 'relaxed', fx: [] }]] },
 
   // танец в духе румбы: 120 ударов в минуту, 4 удара за цикл; переступает ногами, бёдра качаются, локти внизу, предплечья подняты и идут волной
   dance: { len: 2, loop: true,
@@ -167,5 +167,5 @@ window.CLIPS = {
 window.MOODS = {
   neutral: { eyeShape: 'orig', brows: 'orig', iris: 'orig', mouth: 'closed', fx: [] },
   happy: { eyeShape: 'smiling', brows: 'kind', iris: 'orig', mouth: 'closed', fx: ['blush'] },
-  confused: { eyeShape: 'neutral', brows: 'worried', iris: 'orig', mouth: 'grumpy', fx: ['sweat'] },
+  confused: { eyeShape: 'sad', brows: 'worried', iris: 'orig', mouth: 'grumpy', fx: ['sweat'] },
 };

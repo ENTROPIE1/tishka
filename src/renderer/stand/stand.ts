@@ -22,6 +22,7 @@ const play = $<HTMLButtonElement>('play'), stop = $<HTMLButtonElement>('stop'), 
 const rigPanel = $('rig-panel'), rigEyes = $<HTMLSelectElement>('rig-eyes'), rigIris = $<HTMLSelectElement>('rig-iris');
 const rigBrows = $<HTMLSelectElement>('rig-brows'), rigMouth = $<HTMLSelectElement>('rig-mouth');
 const rigHandL = $<HTMLSelectElement>('rig-hand-l'), rigHandR = $<HTMLSelectElement>('rig-hand-r'), rigFxHost = $('rig-fx');
+const rigLids = $<HTMLSelectElement>('rig-lids'), rigEmotionsHost = $('rig-emotions'), rigEmotesHost = $('rig-emotes');
 
 let character: Character | undefined;
 let rig: RigPlayer | undefined;
@@ -143,12 +144,36 @@ function buildRigFx(values: readonly string[], list: readonly string[]): void {
   }
 }
 
+// Эмоция («по действию» — лицо по клипу) и сценки из emotions.js модели.
+function buildRigEmotions(instance: RigPlayer): void {
+  const model = instance.data;
+  rigEmotionsHost.replaceChildren();
+  rigEmotesHost.replaceChildren();
+  if (model === null) {
+    return;
+  }
+  const choices: [string, string][] = [['neutral', 'по действию'], ...Object.entries(model.emotions ?? {}).map(([n, e]): [string, string] => [n, e.ru])];
+  for (const [name, label] of choices) {
+    const button = makeButton(label, name === 'neutral' ? 'clip-button is-active' : 'clip-button', () => {
+      instance.setMood(name);
+      for (const other of rigEmotionsHost.children) {
+        other.classList.toggle('is-active', other === button);
+      }
+    });
+    rigEmotionsHost.append(button);
+  }
+  for (const [name, emote] of Object.entries(model.emotes ?? {})) {
+    rigEmotesHost.append(makeButton(emote.ru, 'clip-button', () => instance.playEmote(name)));
+  }
+}
+
 function configureRig(instance: RigPlayer): void {
   const model = instance.data;
   if (model === null) {
     return;
   }
   const show = model.show;
+  fillSelect(rigLids, ['open', 'half', 'closed'], show.eyes);
   fillSelect(rigEyes, eyeShapeList(model), show.eyeShape);
   fillSelect(rigIris, irisList(model), show.iris);
   fillSelect(rigBrows, browList(model), show.brows);
@@ -157,6 +182,7 @@ function configureRig(instance: RigPlayer): void {
   fillSelect(rigHandR, handList(model), show.hand_r);
   rigFx.clear();
   buildRigFx(model.fx, show.fx);
+  buildRigEmotions(instance);
 }
 
 function availableClips(): string[] {
@@ -232,6 +258,7 @@ function initControls(): void {
     }
   });
   flipBox.addEventListener('change', () => setFlip(flipBox.checked));
+  rigLids.addEventListener('change', () => rig?.setShow({ eyes: rigLids.value as 'open' | 'half' | 'closed' }));
   rigEyes.addEventListener('change', () => rig?.setShow({ eyeShape: rigEyes.value }));
   rigIris.addEventListener('change', () => rig?.setShow({ iris: rigIris.value }));
   rigBrows.addEventListener('change', () => rig?.setShow({ brows: rigBrows.value }));

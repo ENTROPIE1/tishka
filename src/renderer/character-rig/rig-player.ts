@@ -4,6 +4,7 @@
 import { drawCharacter, type RenderState } from './rig-draw';
 import { RigPoseAnimator } from './rig-pose';
 import { RigPhysics } from './rig-physics';
+import { RigEmotionState, resolveMood } from './rig-emotion';
 import { emptyShow, parseModel, type RigClip, type RigModel, type RigShow } from './rig-data';
 import { fitMatrix, RigCanvasSizer } from './rig-size';
 import { Blinker, nextBlinkDelay, shouldAutoBlink, showAt } from './rig-show';
@@ -33,6 +34,7 @@ export class RigPlayer {
   private readonly images = new Map<string, HTMLImageElement>();
   private animator: RigPoseAnimator | null = null;
   private readonly physics = new RigPhysics();
+  private emotion: RigEmotionState | null = null;
   private baseShow: RigShow = emptyShow();
   private mouthOverride: string | null = null;
   private pendingMood: string | null = null;
@@ -64,6 +66,11 @@ export class RigPlayer {
     const model = parseModel(await this.loader(`${this.basePath}/${this.modelFile}`));
     this.model = model;
     this.animator = new RigPoseAnimator(model.clips);
+    this.emotion = new RigEmotionState({
+      emotions: model.emotions ?? {},
+      emotes: model.emotes ?? {},
+      emotionFx: model.emotionFx ?? []
+    });
     this.physics.reset();
     this.baseShow = cloneShow(model.show);
     if (this.pendingMood !== null) {
@@ -104,14 +111,29 @@ export class RigPlayer {
     this.mouthOverride = shape;
   }
 
-  // Эмоция из данных модели: меняет слои лица и эффекты, не трогая клип и речь.
+  // Эмоция или сценка из данных модели: меняет лицо, уши и наклон головы, не трогая клип и речь.
   setMood(name: string): void {
-    const mood = this.model?.moods[name];
-    if (mood === undefined) {
+    const model = this.model;
+    if (model === null) {
       this.pendingMood = name;
       return;
     }
-    this.setShow(mood);
+    const action = resolveMood(model, name);
+    if (action.kind === 'reset') {
+      this.emotion?.setEmotion(null);
+      this.emotion?.stopEmote();
+    } else if (action.kind === 'emote') {
+      this.emotion?.playEmote(action.name, performance.now());
+    } else if (action.kind === 'emotion') {
+      this.emotion?.setEmotion(action.name);
+      this.emotion?.stopLoopingEmote();
+    } else if (model.moods[name] !== undefined) {
+      this.setShow(model.moods[name]);
+    }
+  }
+
+  playEmote(name: string): void {
+    this.emotion?.playEmote(name, performance.now());
   }
 
   setFlip(flipped: boolean): void {
@@ -155,14 +177,20 @@ export class RigPlayer {
       }
       const clip: RigClip | null = animator.clip;
       let show = showAt(this.baseShow, clip, phase.time);
+      let pose = animator.current;
+      if (this.emotion !== null) {
+        this.emotion.step(now);
+        show = this.emotion.face(show);
+        pose = this.emotion.pose(pose);
+      }
       if (this.mouthOverride !== null) {
         show = { ...show, mouth: this.mouthOverride };
       }
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      this.physics.step(model, animator.current, now);
+      this.physics.step(model, pose, now);
       const state: RenderState = {
-        pose: animator.current,
+        pose,
         show,
         clip,
         blinkK: this.blinkValue(now, show, clip),

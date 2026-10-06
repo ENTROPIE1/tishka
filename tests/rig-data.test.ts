@@ -25,15 +25,15 @@ function readSources(): ModelSources {
 
 describe('model.json', () => {
   it('совпадает с исходниками модели', () => {
-    const built = buildModel(readSources());
+    const built = buildModel(readSources(), readFileSync(join(modelDir, 'emotions.js'), 'utf8'));
     const stored = parseModel(readFileSync(join(modelDir, 'model.json'), 'utf8'));
     expect(stored).toEqual(built);
   });
 
   it('собраны скелет, слои, маски, варианты и клипы', () => {
     const model = parseModel(readFileSync(join(modelDir, 'model.json'), 'utf8'));
-    expect(model.bones).toHaveLength(27);
-    expect(model.layers).toHaveLength(176);
+    expect(model.bones).toHaveLength(29);
+    expect(model.layers).toHaveLength(181);
     expect(Object.keys(model.clips)).toContain('dance');
     expect(Object.keys(model.clips)).toHaveLength(13);
     expect(Object.keys(model.masks).length).toBeGreaterThan(100);

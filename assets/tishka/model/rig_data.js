@@ -1,7 +1,7 @@
 // rig.json, присланный владелицей, с правками; номер rev растёт при каждом обновлении
 window.RIG_FILE={
  "version": 3,
- "rev": 14,
+ "rev": 15,
  "canvas": 1200,
  "axisX": 399.5,
  "bones": [
@@ -247,6 +247,24 @@ window.RIG_FILE={
     250
    ],
    "label": "эффекты"
+  },
+  {
+   "id": "tear_l",
+   "parent": "head",
+   "pivot": [
+    352,
+    352
+   ],
+   "label": "слеза ←"
+  },
+  {
+   "id": "tear_r",
+   "parent": "head",
+   "pivot": [
+    447,
+    352
+   ],
+   "label": "слеза →"
   }
  ],
  "layers": [
@@ -306,22 +324,6 @@ window.RIG_FILE={
    "bone": "ear_r",
    "dx": -10.2,
    "dy": 7.2
-  },
-  {
-   "id": "bud_l",
-   "src": "layers/bud_l.png",
-   "bone": "ear_l",
-   "dx": 0,
-   "dy": 0,
-   "buds": true
-  },
-  {
-   "id": "bud_r",
-   "src": "layers/bud_r.png",
-   "bone": "ear_r",
-   "dx": 0,
-   "dy": 0,
-   "buds": true
   },
   {
    "id": "neck",
@@ -682,6 +684,22 @@ window.RIG_FILE={
    "bone": "head",
    "dx": 0,
    "dy": 0
+  },
+  {
+   "id": "bud_l",
+   "src": "layers/bud_l.png",
+   "bone": "ear_l",
+   "dx": 0,
+   "dy": 0,
+   "buds": true
+  },
+  {
+   "id": "bud_r",
+   "src": "layers/bud_r.png",
+   "bone": "ear_r",
+   "dx": 0,
+   "dy": 0,
+   "buds": true
   },
   {
    "id": "eye_l_white",

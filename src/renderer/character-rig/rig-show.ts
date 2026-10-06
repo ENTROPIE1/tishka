@@ -6,7 +6,7 @@ import type { RigClip, RigLayer, RigShow } from './rig-data';
 export const NO_BLINK_SHAPES = ['happy', 'laugh', 'sleepy'];
 
 export interface EyeState {
-  st: 'open' | 'closed';
+  st: 'open' | 'half' | 'closed';
   shape: string;
   useShape: boolean;
   whiteOn: boolean;
@@ -25,7 +25,9 @@ export function layerVisible(layer: RigLayer, show: RigShow, layers: readonly Ri
   if (layer.eyePart !== undefined) {
     const eye = eyeState(show, layer.side);
     if (layer.eyePart === 'white') {
-      return eye.whiteOn && layer.shape === (eye.useShape ? eye.shape : 'orig');
+      // у исходного глаза свой белок на каждое веко: открытое и полуприкрытое
+      const lidOk = eye.useShape || layer.lid === undefined || layer.lid === eye.st;
+      return eye.whiteOn && layer.shape === (eye.useShape ? eye.shape : 'orig') && lidOk;
     }
     if (layer.eyePart === 'line') {
       return eye.useShape ? layer.shape === eye.shape : layer.shape === 'orig' && layer.lid === eye.st;

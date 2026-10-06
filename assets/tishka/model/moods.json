@@ -1,5 +1,88 @@
 {
-  "neutral": { "eyeShape": "orig", "brows": "orig", "iris": "orig", "mouth": "closed", "fx": [] },
-  "happy": { "eyeShape": "smiling", "brows": "kind", "iris": "orig", "mouth": "closed", "fx": ["blush"] },
-  "confused": { "eyeShape": "neutral", "brows": "worried", "iris": "orig", "mouth": "grumpy", "fx": ["sweat"] }
+  "neutral": {
+    "ru": "спокойно, лицо по действию"
+  },
+  "calm": {
+    "ru": "спокойствие"
+  },
+  "joy": {
+    "ru": "радость"
+  },
+  "delight": {
+    "ru": "восторг"
+  },
+  "laugh": {
+    "ru": "смех"
+  },
+  "anger": {
+    "ru": "злость"
+  },
+  "sadness": {
+    "ru": "печаль"
+  },
+  "surprise": {
+    "ru": "удивление"
+  },
+  "confused": {
+    "ru": "растерянность"
+  },
+  "skeptic": {
+    "ru": "скепсис"
+  },
+  "shy": {
+    "ru": "смущение"
+  },
+  "love": {
+    "ru": "влюблён"
+  },
+  "focus": {
+    "ru": "сосредоточен"
+  },
+  "tired": {
+    "ru": "томность"
+  },
+  "giggle": {
+    "ru": "хохочет",
+    "emote": true
+  },
+  "rage": {
+    "ru": "злится",
+    "emote": true
+  },
+  "cry": {
+    "ru": "плачет",
+    "emote": true
+  },
+  "startle": {
+    "ru": "вздрогнул",
+    "emote": true
+  },
+  "nod": {
+    "ru": "кивает",
+    "emote": true
+  },
+  "shake": {
+    "ru": "мотает «нет»",
+    "emote": true
+  },
+  "puzzle": {
+    "ru": "озадачен",
+    "emote": true
+  },
+  "wink": {
+    "ru": "подмигивает",
+    "emote": true
+  },
+  "huff": {
+    "ru": "фыркает",
+    "emote": true
+  },
+  "blush": {
+    "ru": "смущается",
+    "emote": true
+  },
+  "happy": {
+    "ru": "радость",
+    "alias": true
+  }
 }

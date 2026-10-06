@@ -1,6 +1,6 @@
 import { MEMORY_RULES } from '../memory/prompt';
 import type { InputSource, SpeechMode } from '../types';
-import { moodNames } from './moods';
+import { moodHints } from './moods';
 import type { FyrLevel } from './persona';
 import { personaPrompt } from './persona';
 
@@ -63,11 +63,15 @@ function moodMarkRule(character: 'hedgehog' | 'tishka' | undefined): string[] {
   if (character !== 'tishka') {
     return [];
   }
-  const names = moodNames();
-  if (names.length === 0) {
+  const { emotions, emotes } = moodHints();
+  if (emotions.length === 0 && emotes.length === 0) {
     return [];
   }
-  return [`Эмоции: ${names.join(', ')}. Метку [эмоция] можно поставить внутри реплики say, не чаще одной на предложение.`];
+  const lines = [`Эмоции: ${emotions.join(', ')}. Метку [эмоция] можно поставить внутри реплики say, не чаще одной на предложение.`];
+  if (emotes.length > 0) {
+    lines.push(`Короткие движения той же меткой: ${emotes.join(', ')}.`);
+  }
+  return lines;
 }
 
 function modeLine(context: PromptContext): string {
