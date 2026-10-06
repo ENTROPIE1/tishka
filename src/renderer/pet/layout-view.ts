@@ -14,4 +14,13 @@ export function applyPetLayout(root: HTMLElement, layout: PetLayoutView): void {
   if (layout.muzzle !== undefined) {
     root.style.setProperty('--pet-muzzle', `${layout.muzzle}px`);
   }
+  if (layout.petReserve !== undefined) {
+    root.style.setProperty('--pet-reserve', `${layout.petReserve}px`);
+  }
+  if (layout.feet !== undefined) {
+    root.style.setProperty('--pet-feet', `${layout.feet}px`);
+  }
+  if (layout.stand !== undefined) {
+    root.style.setProperty('--pet-stand', `${layout.stand}px`);
+  }
 }

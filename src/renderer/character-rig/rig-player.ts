@@ -9,10 +9,19 @@ import { emptyShow, parseModel, type RigClip, type RigModel, type RigShow } from
 import { fitMatrix, RigCanvasSizer } from './rig-size';
 import { Blinker, nextBlinkDelay, shouldAutoBlink, showAt } from './rig-show';
 
+// Посадка широкого холста нового персонажа: холст заданного размера в точках,
+// модель рисуется так, чтобы ось была по центру, а высота фигуры — figureHeight.
+export interface RigFigure {
+  figureHeight: number;
+  canvasWidth: number;
+  canvasHeight: number;
+}
+
 export interface RigPlayerOptions {
   basePath?: string;
   modelFile?: string;
   loadModel?: (url: string) => Promise<string>;
+  figure?: RigFigure;
 }
 
 function cloneShow(show: RigShow): RigShow {
@@ -27,6 +36,7 @@ export class RigPlayer {
   private readonly basePath: string;
   private readonly modelFile: string;
   private readonly loader: (url: string) => Promise<string>;
+  private readonly figure: RigFigure | undefined;
   private container: HTMLElement | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -56,6 +66,7 @@ export class RigPlayer {
     this.basePath = options.basePath ?? '../model';
     this.modelFile = options.modelFile ?? 'model.json';
     this.loader = options.loadModel ?? defaultLoader;
+    this.figure = options.figure;
   }
 
   get data(): RigModel | null {
@@ -86,7 +97,12 @@ export class RigPlayer {
     this.container = container;
     const canvas = document.createElement('canvas');
     canvas.className = 'rig-canvas';
-    canvas.style.cssText = 'width:100%;height:100%;display:block';
+    // Широкий холст нового персонажа центрируется по оси: отрицательный отступ
+    // по половине ширины, иначе absolute-холст ушёл бы вправо от персонажа.
+    canvas.style.cssText = this.figure
+      ? `width:${this.figure.canvasWidth}px;height:${this.figure.canvasHeight}px;` +
+        `margin-left:${-this.figure.canvasWidth / 2}px;display:block`
+      : 'width:100%;height:100%;display:block';
     container.replaceChildren(canvas);
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -198,7 +214,7 @@ export class RigPlayer {
         physS: this.physics.scale,
         image: (src: string) => this.image(src)
       };
-      drawCharacter(ctx, model, fitMatrix(this.container, canvas, this.flipped), state);
+      drawCharacter(ctx, model, fitMatrix(this.container, canvas, this.flipped, this.figure?.figureHeight), state);
     }
     this.raf = requestAnimationFrame(this.frame);
   };

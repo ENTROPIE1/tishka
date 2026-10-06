@@ -21,6 +21,13 @@ export interface PetLayoutContent {
   // Высота мордочки персонажа над нижним краем: до этой линии поднимаются
   // облачко и карточка, чтобы не перекрывать лицо.
   muzzle?: number;
+  // Запас по внешнюю сторону персонажа под широкий холст (руки). У прежнего
+  // ежа ноль; у нового Тишки — половина лишней ширины холста.
+  petReserve?: number;
+  // Ширина ступней на экране: строка ввода короче на неё со стороны персонажа.
+  feet?: number;
+  // Насколько холст опускается ниже своей рамки, чтобы ступни встали на строку.
+  stand?: number;
   // Масштаб экрана (1, 1.25, 1.5 …). Положение окна округляется до целого
   // числа физических пикселей, чтобы при перемещении оно не «плыло».
   scale?: number;
@@ -43,6 +50,9 @@ export interface PetLayout {
   petHeight: number;
   muzzle: number;
   composerHeight: number;
+  petReserve: number;
+  feet: number;
+  stand: number;
 }
 
 // Вид раскладки, который главный процесс передаёт окну: сторона и размеры
@@ -52,6 +62,9 @@ export interface PetLayoutView {
   petWidth?: number;
   petHeight?: number;
   muzzle?: number;
+  petReserve?: number;
+  feet?: number;
+  stand?: number;
 }
 
 export const PET_LAYOUT_DEFAULTS = {
@@ -118,15 +131,18 @@ export function rectWithinAny(workAreas: WorkArea[], rect: PetWindowRect): boole
 export function defaultPetX(workArea: WorkArea, content: PetLayoutContent = {}): number {
   const petWidth = content.petWidth ?? PET_LAYOUT_DEFAULTS.petWidth;
   const margin = content.margin ?? PET_LAYOUT_DEFAULTS.margin;
-  return workArea.x + workArea.width - margin - petWidth;
+  const petReserve = content.petReserve ?? 0;
+  return workArea.x + workArea.width - (margin + petReserve) - petWidth;
 }
 
-// Положение ёжика, при котором он остаётся в пределах рабочей области.
+// Положение ёжика, при котором он остаётся в пределах рабочей области с учётом
+// запаса под широкий холст на внешней стороне.
 export function clampPetX(workArea: WorkArea, petX: number, content: PetLayoutContent = {}): number {
   const petWidth = content.petWidth ?? PET_LAYOUT_DEFAULTS.petWidth;
   const margin = content.margin ?? PET_LAYOUT_DEFAULTS.margin;
+  const petReserve = content.petReserve ?? 0;
   const min = workArea.x + margin;
-  const max = workArea.x + workArea.width - margin - petWidth;
+  const max = workArea.x + workArea.width - (margin + petReserve) - petWidth;
   return max < min ? min : clamp(petX, min, max);
 }
 
@@ -143,21 +159,26 @@ export function petLayout(
   const margin = content.margin ?? PET_LAYOUT_DEFAULTS.margin;
   const composerHeight = content.composerHeight ?? PET_LAYOUT_DEFAULTS.composerHeight;
   const muzzle = content.muzzle ?? PET_LAYOUT_DEFAULTS.muzzle;
+  const petReserve = content.petReserve ?? 0;
+  const feet = content.feet ?? 0;
+  const stand = content.stand ?? 0;
   const scale = content.scale ?? 1;
+  // Внешний отступ со стороны персонажа: обычный запас плюс место под холст.
+  const petMargin = margin + petReserve;
 
   const right = workArea.x + workArea.width;
   const desiredPetX = clampPetX(workArea, petX, content);
 
   // Колонка сужается до доступной ширины, но не меньше минимума.
-  const available = workArea.width - margin * 2 - gap - petWidth;
+  const available = workArea.width - margin - petMargin - gap - petWidth;
   const columnWidth = Math.max(columnMin, Math.min(column, available));
-  const width = margin + columnWidth + gap + petWidth + margin;
+  const width = margin + columnWidth + gap + petWidth + petMargin;
 
   // Обычная раскладка: колонка слева от ёжика. Если слева не помещается —
   // зеркалим: колонка уходит вправо, ёжик смотрит вправо.
   const normalX = desiredPetX - gap - columnWidth - margin;
   const mirrored = normalX < workArea.x;
-  const desiredWindowX = mirrored ? desiredPetX - margin : normalX;
+  const desiredWindowX = mirrored ? desiredPetX - petMargin : normalX;
 
   // Окно целиком держим в рабочей области; на сверхузких экранах минимум
   // колонки важнее и окно может выйти за край.
@@ -171,8 +192,8 @@ export function petLayout(
     x = maxX < minX ? workArea.x : clamp(snap(desiredWindowX, scale), minX, maxX);
   }
 
-  const petLeft = mirrored ? x + margin : x + margin + columnWidth + gap;
-  const columnX = mirrored ? x + margin + petWidth + gap : x + margin;
+  const petLeft = mirrored ? x + petMargin : x + margin + columnWidth + gap;
+  const columnX = mirrored ? x + petMargin + petWidth + gap : x + margin;
 
   return {
     window: { x, y: workArea.y, width, height: workArea.height },
@@ -183,6 +204,9 @@ export function petLayout(
     petWidth,
     petHeight,
     muzzle,
-    composerHeight
+    composerHeight,
+    petReserve,
+    feet,
+    stand
   };
 }

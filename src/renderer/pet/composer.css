@@ -1,8 +1,14 @@
+/* Строка ввода короче на ширину ступней персонажа: ноги встают на её конец,
+   а кнопки остаются в видимой части. В зеркальной раскладке — с другой стороны. */
 .composer-host {
   position: relative;
   z-index: 1;
-  width: 100%;
+  width: calc(100% - var(--pet-feet, 0px));
   max-width: 100%;
+}
+
+.pet.mirrored .composer-host {
+  margin-left: var(--pet-feet, 0px);
 }
 
 .composer {
@@ -12,11 +18,16 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding: 8px 10px 10px;
+  /* Правый отступ уводит кнопки из-под ног персонажа. */
+  padding: 8px calc(10px + var(--pet-feet, 0px)) 10px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow);
+}
+
+.pet.mirrored .composer {
+  padding: 8px 10px 10px calc(10px + var(--pet-feet, 0px));
 }
 
 /* Свёрнутая строка — тонкая полоска только под ёжиком. */
@@ -32,6 +43,8 @@
 .pet.mirrored .composer.collapsed {
   margin-left: 0;
   margin-right: auto;
+  /* Отступ расширенной строки не должен утолщать свёрнутую полочку. */
+  padding: 0;
 }
 
 .composer.collapsed .mic,

@@ -6,7 +6,7 @@ import { composerBusy, composerCollapsed } from './composer-state';
 import { createDrag } from './drag';
 import { applyPetLayout } from './layout-view';
 import { createListenUi } from './listen-ui';
-import { createInteractivity, hitTestRegions } from './interactivity';
+import { canvasPixelOpaque, createInteractivity, hitTestRegions, isInteractiveTarget } from './interactivity';
 import { micThreshold } from '../shared/mic-threshold';
 import { createPetCard } from './pet-card';
 import { createMoodTrack } from './mood-track';
@@ -64,9 +64,14 @@ const composer = createComposer({
 composerHost.append(composer.element);
 
 const regions = [character, bubble, cardHost, composer.element];
+// Широкий холст нового персонажа не ловит мышь сам: попадание считаем по его
+// непрозрачному пикселю, иначе щелчок уходит ниже — к строке ввода.
+const rigCanvas = (): HTMLCanvasElement | null => character.querySelector('canvas');
+const hitTest = (x: number, y: number): boolean =>
+  hitTestRegions(regions, x, y, { canvas: rigCanvas(), opaque: canvasPixelOpaque });
 const interactivity = createInteractivity({
   isVisible: () => onScreen,
-  hitTest: (x, y) => hitTestRegions(regions, x, y),
+  hitTest,
   setInteractive: (value) => window.tishka.pet.setInteractive(value)
 });
 
@@ -202,6 +207,9 @@ async function mountCharacter(kind: string): Promise<void> {
   characterModel = await loadCharacter(kind, character, (message) => {
     window.tishka.timingMark('character.fallback', { message });
   });
+  // У костного персонажа широкий прозрачный холст: он не должен перехватывать
+  // щелчки, попадание считается по пикселю (см. hitTest).
+  character.classList.toggle('rig', character.querySelector('canvas') !== null);
   applyCurrentCharacter();
 }
 
@@ -215,14 +223,30 @@ async function refreshCharacter(): Promise<void> {
   await mountCharacter(kind);
 }
 
-function initCharacter(): void {
-  character.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) {
+// Перетаскивание начинается по щелчку на самом персонаже. У костного персонажа
+// холст прозрачный по краям, поэтому обычный слушатель на элементе не годится:
+// точка проверяется по непрозрачности пикселя.
+function onCharacterPointerDown(event: PointerEvent): void {
+  if (event.button !== 0 || dragging) {
+    return;
+  }
+  if (isInteractiveTarget(event.target)) {
+    return;
+  }
+  const canvas = rigCanvas();
+  if (canvas !== null) {
+    if (!canvasPixelOpaque(canvas, event.clientX, event.clientY)) {
       return;
     }
-    drag.down(event.screenX, event.button);
-    event.preventDefault();
-  });
+  } else if (!(event.target instanceof Node) || !character.contains(event.target)) {
+    return;
+  }
+  drag.down(event.screenX, event.button);
+  event.preventDefault();
+}
+
+function initCharacter(): void {
+  window.addEventListener('pointerdown', onCharacterPointerDown);
 }
 
 // Перетаскивание ежа: указатель нажимают на персонаже, отпускают в любом месте
@@ -252,7 +276,7 @@ function initPointer(): void {
       drag.move(event.screenX);
       return;
     }
-    interactivity.set(hitTestRegions(regions, event.clientX, event.clientY));
+    interactivity.set(hitTest(event.clientX, event.clientY));
   });
   window.addEventListener('pointerup', () => drag.up());
   window.addEventListener('pointercancel', () => drag.cancel());

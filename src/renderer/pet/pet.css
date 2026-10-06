@@ -14,6 +14,12 @@
   --pet-margin: 16px;
   /* Высота мордочки ёжика над нижним краем ряда: ноги, подпись и нос в svg. */
   --pet-muzzle: 72px;
+  /* Новый Тишка: запас под холст, ширина ступней и посадка на строку ввода. */
+  --pet-reserve: 0px;
+  --pet-feet: 0px;
+  --pet-stand: 0px;
+  /* Подпись состояния: высота и промежуток над строкой ввода. */
+  --pet-label: 18px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -74,13 +80,21 @@ body {
   flex-direction: row-reverse;
 }
 
-/* Колонка ёжика: сам ёжик и видимая подпись состояния под ним. */
+/* Колонка ёжика: сам ёжик и видимая подпись состояния под ним. Внешний отступ
+   со стороны персонажа отдан под запас широкого холста: колонка не растягивается
+   на него, и место персонажа совпадает с раскладкой окна. У прежнего ежа ноль. */
 .pet-side {
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  margin-right: var(--pet-reserve, 0px);
+}
+
+.pet.mirrored .pet-side {
+  margin-right: 0;
+  margin-left: var(--pet-reserve, 0px);
 }
 
 .answers {
@@ -177,14 +191,31 @@ body {
   cursor: grab;
 }
 
-/* Проигрыватель нового персонажа: холст заполняет фигуру. */
+/* Костный персонаж: попадание считается по непрозрачности холста, поэтому сам
+   элемент и холст мышь не ловят — щелчок уходит к строке ввода под ними. */
+.character.rig,
 .character .rig-canvas {
-  width: 100%;
-  height: 100%;
+  pointer-events: none;
+}
+
+/* Костный персонаж опускается на строку ввода: его рамка доходит до неё, а
+   холст ниже. Подпись состояния остаётся над строкой (z-index выше холста). */
+.character.rig {
+  margin-bottom: calc(-1 * var(--pet-label));
+}
+
+/* Проигрыватель нового персонажа: холст шире фигуры и лежит поверх соседних
+   частей окна. Ось персонажа по центру холста, низ — на строке ввода. */
+.character .rig-canvas {
+  position: absolute;
+  left: 50%;
+  bottom: calc(-1 * var(--pet-stand, 0px));
   display: block;
 }
 
 .state-label {
+  position: relative;
+  z-index: 3;
   height: 16px;
   line-height: 16px;
   font-size: 12px;

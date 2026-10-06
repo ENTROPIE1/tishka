@@ -1,3 +1,8 @@
+import {
+  PET_TISHKA_CANVAS_HEIGHT,
+  PET_TISHKA_CANVAS_WIDTH,
+  PET_TISHKA_HEIGHT
+} from '../../pet/character-size';
 import { RigPlayer } from '../character-rig/rig-player';
 import type { Character } from './character';
 import { RigCharacter } from './rig-character';
@@ -16,7 +21,16 @@ export function createCharacter(kind: string): Character {
     return new SvgHedgehog();
   }
   if (kind === 'rig' || kind === 'tishka') {
-    return new RigCharacter(new RigPlayer());
+    // Новый Тишка рисуется на широком холсте с запасом под руки и под эффекты.
+    return new RigCharacter(
+      new RigPlayer({
+        figure: {
+          figureHeight: PET_TISHKA_HEIGHT,
+          canvasWidth: PET_TISHKA_CANVAS_WIDTH,
+          canvasHeight: PET_TISHKA_CANVAS_HEIGHT
+        }
+      })
+    );
   }
   throw new Error(`character-factory: неизвестный вид персонажа «${kind}»`);
 }
