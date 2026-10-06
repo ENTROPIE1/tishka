@@ -94,7 +94,8 @@ describe('файлы пресетов', () => {
     const builtin = builtinNames();
     const byServer: Record<string, string[]> = {
       confluence: serverToolNames('confluence').map((name) => `confluence__${name}`),
-      exchange: serverToolNames('exchange').map((name) => `exchange__${name}`)
+      exchange: serverToolNames('exchange').map((name) => `exchange__${name}`),
+      jira: serverToolNames('jira').map((name) => `jira__${name}`)
     };
     for (const name of files) {
       const preset = readPreset(name);
@@ -105,6 +106,7 @@ describe('файлы пресетов', () => {
     }
     expect(byServer.confluence.length).toBeGreaterThan(0);
     expect(byServer.exchange.length).toBeGreaterThan(0);
+    expect(byServer.jira.length).toBeGreaterThan(0);
   });
 
   it('подстановки ссылаются на входы и прошлые шаги, в say нет цифр и латиницы', () => {
@@ -214,6 +216,7 @@ function stubRegistry(): ToolRegistry {
     exchange__mail_search: async () => ({ ok: true, content: '{}', data: { mails: [] } }),
     exchange__mail_draft_link: async () => ({ ok: true, content: '{}', data: { url: 'https://example.org/mail', hint: '' } }),
     exchange__meeting_draft_link: async () => ({ ok: true, content: '{}', data: { url: 'https://example.org/meet' } }),
+    jira__jira_my_issues: async () => ({ ok: true, content: '{}', data: { total: 0, groups: [] } }),
     confluence__get_page_version: async () => ({ ok: true, content: '{}', data: { version: '5', url: 'https://example.org/page' } }),
     confluence__get_page_history: async () => ({ ok: true, content: '{}', data: { versions: [] } })
   };

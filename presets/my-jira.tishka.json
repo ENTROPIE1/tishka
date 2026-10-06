@@ -1,0 +1,29 @@
+{
+  "format": "tishka-skill/1",
+  "id": "my-jira",
+  "name": "Что у меня в Jira",
+  "description": "Показывает мои открытые задачи Jira по статусам",
+  "phrases": ["что у меня в Jira", "мои задачи в Jira", "что у меня в работе"],
+  "requires": ["jira"],
+  "trigger": { "type": "manual" },
+  "steps": [
+    {
+      "id": "issues",
+      "tool": "jira__jira_my_issues",
+      "args": { "limit": 25 }
+    },
+    {
+      "id": "digest",
+      "ask": "Вот мои открытые задачи Jira: {{steps.issues.content}}. Сгруппируй их по статусу и перечисли коротко: ключ и о чём задача."
+    },
+    {
+      "id": "answer",
+      "say": "Посмотрел твои задачи, всё в карточке",
+      "show": {
+        "kind": "text",
+        "title": "Мои задачи в Jira",
+        "markdown": "{{steps.digest.content}}"
+      }
+    }
+  ]
+}

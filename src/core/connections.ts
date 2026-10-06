@@ -1,6 +1,6 @@
 import type { McpServerConfig } from './types';
 
-export type ConnectionTemplate = 'confluence' | 'exchange' | 'custom-stdio' | 'custom-http';
+export type ConnectionTemplate = 'confluence' | 'exchange' | 'jira' | 'custom-stdio' | 'custom-http';
 
 export interface ConnectionDraft {
   template: ConnectionTemplate;
@@ -15,9 +15,10 @@ export interface ConnectionPlan {
   secretsToSet: Record<string, string>;       // имя секрета → значение
 }
 
-const TEMPLATES: readonly ConnectionTemplate[] = ['confluence', 'exchange', 'custom-stdio', 'custom-http'];
+const TEMPLATES: readonly ConnectionTemplate[] = ['confluence', 'exchange', 'jira', 'custom-stdio', 'custom-http'];
 const CONFLUENCE_SCRIPT = 'mcp-servers/confluence/dist/index.js';
 const EXCHANGE_SCRIPT = 'mcp-servers/exchange/dist/index.js';
+const JIRA_SCRIPT = 'mcp-servers/jira/dist/index.js';
 const NAME_PATTERN = /^[A-Za-z0-9-]+$/;
 const MAX_NAME_LENGTH = 32;
 const SECRET_MARKER = '${secret:';
@@ -102,6 +103,9 @@ function templateErrors(draft: ConnectionDraft): string[] {
         errors.push('Укажите имя пользователя');
       }
       break;
+    case 'jira':
+      addUrlError(errors, fieldValue(draft.fields, 'url'), 'Укажите адрес');
+      break;
     case 'custom-stdio':
       if (fieldValue(draft.fields, 'command').length === 0) {
         errors.push('Укажите команду');
@@ -155,6 +159,31 @@ function buildExchange(draft: ConnectionDraft, secretsToSet: Record<string, stri
   };
 }
 
+function buildJira(draft: ConnectionDraft, secretsToSet: Record<string, string>): StdioServer {
+  const token = secretName(draft.name, 'token');
+  const password = secretName(draft.name, 'password');
+  const tokenValue = draft.secrets.token ?? '';
+  if (tokenValue.length > 0) {
+    secretsToSet[token] = tokenValue;
+  }
+  const passwordValue = draft.secrets.password ?? '';
+  if (passwordValue.length > 0) {
+    secretsToSet[password] = passwordValue;
+  }
+  return {
+    name: draft.name,
+    transport: 'stdio',
+    command: 'node',
+    args: [JIRA_SCRIPT],
+    env: {
+      JIRA_URL: fieldValue(draft.fields, 'url'),
+      JIRA_USER: fieldValue(draft.fields, 'user'),
+      JIRA_TOKEN: secretRef(token),
+      JIRA_PASSWORD: secretRef(password)
+    }
+  };
+}
+
 function buildCustomStdio(draft: ConnectionDraft, secretsToSet: Record<string, string>): StdioServer {
   const server: StdioServer = {
     name: draft.name,
@@ -201,6 +230,9 @@ function buildServer(draft: ConnectionDraft): ConnectionPlan {
   switch (draft.template) {
     case 'exchange':
       server = buildExchange(draft, secretsToSet);
+      break;
+    case 'jira':
+      server = buildJira(draft, secretsToSet);
       break;
     case 'custom-stdio':
       server = buildCustomStdio(draft, secretsToSet);
@@ -271,6 +303,16 @@ export function describeConnection(server: McpServerConfig): {
         user: server.env?.EXCHANGE_USER ?? ''
       },
       secretNames: ['password']
+    };
+  }
+  if (matchesScript(args, JIRA_SCRIPT)) {
+    return {
+      template: 'jira',
+      fields: {
+        url: server.env?.JIRA_URL ?? '',
+        user: server.env?.JIRA_USER ?? ''
+      },
+      secretNames: ['token', 'password']
     };
   }
   const env = server.env ?? {};

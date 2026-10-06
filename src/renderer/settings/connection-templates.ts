@@ -59,6 +59,20 @@ export const TEMPLATES: Record<ConnectionTemplate, TemplateSpec> = {
     freeEnv: false,
     defaultName: 'exchange'
   },
+  jira: {
+    label: 'Jira',
+    description: 'Jira читает задачи, комментарии и ищет по ним',
+    fields: [
+      { key: 'url', label: 'Адрес', hint: 'Адрес Jira без пути к задаче', placeholder: 'https://jira.example.ru' },
+      { key: 'user', label: 'Логин', hint: 'Нужен, если вход по логину и паролю, а не по токену' }
+    ],
+    secrets: [
+      { key: 'token', label: 'Токен', hint: 'Личный токен доступа Jira; если его нет — заполните логин и пароль' },
+      { key: 'password', label: 'Пароль', hint: 'Пароль для входа без токена' }
+    ],
+    freeEnv: false,
+    defaultName: 'jira'
+  },
   'custom-stdio': {
     label: 'Свой сервер (stdio)',
     fields: [
