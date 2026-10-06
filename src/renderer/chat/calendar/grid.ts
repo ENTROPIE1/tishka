@@ -5,8 +5,15 @@ import type { WorkHours } from './deps';
 import { allDayEvents, layoutDay } from './layout';
 
 export const HOUR_HEIGHT = 44;
+export const GUTTER_WIDTH = 52;
 
 const WEEKDAY_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+
+function gutter(className: string): HTMLElement {
+  const box = el('div', className);
+  box.style.width = `${GUTTER_WIDTH}px`;
+  return box;
+}
 
 const KIND_MARK: Record<string, string> = {
   meeting: '●',
@@ -77,6 +84,7 @@ function eventBlock(event: CalendarEvent, callbacks: GridCallbacks, position?: {
 
 function renderAllDay(container: HTMLElement, days: Date[], events: CalendarEvent[], callbacks: GridCallbacks): void {
   const row = el('div', 'calendar-allday');
+  row.append(gutter('calendar-allday-gutter'));
   for (const day of days) {
     const cell = el('div', 'calendar-allday-cell');
     if (days.length > 1) {
@@ -96,7 +104,7 @@ function renderAllDay(container: HTMLElement, days: Date[], events: CalendarEven
 
 function renderColumns(container: HTMLElement, days: Date[], events: CalendarEvent[], workHours: WorkHours, callbacks: GridCallbacks): void {
   const body = el('div', 'calendar-body');
-  const times = el('div', 'calendar-times');
+  const times = gutter('calendar-times');
   for (let hour = 0; hour < 24; hour += 1) {
     const cell = el('div', 'calendar-time', `${String(hour).padStart(2, '0')}:00`);
     cell.style.height = `${HOUR_HEIGHT}px`;
@@ -158,7 +166,7 @@ export function renderGrid(
   const grid = el('div', 'calendar-grid');
   if (days.length > 1) {
     const header = el('div', 'calendar-week-header');
-    header.append(el('div', 'calendar-week-gutter'));
+    header.append(gutter('calendar-week-gutter'));
     for (const day of days) {
       header.append(el('div', 'calendar-week-day', `${WEEKDAY_SHORT[day.getDay()]} ${day.getDate()}`));
     }

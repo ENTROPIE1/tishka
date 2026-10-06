@@ -52,6 +52,11 @@
   min-height: 28px;
 }
 
+.calendar-allday-gutter {
+  flex: none;
+  border-right: 1px solid var(--border);
+}
+
 .calendar-allday-cell {
   flex: 1;
   display: flex;
@@ -59,6 +64,10 @@
   gap: 4px;
   padding: 4px 6px;
   border-left: 1px solid var(--border);
+}
+
+.calendar-allday-gutter + .calendar-allday-cell {
+  border-left: none;
 }
 
 .calendar-allday-day {
@@ -74,7 +83,6 @@
 }
 
 .calendar-times {
-  width: 52px;
   flex: none;
   border-right: 1px solid var(--border);
 }
@@ -99,6 +107,10 @@
   flex: 1;
   min-width: 0;
   border-left: 1px solid var(--border);
+}
+
+.calendar-col:first-child {
+  border-left: none;
 }
 
 .calendar-hour {
@@ -192,7 +204,6 @@
 }
 
 .calendar-week-gutter {
-  width: 52px;
   flex: none;
   border-right: 1px solid var(--border);
 }
@@ -205,6 +216,10 @@
   font-size: 12px;
   color: var(--muted);
   border-left: 1px solid var(--border);
+}
+
+.calendar-week-gutter + .calendar-week-day {
+  border-left: none;
 }
 
 .calendar-today {

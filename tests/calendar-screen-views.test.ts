@@ -7,6 +7,7 @@ import { defaultConfig } from '../src/core/config';
 import type { CalendarEvent } from '../src/core/calendar/types';
 import type { CalendarApi } from '../src/renderer/chat/calendar/deps';
 import { mountCalendarScreen } from '../src/renderer/chat/calendar/screen';
+import { GUTTER_WIDTH, HOUR_HEIGHT } from '../src/renderer/chat/calendar/grid';
 import type { ConnectionView } from '../src/main/settings-types';
 
 const NOW = new Date('2026-10-07T10:00:00');
@@ -90,6 +91,75 @@ describe('вид «Неделя»', () => {
 
     expect(root.querySelector('.calendar-week-header')).not.toBeNull();
     expect(root.querySelectorAll('.calendar-col')).toHaveLength(7);
+  });
+});
+
+describe('ровная сетка календаря', () => {
+  it('в неделе желоб один у шапки, «весь день» и колонки часов', async () => {
+    const { root } = setup([]);
+    await flush();
+    buttonByText(root, 'Неделя').click();
+    await flush();
+
+    const headerGutter = root.querySelector<HTMLElement>('.calendar-week-gutter');
+    const alldayGutter = root.querySelector<HTMLElement>('.calendar-allday-gutter');
+    const times = root.querySelector<HTMLElement>('.calendar-times');
+    expect(headerGutter).not.toBeNull();
+    expect(alldayGutter).not.toBeNull();
+    expect(times).not.toBeNull();
+
+    const width = `${GUTTER_WIDTH}px`;
+    expect(headerGutter!.style.width).toBe(width);
+    expect(alldayGutter!.style.width).toBe(width);
+    expect(times!.style.width).toBe(width);
+  });
+
+  it('число колонок дней совпадает в шапке, «весь день» и теле', async () => {
+    const { root } = setup([]);
+    await flush();
+    buttonByText(root, 'Неделя').click();
+    await flush();
+
+    const headerDays = root.querySelectorAll('.calendar-week-day');
+    const alldayDays = root.querySelectorAll('.calendar-allday-cell');
+    const bodyDays = root.querySelectorAll('.calendar-col');
+    expect(headerDays).toHaveLength(7);
+    expect(alldayDays).toHaveLength(7);
+    expect(bodyDays).toHaveLength(7);
+  });
+
+  it('24 клетки часов и 24 подписи высотой HOUR_HEIGHT', async () => {
+    const { root } = setup([]);
+    await flush();
+
+    const times = [...root.querySelectorAll<HTMLElement>('.calendar-time')];
+    const hours = [...root.querySelectorAll<HTMLElement>('.calendar-hour')];
+    expect(times).toHaveLength(24);
+    expect(hours).toHaveLength(24);
+    for (const cell of [...times, ...hours]) {
+      expect(cell.style.height).toBe(`${HOUR_HEIGHT}px`);
+    }
+  });
+
+  it('событие стоит на линии по минутам начала', async () => {
+    const event = localEvent({ title: 'Ровное', start: '2026-10-07T02:30:00', end: '2026-10-07T03:00:00' });
+    const { root } = setup([event]);
+    await flush();
+
+    const block = root.querySelector<HTMLElement>('.calendar-col-events .calendar-event');
+    expect(block).not.toBeNull();
+    expect(block!.style.top).toBe(`${(150 / 60) * HOUR_HEIGHT}px`);
+  });
+
+  it('вид «День» остаётся одной колонкой с желобом', async () => {
+    const { root } = setup([]);
+    await flush();
+
+    expect(root.querySelector('.calendar-week-header')).toBeNull();
+    expect(root.querySelectorAll('.calendar-col')).toHaveLength(1);
+    expect(root.querySelectorAll('.calendar-allday-cell')).toHaveLength(1);
+    expect(root.querySelector<HTMLElement>('.calendar-times')?.style.width).toBe(`${GUTTER_WIDTH}px`);
+    expect(root.querySelector<HTMLElement>('.calendar-allday-gutter')?.style.width).toBe(`${GUTTER_WIDTH}px`);
   });
 });
 
