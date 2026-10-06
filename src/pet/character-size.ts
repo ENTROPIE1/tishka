@@ -21,13 +21,16 @@ export const TISHKA_MODEL_AXIS_X = 400;
 export const TISHKA_CANVAS_WIDTH = 880;
 // Запас холста сверху над верхом модели — под эффекты (уведомление и прочее).
 export const TISHKA_CANVAS_TOP = 120;
-// Ширина ступней в единицах модели: на неё укорачивается строка ввода.
+// Ширина ступней в единицах модели: на неё уводится поле строки ввода.
 export const TISHKA_FEET_WIDTH = 336;
 // Низ ступней в единицах модели: ниже фигура пустая.
 export const TISHKA_FEET_BOTTOM = 1184;
 
 // Высота нового персонажа на экране в точках.
 export const PET_TISHKA_HEIGHT = 260;
+
+// Высота строки ввода на экране: поля 8 и 10 точек плюс кнопки 30.
+export const PET_COMPOSER_HEIGHT = 48;
 
 // Перевод единиц модели в точки при высоте фигуры PET_TISHKA_HEIGHT.
 function toPoints(units: number): number {
@@ -49,18 +52,20 @@ export const PET_TISHKA_CANVAS_WIDTH = toPoints(TISHKA_CANVAS_WIDTH);
 export const PET_TISHKA_CANVAS_HEIGHT = toPoints(TISHKA_MODEL_HEIGHT + TISHKA_CANVAS_TOP);
 // Запас по бокам тела под руку — половина лишней ширины холста.
 export const PET_TISHKA_ARM_RESERVE = Math.ceil((PET_TISHKA_CANVAS_WIDTH - PET_TISHKA_SIZE.width) / 2);
-// Ширина ступней на экране: на неё короче строка ввода.
+// Ширина ступней на экране: на неё уводится поле строки ввода.
 export const PET_TISHKA_FEET_WIDTH = toPoints(TISHKA_FEET_WIDTH);
-// Насколько холст опускается ниже рамки, чтобы ступни встали на строку ввода.
-export const PET_TISHKA_STAND = toPoints(TISHKA_MODEL_HEIGHT - TISHKA_FEET_BOTTOM);
+// Посадка на строку ввода: рамка персонажа и холст опускаются на высоту строки,
+// чтобы низ ступней лёг на её верхнюю половину. Рамка и до посадки нависала над
+// подписью состояния (18 точек), ступни стоят на строке, а не в воздухе.
+export const PET_TISHKA_STAND = PET_COMPOSER_HEIGHT;
 
 export function petCharacterSize(kind: PetCharacterKind): PetCharacterSize {
   return kind === 'tishka' ? PET_TISHKA_SIZE : PET_HEDGEHOG_SIZE;
 }
 
 // Настройки раскладки под выбранного персонажа. Высокий Тишка стоит ногами на
-// той же линии; его холст шире тела, поэтому окно придерживает запас под руку
-// и отдаёт ногам часть строки ввода. Прежний ёж не меняется.
+// строке ввода; его холст шире тела, поэтому окно придерживает запас под руку,
+// а поле строки уводится из-под ступней внутренним полем. Прежний ёж не меняется.
 export function petCharacterContent(kind: PetCharacterKind): PetLayoutContent {
   const size = petCharacterSize(kind);
   if (kind === 'tishka') {

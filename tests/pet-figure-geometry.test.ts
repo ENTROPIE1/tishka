@@ -91,12 +91,12 @@ describe('геометрия DOM: запас, холст и строка вво�
     const area: WorkArea = { x: 0, y: 0, width: 1920, height: 1020 };
     for (const petX of [area.x, 960, area.width]) {
       const layout = petLayout(area, petX, tishka);
-      const hostWidth = layout.window.width - margin * 2 - layout.feet;
+      // Строка во всю ширину окна, поле и кнопки уходят из-под ступней
+      // внутренним полем со стороны персонажа.
+      const hostWidth = layout.window.width - margin * 2;
       const innerWidth = hostWidth - (COMPOSER_PAD + layout.feet) - COMPOSER_PAD;
       expect(innerWidth).toBeGreaterThanOrEqual(composerControlsWidth());
-      const hostLeft = layout.mirrored
-        ? layout.window.x + margin + layout.feet
-        : layout.window.x + margin;
+      const hostLeft = layout.window.x + margin;
       expect(hostLeft).toBeGreaterThanOrEqual(layout.window.x);
       expect(hostLeft + hostWidth).toBeLessThanOrEqual(layout.window.x + layout.window.width);
     }
@@ -107,15 +107,20 @@ describe('геометрия DOM: запас, холст и строка вво�
     const area: WorkArea = { x: 0, y: 0, width: 1920, height: 1020 };
     for (const petX of [area.x, 960, area.width]) {
       const layout = petLayout(area, petX, tishka);
-      const hostWidth = layout.window.width - margin * 2 - layout.feet;
-      const hostLeft = layout.mirrored
-        ? layout.window.x + margin + layout.feet
-        : layout.window.x + margin;
+      const hostWidth = layout.window.width - margin * 2;
+      const hostLeft = layout.window.x + margin;
       const collapsedLeft = layout.mirrored ? hostLeft : hostLeft + hostWidth - layout.petWidth;
       const collapsedRight = collapsedLeft + layout.petWidth;
       expect(collapsedLeft).toBeGreaterThanOrEqual(layout.window.x);
       expect(collapsedRight).toBeLessThanOrEqual(layout.window.x + layout.window.width);
     }
+  });
+
+  it('рамка и холст опускаются на посадку: ступни на верхней половине строки', () => {
+    // Рамка персонажа уходит вниз на --pet-stand, холст лежит на её нижней
+    // границе, строка ввода рисуется под ними.
+    expect(petCss).toMatch(/\.character\.rig\s*\{[^}]*margin-bottom:\s*calc\(-1 \* var\(--pet-stand/);
+    expect(petCss).toMatch(/\.character \.rig-canvas\s*\{[^}]*bottom:\s*0/);
   });
 
   it('холст персонажа выше облачка и строки ввода по слоям', () => {
