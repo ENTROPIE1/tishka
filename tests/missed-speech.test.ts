@@ -27,6 +27,11 @@ describe('isMissedSpeech: промах или отсеянный шум', () => 
     expect(isMissedSpeech(empty, MISSED_SPEECH_MIN_MS)).toBe(false);
     expect(isMissedSpeech({ ok: false, error: 'Не расслышал', unreliable: true }, 5000)).toBe(false);
   });
+
+  it('отброшенная выдумка распознавания — не промах', () => {
+    const hallucination = { ok: false as const, error: 'Не расслышал', empty: true, hallucination: true };
+    expect(isMissedSpeech(hallucination, MISSED_SPEECH_MIN_MS + 1)).toBe(false);
+  });
 });
 
 describe('wake-flow: подсказка о калибровке после промахов', () => {
@@ -68,6 +73,21 @@ describe('wake-flow: подсказка о калибровке после пр�
 
     expect(h.missed()).toBe(0);
     expect(h.captions).toEqual(['не разобрал']);
+    expect(h.errors).toEqual([]);
+  });
+
+  it('отброшенная выдумка распознавания не зовёт подсказку о калибровке', async () => {
+    vi.useFakeTimers();
+    const h = makeHarness(
+      [{ error: 'Не расслышал', empty: true, hallucination: true }],
+      voice({ talkByDefault: true })
+    );
+    h.flow.enableConversation();
+
+    h.flow.handlePhrase(LONG);
+    await flush();
+
+    expect(h.missed()).toBe(0);
     expect(h.errors).toEqual([]);
   });
 });

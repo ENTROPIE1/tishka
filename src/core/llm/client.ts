@@ -71,22 +71,22 @@ async function readBody(response: Response): Promise<string> {
 
 // Тело ошибки шлюза читается только для распознавания лимита; в текст ошибки
 // оно не попадает — ни идентификатор ключа, ни почта в ленту не уходят.
-async function responseError(response: Response): Promise<LlmError> {
+async function responseError(response: Response, model: string): Promise<LlmError> {
   const status = response.status;
   const body = await readBody(response);
   if (body.toLowerCase().includes(BUDGET_MARKER)) {
-    return new LlmError('limit', 'На модели исчерпан дневной лимит', true);
+    return new LlmError('limit', 'На модели исчерпан дневной лимит', true, model);
   }
   if (status === 401 || status === 403) {
-    return new LlmError('auth', 'Ключ шлюза моделей отклонён');
+    return new LlmError('auth', 'Ключ шлюза моделей отклонён', false, model);
   }
   if (status === 429) {
-    return new LlmError('limit', 'Шлюз моделей просит снизить частоту запросов');
+    return new LlmError('limit', 'Шлюз моделей просит снизить частоту запросов', false, model);
   }
   if (status >= 500) {
-    return new LlmError('server', `Шлюз моделей недоступен, код ответа ${status}`);
+    return new LlmError('server', `Шлюз моделей недоступен, код ответа ${status}`, false, model);
   }
-  return new LlmError('bad_response', `Шлюз моделей отклонил запрос, код ответа ${status}`);
+  return new LlmError('bad_response', `Шлюз моделей отклонил запрос, код ответа ${status}`, false, model);
 }
 
 function isTransition(error: unknown): boolean {
@@ -210,7 +210,7 @@ export function createLlmClient(opts: LlmClientOptions): {
           await delay(retryDelay(attempt));
           continue;
         }
-        throw new LlmError('network', 'Не удалось связаться со шлюзом моделей');
+        throw new LlmError('network', 'Не удалось связаться со шлюзом моделей', false, model);
       }
 
       if (response.ok) {
@@ -220,7 +220,7 @@ export function createLlmClient(opts: LlmClientOptions): {
         return readOk(response, api);
       }
 
-      const error = await responseError(response);
+      const error = await responseError(response, model);
       const retryable = RETRYABLE_STATUSES.has(response.status) && !error.budget;
       if (retryable && attempt < attempts - 1) {
         const retryAfter = parseRetryAfter(response.headers.get('Retry-After'));
@@ -230,7 +230,7 @@ export function createLlmClient(opts: LlmClientOptions): {
       throw error;
     }
 
-    throw new LlmError('server', 'Шлюз моделей недоступен');
+    throw new LlmError('server', 'Шлюз моделей недоступен', false, model);
   }
 
   async function chat(req: ChatRequest): Promise<ChatResponse> {

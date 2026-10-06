@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configWith, makeChild, okResponse, service, voice } from './stt-test-helpers';
 
 const HELP = [
@@ -20,6 +20,10 @@ function fetchFirstDown() {
 }
 
 const BASE = ['-m', 'model.bin', '-l', 'ru', '-t', '4', '-ac', '768', '--host', '127.0.0.1', '--port', '8178'];
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('createSttService: ключи против выдумок', () => {
   it('добавляет -sns и детектор речи, состояние детектора «включён»', async () => {
@@ -90,5 +94,29 @@ describe('createSttService: ключи против выдумок', () => {
     await expect(stt.start()).resolves.toEqual({ ok: true });
     expect(spawn).not.toHaveBeenCalled();
     expect(stt.detector()).toBe('off');
+  });
+
+  it('справка читается асинхронно: зависшая программа не блокирует запуск', async () => {
+    vi.useFakeTimers();
+    const hanging = makeChild();
+    const helpSpawn = vi.fn((_exe: string, _args: string[], _opts: unknown) => hanging.child);
+    const { child } = makeChild();
+    const serviceSpawn = vi.fn((_exe: string, _args: string[], _opts: unknown) => child);
+    const stt = service(() => configWith('C:\\w\\whisper.exe'), serviceSpawn, fetchFirstDown(), () => true, {
+      spawnHelp: helpSpawn as unknown as typeof import('node:child_process').spawn,
+      listDir: () => []
+    });
+
+    const promise = stt.start();
+    await Promise.resolve();
+    expect(serviceSpawn).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5000);
+
+    await expect(promise).resolves.toEqual({ ok: true });
+    expect(helpSpawn).toHaveBeenCalledWith('C:\\w\\whisper.exe', ['--help'], expect.anything());
+    expect(hanging.kill).toHaveBeenCalled();
+    expect(serviceSpawn).toHaveBeenCalledTimes(1);
+    expect(serviceSpawn.mock.calls[0][1]).toEqual(BASE);
   });
 });

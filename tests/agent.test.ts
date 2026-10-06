@@ -327,6 +327,22 @@ describe('createAgent', () => {
     expect(error?.message).toContain('Подключениях');
   });
 
+  it('ошибка модели картинок называет её имя, а не основную', async () => {
+    const { registry } = makeRegistry();
+    const llm = {
+      chat: vi.fn(async (): Promise<ChatResponse> => {
+        throw new LlmError('server', 'Шлюз моделей недоступен, код ответа 500', false, 'DKS-Vision');
+      })
+    };
+    const { agent, events } = makeAgent(llm, registry);
+
+    await agent.handle('что на экране');
+
+    const error = events.find((event): event is Extract<TishkaEvent, { type: 'error' }> => event.type === 'error');
+    expect(error?.message).toContain('DKS-Vision');
+    expect(error?.message).not.toContain('dks-local');
+  });
+
   it('длинный результат инструмента обрезается с пометкой', async () => {
     const long = 'х'.repeat(7000);
     const { registry, calls } = makeRegistry({ ok: true, content: long });

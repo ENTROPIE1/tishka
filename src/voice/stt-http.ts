@@ -4,7 +4,7 @@ import { wavDurationSec } from './wav';
 
 export type TranscribeResult =
   | { ok: true; text: string }
-  | { ok: false; error: string; empty?: boolean; unreliable?: boolean };
+  | { ok: false; error: string; empty?: boolean; unreliable?: boolean; hallucination?: boolean };
 
 const REQUEST_TIMEOUT_MS = 30000;
 export const PROBE_TIMEOUT_MS = 3000;
@@ -276,7 +276,7 @@ export async function transcribeHttp(
           chars: 0,
           ms: Date.now() - startedAt
         });
-        return { ok: false, error: 'Не расслышал', empty: true };
+        return { ok: false, error: 'Не расслышал', empty: true, hallucination: true };
       }
       text = hallucination.text;
     }

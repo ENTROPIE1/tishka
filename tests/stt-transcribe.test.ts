@@ -174,7 +174,8 @@ describe('createSttService.transcribe', () => {
     await expect(stt.transcribe(new Uint8Array([1, 2]))).resolves.toEqual({
       ok: false,
       error: 'Не расслышал',
-      empty: true
+      empty: true,
+      hallucination: true
     });
     const end = marks.find((item) => item.event === 'stt.request.end');
     expect(end?.details).toMatchObject({ ok: false, reason: 'hallucination' });

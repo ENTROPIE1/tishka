@@ -34,11 +34,13 @@ export type LlmErrorKind = 'auth' | 'limit' | 'network' | 'server' | 'bad_respon
 export class LlmError extends Error {
   readonly kind: LlmErrorKind;
   readonly budget: boolean;   // дневной лимит ключа исчерпан (шлюз: exceeded budget)
+  readonly model?: string;    // модель, на которую шёл отказавший запрос
 
-  constructor(kind: LlmErrorKind, message: string, budget = false) {
+  constructor(kind: LlmErrorKind, message: string, budget = false, model?: string) {
     super(message);
     this.name = 'LlmError';
     this.kind = kind;
     this.budget = budget;
+    this.model = model;
   }
 }

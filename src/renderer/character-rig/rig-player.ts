@@ -2,10 +2,10 @@
 // даёт play/setShow/setMouth/setFlip и масштабирует холст под контейнер с учётом плотности.
 
 import { drawCharacter, type RenderState } from './rig-draw';
-import { IDENTITY, scale, translate, type Mat } from './rig-matrix';
 import { RigPoseAnimator } from './rig-pose';
 import { RigPhysics } from './rig-physics';
 import { emptyShow, parseModel, type RigClip, type RigModel, type RigShow } from './rig-data';
+import { fitMatrix, RigCanvasSizer } from './rig-size';
 import { Blinker, nextBlinkDelay, shouldAutoBlink, showAt } from './rig-show';
 
 export interface RigPlayerOptions {
@@ -41,6 +41,7 @@ export class RigPlayer {
   private nextBlinkAt = 0;
   private raf = 0;
   private running = false;
+  private readonly sizer = new RigCanvasSizer();
   private readonly onVisibility = (): void => {
     if (document.hidden) {
       this.stopLoop();
@@ -82,6 +83,7 @@ export class RigPlayer {
     container.replaceChildren(canvas);
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.sizer.attach(container, canvas);
     document.addEventListener('visibilitychange', this.onVisibility);
     this.startLoop();
   }
@@ -118,6 +120,7 @@ export class RigPlayer {
 
   dispose(): void {
     this.stopLoop();
+    this.sizer.detach();
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.container?.replaceChildren();
     this.canvas = null;
@@ -135,30 +138,12 @@ export class RigPlayer {
     return img;
   }
 
-  // Масштаб под контейнер с учётом плотности пикселей; повторяется на смену размера окна.
-  private baseMatrix(): Mat {
-    const canvas = this.canvas;
-    if (canvas === null) {
-      return IDENTITY;
-    }
-    const dpr = window.devicePixelRatio || 1;
-    const width = this.container?.clientWidth ?? canvas.clientWidth;
-    const height = this.container?.clientHeight ?? canvas.clientHeight;
-    if (canvas.width !== Math.round(width * dpr)) {
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
-    }
-    canvas.style.transform = this.flipped ? 'scaleX(-1)' : '';
-    const s = Math.min(width / 520, height / 1220);
-    let base = scale(IDENTITY, dpr, dpr);
-    base = translate(base, width / 2 - 400 * s, height / 2 - 605 * s);
-    return scale(base, s, s);
-  }
-
+  // Кадр: размер холста, клип, физика и отрисовка под текущую обстановку.
   private frame = (now: number): void => {
     if (!this.running) {
       return;
     }
+    this.sizer.tick();
     const model = this.model;
     const animator = this.animator;
     const ctx = this.ctx;
@@ -185,7 +170,7 @@ export class RigPlayer {
         physS: this.physics.scale,
         image: (src: string) => this.image(src)
       };
-      drawCharacter(ctx, model, this.baseMatrix(), state);
+      drawCharacter(ctx, model, fitMatrix(this.container, canvas, this.flipped), state);
     }
     this.raf = requestAnimationFrame(this.frame);
   };

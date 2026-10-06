@@ -212,7 +212,9 @@ export function createAgent(deps: AgentDeps): Agent {
         }
         const kind = error instanceof LlmError ? error.kind : undefined;
         const budget = error instanceof LlmError && error.budget;
-        const human = errorToHuman(kind, budget, deps.getModel());
+        // Имя берём у самой ошибки: запрос мог уйти на запасную или на модель картинок.
+        const model = error instanceof LlmError && error.model !== undefined ? error.model : deps.getModel();
+        const human = errorToHuman(kind, budget, model);
         deps.events.emit({ type: 'error', message: human.feed });
         return finish({ say: human.say, mood: 'confused' });
       }

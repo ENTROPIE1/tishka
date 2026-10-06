@@ -75,6 +75,7 @@ describe('отказ основной модели и запасная', () => {
 
     expect(error).toBeInstanceOf(LlmError);
     expect(error.kind).toBe('auth');
+    expect(error.model).toBe('main');
     expect(onFallback).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -104,6 +105,7 @@ describe('отказ основной модели и запасная', () => {
 
     expect(error).toBeInstanceOf(LlmError);
     expect(error.kind).toBe('server');
+    expect(error.model).toBe('backup');
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 

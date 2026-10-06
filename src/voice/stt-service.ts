@@ -1,4 +1,4 @@
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Config } from '../core/types';
@@ -28,9 +28,10 @@ export type { SttDetector } from './stt-flags';
 export interface SttServiceOptions {
   getConfig: () => Config['voice'];
   spawn?: typeof import('node:child_process').spawn;
+  spawnHelp?: typeof import('node:child_process').spawn;
   fetch?: typeof fetch;
   fileExists?: (path: string) => boolean;
-  readHelp?: (exe: string) => string;             // справка программы для выбора ключей запуска
+  readHelp?: (exe: string) => string | Promise<string>;   // справка программы для выбора ключей запуска
   listDir?: (dir: string) => string[];            // соседние с моделью файлы: поиск модели детектора
   mark?: TimingMark;
   onStatusChange?: (status: SttStatus) => void;   // переход состояния готовой службы по адресу
@@ -58,18 +59,47 @@ const REMOTE_POLL_UP_MS = 30000;
 const HELP_TIMEOUT_MS = 5000;
 
 // Справка программы: -sns и --vad есть не во всех сборках. Незнакомая или
-// недоступная программа даёт пустую справку — запуск как раньше.
-function defaultReadHelp(exe: string): string {
-  try {
-    const result = spawnSync(exe, ['--help'], {
-      encoding: 'utf8',
-      timeout: HELP_TIMEOUT_MS,
-      windowsHide: true
+// недоступная программа даёт пустую справку — запуск как раньше. Читается
+// асинхронно и с пределом времени: зависшая программа не останавливает процесс.
+function defaultReadHelp(spawnFn: typeof spawn, exe: string): Promise<string> {
+  return new Promise<string>((resolve) => {
+    let output = '';
+    let done = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let child: ChildProcess;
+    const finish = (): void => {
+      if (done) {
+        return;
+      }
+      done = true;
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      resolve(output);
+    };
+    try {
+      child = spawnFn(exe, ['--help'], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch {
+      resolve('');
+      return;
+    }
+    timer = setTimeout(() => {
+      try {
+        child.kill();
+      } catch {
+        // Процесс уже завершился — останавливать нечего.
+      }
+      finish();
+    }, HELP_TIMEOUT_MS);
+    child.stdout?.on('data', (chunk: Buffer | string) => {
+      output += String(chunk);
     });
-    return `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-  } catch {
-    return '';
-  }
+    child.stderr?.on('data', (chunk: Buffer | string) => {
+      output += String(chunk);
+    });
+    child.on('error', finish);
+    child.on('exit', finish);
+  });
 }
 
 function defaultListDir(dir: string): string[] {
@@ -78,9 +108,10 @@ function defaultListDir(dir: string): string[] {
 
 export function createSttService(options: SttServiceOptions): SttService {
   const spawnFn = options.spawn ?? spawn;
+  const spawnHelp = options.spawnHelp ?? spawn;
   const fetchFn = options.fetch ?? fetch;
   const fileExists = options.fileExists ?? existsSync;
-  const readHelp = options.readHelp ?? defaultReadHelp;
+  const readHelp = options.readHelp ?? ((exe: string) => defaultReadHelp(spawnHelp, exe));
   const listDir = options.listDir ?? defaultListDir;
   const mark = options.mark;
   const runs = new RunController();
@@ -254,7 +285,7 @@ export function createSttService(options: SttServiceOptions): SttService {
     state = 'starting';
     let help = '';
     try {
-      help = readHelp(exe);
+      help = await readHelp(exe);
     } catch {
       help = '';
     }
