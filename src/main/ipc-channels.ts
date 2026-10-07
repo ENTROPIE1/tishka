@@ -21,6 +21,7 @@ export const CONFIG_GET_CHANNEL = 'tishka:config:get';
 export const CONFIG_SAVE_CHANNEL = 'tishka:config:save';
 export const CONFIG_CHANGED_CHANNEL = 'tishka:config:changed';
 export const GATEWAY_CHECK_CHANNEL = 'tishka:config:check-gateway';
+export const GATEWAY_MODELS_CHANNEL = 'tishka:config:list-models';
 export const CONNECTIONS_PLAN_CHANNEL = 'tishka:connections:plan';
 export const CONNECTIONS_SAVE_CHANNEL = 'tishka:connections:save';
 export const CONNECTIONS_REMOVE_CHANNEL = 'tishka:connections:remove';

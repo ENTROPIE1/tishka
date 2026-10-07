@@ -7,7 +7,7 @@ import {
   type ConnectionDraft,
   type ConnectionTemplate
 } from '../core/connections';
-import type { GatewayCheckResult } from '../core/llm/check';
+import type { GatewayCheckResult, GatewayModelsResult } from '../core/llm/check';
 import type { McpStatus } from '../core/mcp/manager';
 import type { Config, McpServerConfig, SecretStore } from '../core/types';
 import type {
@@ -141,6 +141,15 @@ export function checkGatewayValue(core: TishkaCore, value: unknown): Promise<Gat
   if (typeof record['key'] === 'string' && record['key'] !== '') input.key = record['key'];
   if (typeof record['api'] === 'string' && record['api'] !== '') input.api = record['api'];
   return core.checkGateway(input);
+}
+
+export function listGatewayModelsValue(core: TishkaCore, value: unknown): Promise<GatewayModelsResult> {
+  const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+  const input: { baseUrl: string; key?: string } = {
+    baseUrl: typeof record['baseUrl'] === 'string' ? record['baseUrl'] : ''
+  };
+  if (typeof record['key'] === 'string' && record['key'] !== '') input.key = record['key'];
+  return core.listGatewayModels(input);
 }
 
 export function planDraft(core: TishkaCore, value: unknown): ConnectionPlanResult {

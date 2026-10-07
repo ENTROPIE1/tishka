@@ -39,9 +39,9 @@ export function calendarAutomationCard(deps: CalendarAutomationDeps): HTMLElemen
     return box;
   }
 
-  for (const connection of exchange) {
-    box.append(sourceRow(connection, deps));
-  }
+  box.append(
+    el('p', 'field-hint', 'Включается в Календаре, блок «Источники». Здесь только запуск.')
+  );
 
   const run = el('button', 'button', 'Запустить сейчас');
   run.type = 'button';
@@ -51,31 +51,3 @@ export function calendarAutomationCard(deps: CalendarAutomationDeps): HTMLElemen
   return box;
 }
 
-function sourceRow(connection: ConnectionView, deps: CalendarAutomationDeps): HTMLElement {
-  const row = el('div', 'calendar-source');
-  const toggle = el('input', 'checkbox');
-  toggle.type = 'checkbox';
-  toggle.checked = deps.sources[connection.name] === true;
-  toggle.addEventListener('change', () => deps.onToggle(connection.name, toggle.checked));
-  const info = el('div', 'calendar-source-info');
-  info.append(el('span', 'calendar-source-name', connection.name));
-  info.append(el('span', 'field-hint', connection.address));
-  info.append(el('span', 'field-hint', describeState(deps.state[connection.name])));
-  row.append(toggle, el('span', 'calendar-source-toggle', 'Загружать встречи'), info);
-  return row;
-}
-
-function describeState(state: SourceState | undefined): string {
-  if (state === undefined) {
-    return 'Ещё не загружалось';
-  }
-  const time =
-    state.loadedAt === undefined
-      ? ''
-      : `Последняя удачная загрузка: ${new Date(state.loadedAt).toLocaleString('ru-RU')}`;
-  if (state.error !== undefined) {
-    return time === '' ? `Ошибка: ${state.error}` : `Ошибка: ${state.error}. ${time}`;
-  }
-  const counts = `добавлено ${state.added ?? 0}, изменено ${state.updated ?? 0}, убрано ${state.removed ?? 0}`;
-  return `${time}. ${counts}`;
-}

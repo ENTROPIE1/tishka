@@ -22,6 +22,8 @@ export interface RigLayer {
   bone: string;
   dx?: number;
   dy?: number;
+  sx?: number;
+  sy?: number;
   group?: string;
   variant?: string;
   hand?: HandSpec;

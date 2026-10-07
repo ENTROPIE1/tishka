@@ -56,6 +56,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
   talkByDefault.type = 'checkbox';
   const wakeWords = textInput();
   const talkTimeout = textInput('', 'number');
+  const idleLeave = textInput('', 'number');
   const mode = selectInput(MODE_OPTIONS, 'local');
   mode.classList.add('stt-mode');
   const exe = textInput();
@@ -136,7 +137,8 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
         'После обращения по имени, клавише или щелчку микрофон остаётся включённым, пока Тишка не уйдёт'
       ),
       field('Имена', wakeWords, 'Через запятую, например: тишка, ёжик'),
-      field('Уходить после тишины, секунд', talkTimeout)
+      field('Выключать микрофон после тишины, секунд', talkTimeout),
+      field('Уходить с экрана после простоя, секунд', idleLeave)
     ),
     micGroup.element,
     service,
@@ -216,6 +218,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
     talkByDefault.checked = view.config.voice.talkByDefault;
     wakeWords.value = view.config.voice.wakeWords.join(', ');
     talkTimeout.value = String(view.config.voice.talkTimeoutSec);
+    idleLeave.value = String(view.config.voice.idleLeaveSec);
     mic = view.config.voice.mic;
     mode.value = view.config.voice.stt.mode;
     exe.value = view.config.voice.stt.exe;
@@ -235,6 +238,7 @@ export function mountVoiceSection(root: HTMLElement): SettingsSection {
           talkByDefault,
           wakeWords,
           talkTimeout,
+          idleLeave,
           mode,
           sttUrl,
           exe,

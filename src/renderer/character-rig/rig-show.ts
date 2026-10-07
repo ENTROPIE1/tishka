@@ -4,6 +4,8 @@
 import type { RigClip, RigLayer, RigShow } from './rig-data';
 
 export const NO_BLINK_SHAPES = ['happy', 'laugh', 'sleepy'];
+// Только плотные галочки/дуги смеха без белка. «smiling» — открытый контур, зрачок нужен (кивок).
+export const NO_IRIS_SHAPES = ['happy', 'laugh'];
 
 export interface EyeState {
   st: 'open' | 'half' | 'closed';
@@ -18,7 +20,8 @@ export function eyeState(show: RigShow, side?: 'l' | 'r'): EyeState {
   const st = side !== undefined && show.wink === side ? 'closed' : show.eyes;
   const shape = show.eyeShape || 'orig';
   const useShape = st === 'open' && shape !== 'orig';
-  return { st, shape, useShape, whiteOn: st !== 'closed', iris: show.iris || 'orig' };
+  const hideIris = useShape && NO_IRIS_SHAPES.includes(shape);
+  return { st, shape, useShape, whiteOn: st !== 'closed' && !hideIris, iris: show.iris || 'orig' };
 }
 
 export function layerVisible(layer: RigLayer, show: RigShow, layers: readonly RigLayer[]): boolean {

@@ -1,5 +1,6 @@
 import { atTime, toLocalIso } from '../../../core/calendar/time';
 import type { CalendarEvent, CalendarKind } from '../../../core/calendar/types';
+import { askConfirm } from '../../shared/app-confirm';
 import { button, el, field, selectInput, textarea, textInput } from '../../settings/dom';
 import type { CalendarApi } from './deps';
 
@@ -90,7 +91,7 @@ export function openEventForm(container: HTMLElement, options: EventFormOptions)
     const remove = button('Удалить', 'button danger');
     remove.addEventListener('click', async (clickEvent) => {
       clickEvent.preventDefault();
-      if (!window.confirm('Удалить событие?')) {
+      if (!(await askConfirm('Удалить событие?'))) {
         return;
       }
       await options.api.remove(existing.id);

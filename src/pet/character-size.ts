@@ -54,10 +54,9 @@ export const PET_TISHKA_CANVAS_HEIGHT = toPoints(TISHKA_MODEL_HEIGHT + TISHKA_CA
 export const PET_TISHKA_ARM_RESERVE = Math.ceil((PET_TISHKA_CANVAS_WIDTH - PET_TISHKA_SIZE.width) / 2);
 // Ширина ступней на экране: на неё уводится поле строки ввода.
 export const PET_TISHKA_FEET_WIDTH = toPoints(TISHKA_FEET_WIDTH);
-// Посадка на строку ввода: рамка персонажа и холст опускаются на высоту строки,
-// чтобы низ ступней лёг на её верхнюю половину. Рамка и до посадки нависала над
-// подписью состояния (18 точек), ступни стоят на строке, а не в воздухе.
-export const PET_TISHKA_STAND = PET_COMPOSER_HEIGHT;
+// Посадка: низ ступней на верхней кромке строки (не на её дне). Высота пустоты
+// модели под ступнями плюс поле строки сверху (~8), без всей высоты кнопок.
+export const PET_TISHKA_STAND = 32;
 
 export function petCharacterSize(kind: PetCharacterKind): PetCharacterSize {
   return kind === 'tishka' ? PET_TISHKA_SIZE : PET_HEDGEHOG_SIZE;

@@ -63,7 +63,7 @@ describe('pet state: появление всегда через appear', () => {
 });
 
 describe('pet state: ход разговора', () => {
-  it('listen.end → thinking, tool.start → working, tool.end → thinking', () => {
+  it('listen.end → thinking, tool.start → working, tool.end остаётся working', () => {
     let model = fire(ready(0), { type: 'listen.end', text: 'привет' }, 1000);
     expect(model.state).toBe('thinking');
 
@@ -71,7 +71,10 @@ describe('pet state: ход разговора', () => {
     expect(model.state).toBe('working');
 
     model = fire(model, { type: 'tool.end', tool: 't', ok: true }, 1002);
-    expect(model.state).toBe('thinking');
+    expect(model.state).toBe('working');
+
+    model = fire(model, { type: 'think.start' }, 1003);
+    expect(model.state).toBe('working');
   });
 
   it('reply с текстом из 50 знаков: talking, через 1500+50·60 мс — idle, say и panel сохранены', () => {
@@ -153,16 +156,16 @@ describe('pet state: ход разговора', () => {
 });
 
 describe('pet state: уход по тишине', () => {
-  it('30 секунд idle при petMode false: leave, затем hidden, облачко и карточка очищены', () => {
+  it('90 секунд idle при petMode false: leave, затем hidden, облачко и карточка очищены', () => {
     let model = fire(ready(0), { type: 'reply', reply: { say: 'привет', show: PANEL } }, 1000);
     const talkEnd = 1000 + 1500 + 6 * 60;
     model = onTick(model, talkEnd, MODE_OFF);
     expect(model.state).toBe('idle');
 
-    model = onTick(model, talkEnd + 30000, MODE_OFF);
+    model = onTick(model, talkEnd + 90_000, MODE_OFF);
     expect(model.state).toBe('leave');
 
-    model = onTick(model, talkEnd + 30900, MODE_OFF);
+    model = onTick(model, talkEnd + 90_900, MODE_OFF);
     expect(model.state).toBe('hidden');
     expect(model.say).toBeUndefined();
     expect(model.panel).toBeUndefined();
@@ -245,10 +248,18 @@ describe('pet state: уход по тишине', () => {
     model = onTick(model, 900 + 60001, { petMode: false, busy: true });
     expect(model.state).toBe('idle');
 
-    model = onTick(model, 900 + 89999, { petMode: false, busy: false });
+    model = onTick(model, 900 + 60_001 + 89_999, { petMode: false, busy: false });
     expect(model.state).toBe('idle');
 
-    model = onTick(model, 900 + 90001, { petMode: false, busy: false });
+    model = onTick(model, 900 + 60_001 + 90_001, { petMode: false, busy: false });
+    expect(model.state).toBe('leave');
+  });
+
+  it('время ухода по простою берётся из настроек', () => {
+    let model = ready(0);
+    model = onTick(model, 900 + 29_999, { petMode: false, idleLeaveMs: 30_000 });
+    expect(model.state).toBe('idle');
+    model = onTick(model, 900 + 30_000, { petMode: false, idleLeaveMs: 30_000 });
     expect(model.state).toBe('leave');
   });
 

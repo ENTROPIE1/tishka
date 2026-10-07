@@ -5,8 +5,8 @@ import { clipForState, type ClipName } from '../src/renderer/pet/character';
 import { SvgHedgehog } from '../src/renderer/pet/svg-hedgehog';
 
 const TABLE: Record<PetState, { clip: ClipName; flip: boolean }> = {
-  appear: { clip: 'walk', flip: true },
-  leave: { clip: 'walk', flip: false },
+  appear: { clip: 'peek', flip: false },
+  leave: { clip: 'happy', flip: false },
   idle: { clip: 'idle', flip: false },
   listening: { clip: 'listen', flip: false },
   thinking: { clip: 'think', flip: false },
@@ -76,7 +76,7 @@ describe('SvgHedgehog', () => {
 
   it('setClip с неизвестным именем включает idle', async () => {
     const { character, root } = await mount();
-    character.setClip('dance' as ClipName);
+    character.setClip('nope' as ClipName);
     expect(root.classList.contains('clip-idle')).toBe(true);
   });
 
@@ -104,11 +104,12 @@ describe('SvgHedgehog', () => {
     expect(root.classList.contains('flipped')).toBe(false);
   });
 
-  it('clips возвращает все десять клипов', async () => {
+  it('clips возвращает все клипы, включая танец', async () => {
     const { character } = await mount();
     expect(character.clips()).toEqual([
       'idle',
       'walk',
+      'peek',
       'listen',
       'think',
       'work',
@@ -116,9 +117,9 @@ describe('SvgHedgehog', () => {
       'notify',
       'happy',
       'confused',
-      'sleep'
+      'sleep',
+      'dance'
     ]);
-    expect(character.clips()).toHaveLength(10);
   });
 
   it('в клипе talk рот двигается сам, setMouth останавливает авто', async () => {

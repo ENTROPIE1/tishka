@@ -33,6 +33,19 @@ describe('eyeState', () => {
     expect(eyeState(shown, 'l').st).toBe('closed');
     expect(eyeState(shown, 'r').st).toBe('open');
   });
+
+  it('на глазах-галочках белка и зрачок выключены, на smiling — нет', () => {
+    for (const eyeShape of ['happy', 'laugh']) {
+      const eye = eyeState({ ...base(), eyes: 'open', eyeShape, iris: 'orig' });
+      expect(eye.useShape).toBe(true);
+      expect(eye.whiteOn).toBe(false);
+    }
+    const smile = eyeState({ ...base(), eyes: 'open', eyeShape: 'smiling', iris: 'orig' });
+    expect(smile.useShape).toBe(true);
+    expect(smile.whiteOn).toBe(true);
+    const open = eyeState({ ...base(), eyes: 'open', eyeShape: 'angry', iris: 'orig' });
+    expect(open.whiteOn).toBe(true);
+  });
 });
 
 describe('shouldAutoBlink', () => {

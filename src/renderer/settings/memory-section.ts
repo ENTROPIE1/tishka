@@ -1,4 +1,5 @@
 import type { MemoryRecord } from '../../core/memory/store';
+import { askConfirm } from '../shared/app-confirm';
 import { button, clear, el, sectionTitle, textInput, type SettingsSection } from './dom';
 import { createMemoryEditor } from './memory-editor';
 
@@ -114,7 +115,12 @@ export function mountMemorySection(root: HTMLElement): SettingsSection {
       openEditor(record);
     });
     forget.addEventListener('click', () => {
-      void removeRecord(record.id);
+      void (async () => {
+        if (!(await askConfirm('Забыть эту запись?'))) {
+          return;
+        }
+        await removeRecord(record.id);
+      })();
     });
     const itemActions = el('div', 'memory-item-actions');
     itemActions.append(edit, forget);
@@ -149,7 +155,7 @@ export function mountMemorySection(root: HTMLElement): SettingsSection {
 
   forgetAll.addEventListener('click', () => {
     void (async () => {
-      if (!window.confirm('Забыть все записи памяти?')) {
+      if (!(await askConfirm('Забыть все записи памяти?'))) {
         return;
       }
       try {

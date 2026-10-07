@@ -284,7 +284,8 @@
 }
 
 .calendar-day-name {
-  min-width: 150px;
+  min-width: 28px;
+  width: 28px;
   font-size: 13px;
   color: var(--text);
 }

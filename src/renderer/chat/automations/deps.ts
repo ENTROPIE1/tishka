@@ -12,6 +12,6 @@ export interface SkillApi {
 
 export interface MyTabDeps {
   api: SkillApi;
-  confirm(message: string): boolean;
+  confirm(message: string): boolean | Promise<boolean>;
   onChanged(): void;
 }

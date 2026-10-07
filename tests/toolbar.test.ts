@@ -73,10 +73,10 @@ describe('mountChatToolbar', () => {
       }),
       historySearch: vi.fn(async () => [])
     };
-    (window as unknown as { confirm: () => boolean }).confirm = () => true;
     const { setStatus } = mount();
 
     click('clear-history');
+    document.querySelector<HTMLButtonElement>('.app-confirm .button-danger')?.click();
     await tick();
     await tick();
 

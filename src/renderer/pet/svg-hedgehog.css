@@ -49,6 +49,13 @@
 .hedgehog.clip-walk #hh-leg-fr,
 .hedgehog.clip-walk #hh-leg-bl { animation: hh-step 0.5s ease-in-out infinite reverse; }
 
+.hedgehog.clip-peek #hh-root { animation: hh-wobble 0.9s ease-in-out 1; }
+.hedgehog.clip-peek #hh-head { animation: hh-peek-head 0.9s ease-out 1; }
+.hedgehog.clip-peek #hh-leg-fl,
+.hedgehog.clip-peek #hh-leg-br { animation: hh-step 0.45s ease-in-out 1 0.4s; }
+.hedgehog.clip-peek #hh-leg-fr,
+.hedgehog.clip-peek #hh-leg-bl { animation: hh-step 0.45s ease-in-out 1 0.4s reverse; }
+
 .hedgehog.clip-listen #hh-head { transform: rotate(-9deg); }
 .hedgehog.clip-listen #hh-ears { transform: translateY(-3px); }
 
@@ -101,6 +108,12 @@
 @keyframes hh-wave {
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(-45deg); }
+}
+
+@keyframes hh-peek-head {
+  0% { transform: rotate(-16deg); }
+  35% { transform: rotate(10deg); }
+  100% { transform: rotate(0deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {

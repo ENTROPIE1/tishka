@@ -4,7 +4,7 @@ import type { CalendarSituation } from '../core/calendar/situation';
 import type { AddEventInput, CalendarEvent, CalendarRange, UpdateEventPatch } from '../core/calendar/types';
 import type { ConnectionDraft } from '../core/connections';
 import type { HistoryEntry } from '../core/history';
-import type { GatewayCheckResult } from '../core/llm/check';
+import type { GatewayCheckResult, GatewayModelsResult } from '../core/llm/check';
 import type { McpStatus } from '../core/mcp/manager';
 import type { MemoryRecord, UpdateMemoryPatch } from '../core/memory/store';
 import { nextScreenLooking } from '../core/screen-look';
@@ -57,6 +57,7 @@ import {
   COPY_TEXT_CHANNEL,
   EVENT_CHANNEL,
   GATEWAY_CHECK_CHANNEL,
+  GATEWAY_MODELS_CHANNEL,
   OPEN_IMAGE_CHANNEL,
   HISTORY_CHANNEL,
   HISTORY_CLEAR_CHANNEL,
@@ -205,6 +206,9 @@ const api = {
     },
     checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult> {
       return ipcRenderer.invoke(GATEWAY_CHECK_CHANNEL, input);
+    },
+    listModels(input: { baseUrl: string; key?: string }): Promise<GatewayModelsResult> {
+      return ipcRenderer.invoke(GATEWAY_MODELS_CHANNEL, input);
     },
     onChanged(listener: () => void): () => void {
       const handler = (): void => {

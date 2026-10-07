@@ -2,6 +2,7 @@ import type { SkillOverview } from '../../../core/skills/overview';
 import type { PresetInfo } from '../../../core/skills/presets';
 import type { SourceState } from '../../../main/ipc-calendar';
 import type { ConnectionView } from '../../../main/ipc-settings';
+import { askConfirm } from '../../shared/app-confirm';
 import { clear, el } from '../../settings/dom';
 import { calendarAutomationCard } from './calendar-card';
 import { renderMyTab } from './my-tab';
@@ -92,7 +93,7 @@ export function mountAutomationsScreen(root: HTMLElement): AutomationsScreen {
         connections,
         {
           api: window.tishka.automations,
-          confirm: (message) => window.confirm(message),
+          confirm: (message) => askConfirm(message),
           onChanged: () => {
             void refresh();
           }

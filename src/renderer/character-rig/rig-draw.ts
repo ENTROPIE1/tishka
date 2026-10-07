@@ -99,6 +99,16 @@ export function layerMatrix(model: RigModel, layer: RigLayer, ctx: WorldContext,
     return translate(m, -anchor.ax, -anchor.ay);
   }
   let m = translate(m0, layer.dx ?? 0, layer.dy ?? 0);
+  const sx = layer.sx ?? 1;
+  const sy = layer.sy ?? 1;
+  if (sx !== 1 || sy !== 1) {
+    const bone = model.bones.find((b) => b.id === layer.bone);
+    if (bone !== undefined) {
+      m = translate(m, bone.pivot[0], bone.pivot[1]);
+      m = scale(m, sx, sy);
+      m = translate(m, -bone.pivot[0], -bone.pivot[1]);
+    }
+  }
   if (layer.group === 'tablet' && state.clip?.tabletY !== undefined) {
     m = translate(m, 0, state.clip.tabletY);
   }

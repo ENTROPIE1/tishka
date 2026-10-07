@@ -14,6 +14,7 @@ function makeConfig(): Config {
       wakeEnabled: false,
       talkByDefault: true,
       talkTimeoutSec: 8,
+      idleLeaveSec: 90,
       sensitivity: 'normal',
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: '',

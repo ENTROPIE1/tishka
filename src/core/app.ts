@@ -14,7 +14,7 @@ import type { AddEventInput, CalendarEvent, CalendarRange, UpdateEventPatch } fr
 import { freeWindows } from './calendar/windows';
 import { createHistory, type HistoryEntry } from './history';
 import { registerHistoryTools } from './history-tool';
-import { checkGateway as runGatewayCheck, type GatewayCheckResult } from './llm/check';
+import { checkGateway as runGatewayCheck, listGatewayModels as runGatewayModels, type GatewayCheckResult, type GatewayModelsResult } from './llm/check';
 import { runTriggered } from './idle';
 import { createLlmClient } from './llm/client';
 import { createMcpManager, type McpManager, type McpStatus } from './mcp/manager';
@@ -109,6 +109,7 @@ export interface TishkaCore {
   cancel(source?: StopSource): void;   // прервать текущую работу и очистить очередь
   hasGatewayKey(): Promise<boolean>;
   checkGateway(input: { baseUrl: string; model: string; key?: string; api?: string }): Promise<GatewayCheckResult>;
+  listGatewayModels(input: { baseUrl: string; key?: string }): Promise<GatewayModelsResult>;
   config(): Config;
   mcpStatus(): McpStatus[];
   reloadConfig(): Promise<void>;   // перечитать config.json и переподключить серверы MCP
@@ -324,6 +325,15 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
       },
       { fetch: deps.fetch }
     );
+  }
+
+  async function listGatewayModels(input: { baseUrl: string; key?: string }): Promise<GatewayModelsResult> {
+    const explicit = typeof input.key === 'string' ? input.key.trim() : '';
+    const apiKey = explicit !== '' ? explicit : await gatewayKey();
+    if (apiKey === undefined) {
+      return { ok: false, models: [], error: 'Ключ шлюза не задан', ms: 0 };
+    }
+    return runGatewayModels({ baseUrl: input.baseUrl, apiKey }, { fetch: deps.fetch });
   }
 
   // Служебная строка живёт только в ленте чата: помечаем источник «чат», чтобы
@@ -932,6 +942,7 @@ export function createTishkaCore(deps: CoreDeps): TishkaCore {
     cancel,
     hasGatewayKey,
     checkGateway,
+    listGatewayModels,
     config: () => config,
     mcpStatus: () => mcp?.status() ?? [],
     reloadConfig,

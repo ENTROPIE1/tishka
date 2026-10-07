@@ -9,6 +9,7 @@ function voice(): Config['voice'] {
     wakeEnabled: false,
     talkByDefault: true,
     talkTimeoutSec: 30,
+    idleLeaveSec: 90,
     sensitivity: 'normal',
     mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
     sttUrl: 'http://127.0.0.1:8178',

@@ -1,5 +1,6 @@
 import type { ConnectionTemplate } from '../../core/connections';
 import type { ConnectionView } from '../../main/ipc-settings';
+import { askConfirm } from '../shared/app-confirm';
 import { openEditor, TEMPLATE_OPTIONS, templateLabel } from './connection-editor';
 import { button, clear, el, field, runWithFeedback, sectionTitle, selectInput, type SettingsSection } from './dom';
 
@@ -17,7 +18,14 @@ function stateLabel(view: ConnectionView): string {
 
 export function mountConnectionsSection(root: HTMLElement): SettingsSection {
   clear(root);
-  root.append(sectionTitle('Подключения'));
+  root.append(sectionTitle('Серверы MCP'));
+  root.append(
+    el(
+      'p',
+      'field-hint',
+      'Готовые: Confluence, Exchange, Jira. Свой MCP — stdio или HTTP (например, база только на SELECT). Имя в карточке — то, что стоит в навыке: exchange, confluence, jira.'
+    )
+  );
 
   const list = el('div');
   const addHost = el('div');
@@ -35,7 +43,7 @@ export function mountConnectionsSection(root: HTMLElement): SettingsSection {
     'Снимок делается только по вашей просьбе и уходит в локальную модель ДКС; на диск не сохраняется'
   );
 
-  root.append(list, screenField, addRow, addHost, messages);
+  root.append(list, sectionTitle('Экран'), screenField, addRow, addHost, messages);
 
   let views: ConnectionView[] = [];
 
@@ -81,7 +89,10 @@ export function mountConnectionsSection(root: HTMLElement): SettingsSection {
   function card(view: ConnectionView): HTMLElement {
     const box = el('div', 'connection');
     const head = el('div', 'connection-head');
-    head.append(el('span', 'connection-name', view.name), el('span', 'connection-template', templateLabel(view.template)));
+    head.append(
+      el('span', 'connection-name', templateLabel(view.template)),
+      el('span', 'connection-template', view.name)
+    );
     head.append(el('span', `state state-${view.state}`, stateLabel(view)));
     head.append(el('span', 'connection-tools', `${view.tools} инструментов`));
     box.append(head);
@@ -157,10 +168,10 @@ export function mountConnectionsSection(root: HTMLElement): SettingsSection {
     });
 
     remove.addEventListener('click', () => {
-      if (!window.confirm(`Удалить подключение «${view.name}»?`)) {
-        return;
-      }
       void (async () => {
+        if (!(await askConfirm(`Удалить подключение «${view.name}»?`))) {
+          return;
+        }
         try {
           await window.tishka.connections.remove(view.name);
           await refresh();

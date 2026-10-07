@@ -20,6 +20,8 @@ export interface WakeListener {
   // Сброс идущей записи: появление ежа или конец ответа.
   reset(): void;
   keyboard(): void;
+  inputFocus(): void;
+  inputBlur(): void;
   beginDrag(): void;
   dragMove(): void;
   endDrag(): void;
@@ -171,8 +173,12 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       listener?.reset();
     },
     keyboard(): void {
-      // Набор текста в строке ежа: запись на паузе, возобновление через 2 секунды
-      // после последнего нажатия. Значок микрофона при этом не меняется.
+      pause.hold('typing', TYPING_RESUME_MS);
+    },
+    inputFocus(): void {
+      pause.hold('typing', 120_000);
+    },
+    inputBlur(): void {
       pause.hold('typing', TYPING_RESUME_MS);
     },
     beginDrag(): void {

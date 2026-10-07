@@ -26,6 +26,7 @@ export interface RigCharacterPlayer {
   // Смена эмоции из данных модели; необязательна для подставного проигрывателя.
   setMood?(name: string): void;
   setFlip(flipped: boolean): void;
+  setShow?(patch: { headphones?: boolean }): void;
   dispose(): void;
 }
 
@@ -72,9 +73,20 @@ export class RigCharacter implements Character {
 
   setMood(name: string): void {
     this.mood = name;
-    if (this.mounted) {
-      this.player.setMood?.(name);
+    if (!this.mounted) {
+      return;
     }
+    const available = this.player.clips();
+    if (name === 'neutral' || name === 'calm') {
+      this.applyClip();
+    } else if (available.includes(name)) {
+      this.player.play(name);
+    }
+    this.player.setMood?.(name);
+  }
+
+  setHeadphones(on: boolean): void {
+    this.player.setShow?.({ headphones: on });
   }
 
   setFlip(flipped: boolean): void {

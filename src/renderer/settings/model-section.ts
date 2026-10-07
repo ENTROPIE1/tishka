@@ -32,10 +32,12 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
 
   const baseUrl = textInput();
   const format = selectInput(FORMAT_OPTIONS, 'chat');
-  const model = textInput();
-  const fallbackModel = textInput();
-  const visionModel = textInput();
-  const visionFallbackModel = textInput();
+  const model = el('select', 'select-input');
+  model.id = MODEL_LIST_ID;
+  const fallbackModel = el('select', 'select-input');
+  const visionModel = el('select', 'select-input');
+  visionModel.id = VISION_LIST_ID;
+  const visionFallbackModel = el('select', 'select-input');
   const key = textInput('', 'password');
   const keyState = el('span', 'field-hint', KEY_MISSING);
   const modelHint = el('span', 'field-hint model-warning');
@@ -46,15 +48,6 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
   fallbackHint.hidden = true;
   visionHint.hidden = true;
   visionFallbackHint.hidden = true;
-
-  const modelList = el('datalist');
-  modelList.id = MODEL_LIST_ID;
-  const visionList = el('datalist');
-  visionList.id = VISION_LIST_ID;
-  model.setAttribute('list', MODEL_LIST_ID);
-  fallbackModel.setAttribute('list', MODEL_LIST_ID);
-  visionModel.setAttribute('list', VISION_LIST_ID);
-  visionFallbackModel.setAttribute('list', VISION_LIST_ID);
 
   const modelField = field('Модель', model);
   modelField.append(modelHint);
@@ -81,7 +74,7 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
   );
   const actions = el('div', 'row');
   actions.append(save, check);
-  root.append(actions, messages, modelList, visionList);
+  root.append(actions, messages);
 
   function show(error: string | undefined, ok?: string): void {
     clear(messages);
@@ -93,13 +86,30 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
     }
   }
 
-  function fillList(list: HTMLDataListElement, names: string[]): void {
-    clear(list);
-    for (const name of names) {
-      const option = el('option');
-      option.value = name;
-      list.append(option);
+  function fillSelect(select: HTMLSelectElement, names: string[], current: string, emptyLabel: string): void {
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    if (current !== '' && !names.includes(current)) {
+      unique.push(current);
     }
+    for (const name of names) {
+      if (name !== '' && !seen.has(name)) {
+        seen.add(name);
+        unique.push(name);
+      }
+    }
+    clear(select);
+    if (current === '' || unique.length === 0) {
+      const blank = el('option', undefined, emptyLabel);
+      blank.value = '';
+      select.append(blank);
+    }
+    for (const name of unique) {
+      const option = el('option', undefined, name);
+      option.value = name;
+      select.append(option);
+    }
+    select.value = unique.includes(current) ? current : '';
   }
 
   function warnMissing(hint: HTMLElement, value: string, names: string[]): void {
@@ -112,24 +122,43 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
     hint.hidden = false;
   }
 
+  let knownModels: string[] = [];
+
   function applyModels(names: string[]): void {
-    fillList(modelList, names);
-    fillList(visionList, names);
+    knownModels = names;
+    fillSelect(model, names, model.value.trim(), 'выберите модель');
+    fillSelect(fallbackModel, names, fallbackModel.value.trim(), 'не задана');
+    fillSelect(visionModel, names, visionModel.value.trim(), 'выберите модель');
+    fillSelect(visionFallbackModel, names, visionFallbackModel.value.trim(), 'не задана');
     warnMissing(modelHint, model.value, names);
     warnMissing(fallbackHint, fallbackModel.value, names);
     warnMissing(visionHint, visionModel.value, names);
     warnMissing(visionFallbackHint, visionFallbackModel.value, names);
   }
 
+  async function loadModels(keySet: boolean): Promise<void> {
+    if (!keySet && key.value.trim() === '') {
+      return;
+    }
+    const result = await window.tishka.config.listModels({
+      baseUrl: baseUrl.value,
+      key: key.value.trim()
+    });
+    if (result.ok && result.models.length > 0) {
+      applyModels(result.models);
+    }
+  }
+
   async function refresh(): Promise<void> {
     const view = await window.tishka.config.get();
     baseUrl.value = view.config.llm.baseUrl;
     format.value = view.config.llm.api;
-    model.value = view.config.llm.model;
-    fallbackModel.value = view.config.llm.fallbackModel;
-    visionModel.value = view.config.llm.visionModel;
-    visionFallbackModel.value = view.config.llm.visionFallbackModel;
+    fillSelect(model, knownModels, view.config.llm.model, 'выберите модель');
+    fillSelect(fallbackModel, knownModels, view.config.llm.fallbackModel, 'не задана');
+    fillSelect(visionModel, knownModels, view.config.llm.visionModel, 'выберите модель');
+    fillSelect(visionFallbackModel, knownModels, view.config.llm.visionFallbackModel, 'не задана');
     keyState.textContent = view.gatewayKeySet ? KEY_SET : KEY_MISSING;
+    await loadModels(view.gatewayKeySet);
   }
 
   save.addEventListener('click', () => {
@@ -214,20 +243,20 @@ export function mountModelSection(root: HTMLElement): SettingsSection {
     });
   });
 
-  model.addEventListener('input', () => {
-    warnMissing(modelHint, model.value, [...modelList.options].map((option) => option.value));
+  model.addEventListener('change', () => {
+    warnMissing(modelHint, model.value, knownModels);
   });
 
-  fallbackModel.addEventListener('input', () => {
-    warnMissing(fallbackHint, fallbackModel.value, [...modelList.options].map((option) => option.value));
+  fallbackModel.addEventListener('change', () => {
+    warnMissing(fallbackHint, fallbackModel.value, knownModels);
   });
 
-  visionModel.addEventListener('input', () => {
-    warnMissing(visionHint, visionModel.value, [...visionList.options].map((option) => option.value));
+  visionModel.addEventListener('change', () => {
+    warnMissing(visionHint, visionModel.value, knownModels);
   });
 
-  visionFallbackModel.addEventListener('input', () => {
-    warnMissing(visionFallbackHint, visionFallbackModel.value, [...visionList.options].map((option) => option.value));
+  visionFallbackModel.addEventListener('change', () => {
+    warnMissing(visionFallbackHint, visionFallbackModel.value, knownModels);
   });
 
   void refresh();

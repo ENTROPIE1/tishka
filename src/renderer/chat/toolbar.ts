@@ -1,4 +1,5 @@
 import type { HistoryEntry } from '../../core/history';
+import { askConfirm } from '../shared/app-confirm';
 import type { ChatFeed } from './feed';
 import { createChatSearch } from './search';
 
@@ -37,17 +38,17 @@ export function mountChatToolbar(deps: ChatToolbarDeps): void {
       });
   });
   element<HTMLButtonElement>('clear-history').addEventListener('click', () => {
-    if (!window.confirm('Очистить всю переписку с Тишкой?')) {
-      return;
-    }
-    void window.tishka
-      .clearHistory()
-      .then(() => {
+    void (async () => {
+      if (!(await askConfirm('Очистить всю переписку с Тишкой?'))) {
+        return;
+      }
+      try {
+        await window.tishka.clearHistory();
         deps.feed.clear();
         deps.clearStatus();
-      })
-      .catch(() => {
+      } catch {
         deps.setStatus('Не удалось очистить историю');
-      });
+      }
+    })();
   });
 }

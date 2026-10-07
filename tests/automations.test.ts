@@ -169,7 +169,7 @@ function exchangeConnection(name: string): ConnectionView {
 }
 
 describe('calendarAutomationCard: встроенная карточка', () => {
-  it('показывает подключение, состояние загрузки и переключатель', () => {
+  it('показывает состояние и отсылает к источникам календаря', () => {
     const card = calendarAutomationCard({
       connections: [exchangeConnection('work')],
       sources: { work: true },
@@ -180,27 +180,19 @@ describe('calendarAutomationCard: встроенная карточка', () => 
 
     expect(card.textContent).toContain('Встречи из почты в календарь');
     expect(card.textContent).toContain('включена');
-    expect(card.textContent).toContain('Загружать встречи');
-    expect(card.textContent).toContain('добавлено 2, изменено 1, убрано 3');
-    const checkbox = card.querySelector<HTMLInputElement>('input[type="checkbox"]');
-    expect(checkbox?.checked).toBe(true);
+    expect(card.textContent).toContain('Источники');
+    expect(card.querySelector('input[type="checkbox"]')).toBeNull();
   });
 
-  it('переключатель и «Запустить сейчас» зовут обработчики', () => {
-    const onToggle = vi.fn();
+  it('«Запустить сейчас» зовёт обработчик', () => {
     const onRun = vi.fn();
     const card = calendarAutomationCard({
       connections: [exchangeConnection('work')],
       sources: { work: true },
       state: {},
-      onToggle,
+      onToggle: vi.fn(),
       onRun
     });
-
-    const checkbox = card.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    checkbox.checked = false;
-    checkbox.dispatchEvent(new Event('change'));
-    expect(onToggle).toHaveBeenCalledWith('work', false);
 
     [...card.querySelectorAll('button')].find((item) => item.textContent === 'Запустить сейчас')!.click();
     expect(onRun).toHaveBeenCalled();
@@ -279,6 +271,6 @@ describe('mountAutomationsScreen', () => {
     await flush();
 
     expect(root.textContent).toContain('Встречи из почты в календарь');
-    expect(root.textContent).toContain('work');
+    expect(root.textContent).toContain('Источники');
   });
 });

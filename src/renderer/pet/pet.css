@@ -78,15 +78,16 @@ body {
   flex-direction: row-reverse;
 }
 
-/* Колонка ёжика: сам ёжик и видимая подпись состояния под ним. Внешний отступ
-   со стороны персонажа отдан под запас широкого холста: колонка не растягивается
-   на него, и место персонажа совпадает с раскладкой окна. У прежнего ежа ноль. */
+/* Колонка ёжика. Подпись состояния — в углу справа от фигуры (в запасе холста),
+   чтобы холст её не перекрывал. У прежнего ежа запас нулевой. */
 .pet-side {
+  position: relative;
   flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  /* Место прежней подписи под ногами: без него персонаж садится на 18 точек ниже. */
+  padding-bottom: 18px;
   margin-right: var(--pet-reserve, 0px);
 }
 
@@ -142,13 +143,13 @@ body {
   align-self: flex-start;
 }
 
-/* Хвостик — часть самого облачка: растёт из его правого края вниз (на уровне
-   мордочки) и целиком лежит внутри облачка даже у короткой реплики. */
+/* Хвостик к мордочке: треугольник у правого края, чуть выше низа, с обводкой. */
+.bubble::before,
 .bubble::after {
   content: "";
   position: absolute;
   right: -8px;
-  bottom: 0;
+  bottom: 14px;
   width: 0;
   height: 0;
   border-top: 8px solid transparent;
@@ -156,11 +157,26 @@ body {
   border-left: 8px solid var(--surface);
 }
 
+.bubble::before {
+  right: -9px;
+  border-left-color: var(--border);
+  border-top-width: 9px;
+  border-bottom-width: 9px;
+  border-left-width: 9px;
+}
+
+.pet.mirrored .bubble::before,
 .pet.mirrored .bubble::after {
   right: auto;
   left: -8px;
   border-left: 0;
   border-right: 8px solid var(--surface);
+}
+
+.pet.mirrored .bubble::before {
+  left: -9px;
+  border-right-color: var(--border);
+  border-right-width: 9px;
 }
 
 .say {
@@ -196,9 +212,8 @@ body {
   pointer-events: none;
 }
 
-/* Костный персонаж опускается на строку ввода: рамка уходит вниз на посадку
-   (высота строки), холст опускается вместе с ней. Подпись состояния остаётся
-   над строкой (z-index выше холста) и поле ввода не перекрывает. */
+/* Костный персонаж опускается на строку ввода: рамка уходит вниз на посадку,
+   холст опускается вместе с ней. */
 .character.rig {
   margin-bottom: calc(-1 * var(--pet-stand, 0px));
 }
@@ -214,34 +229,100 @@ body {
 }
 
 .state-label {
-  position: relative;
-  z-index: 3;
-  height: 16px;
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  left: 100%;
+  margin-left: 2px;
+  padding: 1px 7px;
+  border-radius: 8px;
   line-height: 16px;
   font-size: 12px;
   color: var(--muted);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
   pointer-events: none;
   user-select: none;
 }
 
-/* Появление и уход — на месте: ёжик поднимается из-за края и опускается за него,
-   окно при этом не двигается по экрану. */
+.state-label:empty {
+  display: none;
+}
+
+.pet.mirrored .state-label {
+  left: auto;
+  right: 100%;
+  margin-left: 0;
+  margin-right: 2px;
+}
+
+/* Появление — выглядывает из-за края экрана и делает шаг. Уход — прыжок вверх. */
 .character[data-state="appear"] {
-  animation: pet-appear 0.9s ease-out;
+  animation: pet-peek 0.9s cubic-bezier(0.28, 0.12, 0.22, 1);
+}
+
+.pet.mirrored .character[data-state="appear"] {
+  animation-name: pet-peek-left;
 }
 
 .character[data-state="leave"] {
   animation: pet-leave 0.9s ease-in forwards;
 }
 
-@keyframes pet-appear {
-  from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes pet-peek {
+  0% {
+    transform: translateX(38%);
+  }
+  32% {
+    transform: translateX(26%);
+  }
+  42% {
+    transform: translateX(24%);
+  }
+  78% {
+    transform: translateX(-8px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes pet-peek-left {
+  0% {
+    transform: translateX(-38%);
+  }
+  32% {
+    transform: translateX(-26%);
+  }
+  42% {
+    transform: translateX(-24%);
+  }
+  78% {
+    transform: translateX(8px);
+  }
+  100% {
+    transform: translateX(0);
+  }
 }
 
 @keyframes pet-leave {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(48px); }
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1, 1);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(8px) scale(1.04, 0.9);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-48px) scale(1, 1.06);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-92px) scale(0.94, 0.94);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

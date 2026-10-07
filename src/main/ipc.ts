@@ -53,7 +53,8 @@ export function registerIpc(
   bus: SourceBus,
   core: TishkaCore,
   secrets: SecretStore,
-  onUserText?: () => void
+  onUserText?: () => void,
+  onCancel?: () => void
 ): void {
   bus.on(broadcastEvent);
 
@@ -79,6 +80,7 @@ export function registerIpc(
   ipcMain.on(CANCEL_CHANNEL, (event) => {
     const sender = BrowserWindow.fromWebContents(event.sender);
     core.cancel(sender !== null && isMainWindow(sender) ? 'chat' : 'pet');
+    onCancel?.();
   });
 
   // Ответ на вопрос подтверждения из любого окна: «да» выполняет инструмент,

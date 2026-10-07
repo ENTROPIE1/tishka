@@ -97,12 +97,15 @@ describe('разметка окна-питомца', () => {
     expect(element('pet').classList.contains('mirrored')).toBe(false);
   });
 
-  it('подпись состояния стоит под ёжиком, состояние — в data-state', () => {
+  it('подпись состояния стоит справа от ёжика в углу, состояние — в data-state', () => {
     mount();
     const label = document.querySelector('.state-label');
     expect(label).not.toBeNull();
     expect(element('character').nextElementSibling).toBe(label);
     expect(element('character').getAttribute('data-state')).not.toBeNull();
+    const block = cssBlock('\\.state-label');
+    expect(block).toContain('position: absolute');
+    expect(block).toContain('left: 100%');
   });
 
   it('подпись состояния есть в разметке и видима', () => {

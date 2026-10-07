@@ -4,6 +4,7 @@ import type { PetState } from '../../pet/state';
 export type ClipName =
   | 'idle'
   | 'walk'
+  | 'peek'
   | 'listen'
   | 'think'
   | 'work'
@@ -11,11 +12,13 @@ export type ClipName =
   | 'notify'
   | 'happy'
   | 'confused'
-  | 'sleep';
+  | 'sleep'
+  | 'dance';
 
 export const CLIP_NAMES: ClipName[] = [
   'idle',
   'walk',
+  'peek',
   'listen',
   'think',
   'work',
@@ -23,7 +26,8 @@ export const CLIP_NAMES: ClipName[] = [
   'notify',
   'happy',
   'confused',
-  'sleep'
+  'sleep',
+  'dance'
 ];
 
 export interface Character {
@@ -34,6 +38,7 @@ export interface Character {
   setViseme?(shape: string | null): void;
   // Смена эмоции по имени из данных модели; прежний ёж не реализует.
   setMood?(name: string): void;
+  setHeadphones?(on: boolean): void;
   setFlip(flipped: boolean): void;
   clips(): ClipName[];
   // Пропорции персонажа на экране: раскладка окна ежа учитывает их.
@@ -47,8 +52,8 @@ interface ClipState {
 }
 
 const STATE_TO_CLIP: Record<PetState, ClipState> = {
-  appear: { clip: 'walk', flip: true },
-  leave: { clip: 'walk', flip: false },
+  appear: { clip: 'peek', flip: false },
+  leave: { clip: 'happy', flip: false },
   idle: { clip: 'idle', flip: false },
   listening: { clip: 'listen', flip: false },
   thinking: { clip: 'think', flip: false },

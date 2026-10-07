@@ -194,13 +194,13 @@ describe('правка и удаление своих событий', () => {
   });
 
   it('удаляет своё событие после подтверждения', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const event = localEvent({ title: 'Своё', start: '2026-10-07T14:00:00', end: '2026-10-07T15:00:00' });
     const { api, root } = setup([event]);
     await flush();
 
     root.querySelector<HTMLButtonElement>('.calendar-event')!.click();
     buttonByText(root, 'Удалить').click();
+    document.querySelector<HTMLButtonElement>('.app-confirm .button-danger')?.click();
     await flush();
 
     expect(api.remove).toHaveBeenCalledWith('Своё');

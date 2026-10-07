@@ -88,9 +88,9 @@ export const replyTool: ToolDef = {
 
 // Меты эмоции — только [слово] из 2–20 латинских букв или подчёркиваний и не
 // перед круглой скобкой: так ссылки [текст](адрес) и сноски [1] остаются как
-// есть. Известное имя становится сменой эмоции с позицией в знаках очищенного
-// текста, неизвестное слово такого вида просто убирается.
-const MOOD_MARK = /\[([A-Za-z_]{2,20})\](?!\()/g;
+// есть. [joy] открывает эмоцию, [/joy] закрывает в нейтраль. Позиция — в знаках
+// очищенного текста. Неизвестное имя такого вида просто убирается.
+const MOOD_MARK = /\[(\/)?([A-Za-z_]{2,20})\](?!\()/g;
 
 export function stripMoodMarks(text: string): { text: string; moods: MoodMark[] } {
   const moods: MoodMark[] = [];
@@ -100,12 +100,17 @@ export function stripMoodMarks(text: string): { text: string; moods: MoodMark[] 
   let match: RegExpExecArray | null;
   while ((match = mark.exec(text)) !== null) {
     clean += text.slice(index, match.index);
-    const name = match[1];
+    const closing = match[1] === '/';
+    const name = match[2];
     let next = match.index + match[0].length;
     if (text[next] === ' ') {
       next += 1;
     }
-    if (isKnownMood(name)) {
+    if (closing) {
+      if (name === undefined || isKnownMood(name)) {
+        moods.push({ at: clean.length, mood: 'neutral' });
+      }
+    } else if (isKnownMood(name)) {
       moods.push({ at: clean.length, mood: name });
     }
     index = next;

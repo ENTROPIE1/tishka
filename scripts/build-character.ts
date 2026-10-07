@@ -51,6 +51,9 @@ export function moodList(model: RigModel): Record<string, MoodInfo> {
       out[name] = { ru: model.emotions?.[target]?.ru ?? target, alias: true };
     }
   }
+  if (model.clips.dance !== undefined && out.dance === undefined) {
+    out.dance = { ru: 'танцует', emote: true };
+  }
   return out;
 }
 

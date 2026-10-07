@@ -139,6 +139,16 @@ describe('метки эмоций в реплике', () => {
     expect(result.moods[1].at).toBe(result.text.length);
   });
 
+  it('парные метки держат эмоцию на отрезке и закрываются в neutral', () => {
+    const result = stripMoodMarks('Сначала спокойно. [joy] Вот радость [/joy] и снова спокойно.');
+
+    expect(result.text).toBe('Сначала спокойно. Вот радость и снова спокойно.');
+    expect(result.text).not.toContain('[');
+    expect(result.moods.map((mark) => mark.mood)).toEqual(['joy', 'neutral']);
+    expect(result.moods[0].at).toBe('Сначала спокойно. '.length);
+    expect(result.moods[1].at).toBe('Сначала спокойно. Вот радость '.length);
+  });
+
   it('метки попадают в ответ инструмента, но не в say', () => {
     const reply = replyFromToolArgs({ say: 'Готово. [happy] Открыл.' }, null);
 

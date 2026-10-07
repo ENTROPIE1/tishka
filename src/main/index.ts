@@ -162,7 +162,7 @@ app.whenReady().then(async () => {
   });
   core = tishka;
 
-  registerIpc(bus, tishka, secrets, () => petListen?.cancel());
+  registerIpc(bus, tishka, secrets, () => petListen?.cancel(), () => speech?.stopSpeaking());
   registerTimingIpc({ logPath: timingLogPath, openPath: (path) => shell.openPath(path) });
   registerAutomationIpc(tishka);
   registerCalendarIpc({ calendar: () => tishka.calendar });

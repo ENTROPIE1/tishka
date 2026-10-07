@@ -9,13 +9,13 @@ export interface WorkHoursChange {
 }
 
 const DAY_LABELS: Record<string, string> = {
-  mon: 'Понедельник',
-  tue: 'Вторник',
-  wed: 'Среда',
-  thu: 'Четверг',
-  fri: 'Пятница',
-  sat: 'Суббота',
-  sun: 'Воскресенье'
+  mon: 'Пн',
+  tue: 'Вт',
+  wed: 'Ср',
+  thu: 'Чт',
+  fri: 'Пт',
+  sat: 'Сб',
+  sun: 'Вс'
 };
 
 function dayEditor(day: string, hours: CalendarDayHours | null, onChange: (next: CalendarDayHours | null) => void): HTMLElement {

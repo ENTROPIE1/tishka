@@ -6,6 +6,7 @@ export interface VoiceControls {
   talkByDefault: HTMLInputElement;
   wakeWords: HTMLInputElement;
   talkTimeout: HTMLInputElement;
+  idleLeave: HTMLInputElement;
   mode: HTMLSelectElement;
   sttUrl: HTMLInputElement;
   exe: HTMLInputElement;
@@ -38,6 +39,7 @@ export async function saveVoice(controls: VoiceControls): Promise<void> {
       talkByDefault: controls.talkByDefault.checked,
       wakeWords: parseWords(controls.wakeWords.value, view.config.voice.wakeWords),
       talkTimeoutSec: parseTimeout(controls.talkTimeout.value, view.config.voice.talkTimeoutSec),
+      idleLeaveSec: parseTimeout(controls.idleLeave.value, view.config.voice.idleLeaveSec),
       sttUrl: controls.sttUrl.value.trim(),
       stt: {
         ...view.config.voice.stt,

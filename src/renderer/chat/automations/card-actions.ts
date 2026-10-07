@@ -112,10 +112,10 @@ export function createActions(
   });
 
   remove.addEventListener('click', () => {
-    if (!deps.confirm(`Удалить навык «${entry.skill.name}»?`)) {
-      return;
-    }
     void (async () => {
+      if (!(await deps.confirm(`Удалить навык «${entry.skill.name}»?`))) {
+        return;
+      }
       await deps.api.remove(entry.skill.id);
       deps.onChanged();
     })();

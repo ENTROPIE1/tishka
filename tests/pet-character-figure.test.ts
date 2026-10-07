@@ -54,7 +54,7 @@ describe('размеры холста нового Тишки', () => {
 
   it('посадка не меньше высоты строки, ступни ложатся на её верхнюю половину', () => {
     expect(PET_TISHKA_STAND).toBeGreaterThan(8);
-    expect(PET_TISHKA_STAND).toBeGreaterThanOrEqual(PET_COMPOSER_HEIGHT);
+    expect(PET_TISHKA_STAND).toBeLessThan(PET_COMPOSER_HEIGHT);
     // Рамка уходит на посадку с вычетом подписи под персонажем (16 точек и
     // промежуток 2), под ступнями в модели остаётся пустота: глубина ступней
     // на строке = посадка - 18 - пустота модели под ступнями.
@@ -143,9 +143,8 @@ describe('строка ввода и ступни', () => {
     expect(composerCss).not.toContain('.pet.mirrored .composer-host');
   });
 
-  it('внутреннее поле строки уводит кнопки из-под ног в обеих раскладках', () => {
-    expect(cssBlock('\\.composer')).toContain('var(--pet-feet, 0px)');
-    const mirrored = cssBlock('\\.pet\\.mirrored \\.composer');
-    expect(mirrored).toContain('var(--pet-feet, 0px)');
+  it('внутреннее поле строки без запаса под ступни — кнопки у края, персонаж стоит на рамке', () => {
+    expect(cssBlock('\\.composer')).not.toContain('var(--pet-feet');
+    expect(cssBlock('\\.pet\\.mirrored \\.composer')).not.toContain('var(--pet-feet');
   });
 });

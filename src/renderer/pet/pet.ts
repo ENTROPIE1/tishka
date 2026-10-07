@@ -51,14 +51,16 @@ const composer = createComposer({
   onSettings: () => {
     void window.tishka.openSettings();
   },
-  // Глаз: просьба посмотреть на экран уходит тем же текстом, что из чата,
-  // остановка — общим каналом остановки.
-  onScreenLook: (action) => {
-    if (action.kind === 'send') {
-      window.tishka.sendUserText(action.text);
-    } else if (action.kind === 'stop') {
-      window.tishka.stop();
-    }
+  onSpeakToggle: () => {
+    void (async () => {
+      const view = await window.tishka.config.get();
+      const enabled = !view.config.voice.tts.enabled;
+      await window.tishka.config.save({
+        ...view.config,
+        voice: { ...view.config.voice, tts: { ...view.config.voice.tts, enabled } }
+      });
+      composer.setSpeaking(enabled);
+    })();
   }
 });
 composerHost.append(composer.element);
@@ -93,6 +95,7 @@ const petCard = createPetCard({ element: cardHost, refreshBusy });
 const wake = createWakeListener({
   onConversation: (on) => {
     composer.setListening(on);
+    characterModel?.setHeadphones?.(!on);
   },
   onWaiting: (value) => {
     waiting = value;
@@ -103,9 +106,13 @@ const wake = createWakeListener({
 const listen = createListenUi((value) => wake.setRecorderListening(value), micThreshold);
 composer.input.addEventListener('keydown', () => {
   wake.keyboard();
-  // Печать отменяет идущую разовую запись: её пустой итог не должен
-  // показаться сообщением «Не расслышал».
   listen.cancel();
+});
+composer.input.addEventListener('focus', () => {
+  wake.inputFocus();
+});
+composer.input.addEventListener('blur', () => {
+  wake.inputBlur();
 });
 
 function isOnScreen(state: PetState): boolean {
@@ -289,14 +296,17 @@ window.tishka.onEvent((event) => {
   if (event.type === 'speak.level') {
     mouthLevel = event.level;
     characterModel?.setMouth(event.level);
+  } else if (event.type === 'speak.start') {
+    faceMood.hold(true);
   } else if (event.type === 'reply') {
     faceMood.reply(event.reply.mood);
     timingMark('reply.shown');
   } else if (event.type === 'error') {
     listen.setError(event.message);
-  } else if (event.type === 'wake' || event.type === 'idle' || event.type === 'speak.end') {
-    // Появление ежа и конец ответа (в том числе речи) — граница записи:
-    // сказанное до неё репликой не становится.
+  } else if (event.type === 'speak.end') {
+    faceMood.hold(false);
+    wake.reset();
+  } else if (event.type === 'wake' || event.type === 'idle') {
     wake.reset();
   }
 });
@@ -314,24 +324,19 @@ window.tishka.pet.onLayout((layout) => {
 });
 window.tishka.pet.onSpeak((message) => speaker.play(message));
 window.tishka.pet.onSpeakStop(() => speaker.stop());
-// Вид кнопки с глазом ведёт ядро: событие о просмотре экрана приходит обоим окнам.
-window.tishka.onScreenLook((looking) => {
-  composer.setLooking(looking);
-});
-// Просмотр экрана выключен в настройках: кнопки с глазом нет.
-async function refreshScreenLook(): Promise<void> {
+async function refreshSpeak(): Promise<void> {
   try {
     const view = await window.tishka.config.get();
-    composer.setScreenLookAvailable(view.config.screen.enabled);
+    composer.setSpeaking(view.config.voice.tts.enabled);
   } catch {
-    composer.setScreenLookAvailable(false);
+    composer.setSpeaking(false);
   }
 }
 window.tishka.config.onChanged(() => {
-  void refreshScreenLook();
+  void refreshSpeak();
   void refreshCharacter();
 });
-void refreshScreenLook();
+void refreshSpeak();
 void refreshCharacter();
 installLinkGuard(document);
 initCharacter();

@@ -13,8 +13,7 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  /* Правый отступ уводит кнопки из-под ног персонажа. */
-  padding: 8px calc(10px + var(--pet-feet, 0px)) 10px 10px;
+  padding: 8px 10px 10px 10px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -22,7 +21,7 @@
 }
 
 .pet.mirrored .composer {
-  padding: 8px 10px 10px calc(10px + var(--pet-feet, 0px));
+  padding: 8px 10px 10px 10px;
 }
 
 /* Свёрнутая строка — тонкая полоска только под ёжиком. */

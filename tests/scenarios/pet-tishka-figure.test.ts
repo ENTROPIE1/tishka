@@ -49,10 +49,11 @@ describe('Сценарий: окно ежа с новым Тишкой', () => {
     for (const petX of [SCREEN.x + 16, SCREEN.width]) {
       const layout = petLayout(SCREEN, petX, content);
 
-      // Посадка не меньше высоты строки ввода (поля 8+10 и кнопки 30): холст
-      // опускается на строку, низ ступней ложится на её верхнюю половину.
+      // Посадка на верхнюю кромку строки, не на её низ (раньше 48 точек
+      // утаскивали ступни ниже рамки).
       expect(layout.stand).toBe(PET_TISHKA_STAND);
-      expect(layout.stand).toBeGreaterThanOrEqual(48);
+      expect(layout.stand).toBeGreaterThanOrEqual(12);
+      expect(layout.stand).toBeLessThan(40);
       // Поле строки уводится из-под ступней внутренним полем на их ширину,
       // окно остаётся целиком на экране.
       expect(layout.feet).toBe(PET_TISHKA_FEET_WIDTH);

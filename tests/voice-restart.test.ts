@@ -15,6 +15,7 @@ function config(mode: SttMode, exe = '', model = '', sttUrl = 'http://127.0.0.1:
       wakeEnabled: false,
       talkByDefault: true,
       talkTimeoutSec: 8,
+      idleLeaveSec: 90,
       sensitivity: 'normal',
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl,

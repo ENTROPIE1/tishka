@@ -110,20 +110,30 @@ export function createPetLifecycle(deps: PetLifecycleDeps): PetLifecycle {
     return deps.getConfig().petMode;
   }
 
+  function idleLeaveMs(): number {
+    const seconds = deps.getConfig().voice.idleLeaveSec;
+    return Math.max(1, Number.isFinite(seconds) ? seconds : 90) * 1000;
+  }
+
+  function tickOpts(): { petMode: boolean; busy: boolean; idleLeaveMs: number } {
+    return { petMode: petMode(), busy, idleLeaveMs: idleLeaveMs() };
+  }
+
   function handleEvent(event: Parameters<typeof onEvent>[1]): void {
     applyModel(
       onEvent(model, event, Date.now(), {
         petMode: petMode(),
         busy,
         source: bus.source?.(),
-        ready: deps.isReady?.()
+        ready: deps.isReady?.(),
+        idleLeaveMs: idleLeaveMs()
       })
     );
   }
 
   const unsubscribe = bus.on(handleEvent);
   tickTimer = setInterval(() => {
-    applyModel(onTick(model, Date.now(), { petMode: petMode(), busy }));
+    applyModel(onTick(model, Date.now(), tickOpts()));
   }, TICK_MS);
   window.webContents.on('did-finish-load', () => {
     sendModel();

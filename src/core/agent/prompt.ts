@@ -69,7 +69,9 @@ function moodMarkRule(character: 'hedgehog' | 'tishka' | undefined): string[] {
   }
   const lines = [`Эмоции: ${emotions.join(', ')}. Метку [эмоция] можно поставить внутри реплики say, не чаще одной на предложение.`];
   if (emotes.length > 0) {
-    lines.push(`Короткие движения той же меткой: ${emotes.join(', ')}.`);
+    lines.push(
+      'Чувство держи на отрезке реплики парными метками: [joy] вот эта часть [/joy]. Закрывающая [/имя] возвращает спокойное лицо. Без пары эмоция держится до конца речи, не вспышкой на одно слово. Радость [joy], восторг [delight], смех [laugh] или [giggle], злость [anger] или [rage], печаль [sadness] или [cry], удивление [surprise], растерянность [confused], скепсис [skeptic], смущение [shy], нежность [love], сосредоточенность [focus], усталость [tired], кивок [nod], отказ [shake], подмигивание [wink], фырк [huff].'
+    );
   }
   return lines;
 }

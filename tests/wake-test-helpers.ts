@@ -12,6 +12,7 @@ export function voice(overrides: Partial<Config['voice']> = {}): Config['voice']
     wakeEnabled: true,
     talkByDefault: false,
     talkTimeoutSec: 30,
+    idleLeaveSec: 90,
     sensitivity: 'normal',
     mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
     sttUrl: 'http://127.0.0.1:8178',

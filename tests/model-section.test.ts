@@ -21,6 +21,7 @@ function makeConfig(): Config {
       wakeEnabled: false,
       talkByDefault: true,
       talkTimeoutSec: 30,
+    idleLeaveSec: 90,
       sensitivity: 'normal',
       mic: { threshold: null, noise: null, speech: null, calibratedAt: null },
       sttUrl: '',
@@ -39,33 +40,36 @@ function makeConfig(): Config {
 }
 
 let checkGateway: ReturnType<typeof vi.fn>;
+let listModels: ReturnType<typeof vi.fn>;
 
 function install(result: GatewayCheckResult): void {
   checkGateway = vi.fn(async () => result);
+  listModels = vi.fn(async () => ({ ok: true, models: result.models, ms: 1 }));
   (window as unknown as { tishka: unknown }).tishka = {
     config: {
       get: vi.fn(async () => ({ config: makeConfig(), gatewayKeySet: true })),
       save: vi.fn(async () => undefined),
-      checkGateway
+      checkGateway,
+      listModels
     },
     secrets: { set: vi.fn(async () => undefined) }
   };
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) {
+  for (let i = 0; i < 12; i += 1) {
     await Promise.resolve();
   }
 }
 
-function inputByLabel(root: HTMLElement, label: string): HTMLInputElement {
+function inputByLabel(root: HTMLElement, label: string): HTMLInputElement | HTMLSelectElement {
   const fields = [...root.querySelectorAll('label.field')];
   const field = fields.find((item) => item.querySelector('.field-label')?.textContent === label);
-  const input = field?.querySelector('input');
+  const input = field?.querySelector('input, select');
   if (input === undefined || input === null) {
     throw new Error(`поле «${label}» не найдено`);
   }
-  return input;
+  return input as HTMLInputElement | HTMLSelectElement;
 }
 
 function buttonWith(root: HTMLElement, label: string): HTMLButtonElement {
@@ -96,6 +100,22 @@ describe('mountModelSection', () => {
     expect(save.classList.contains('button')).toBe(true);
     expect(check.classList.contains('button')).toBe(true);
     expect(check.classList.contains('button-secondary')).toBe(true);
+  });
+
+  it('при открытии запрашивает список моделей шлюза', async () => {
+    install({ ok: true, models: ['DKS-Lynx', 'DKS-Leo-A', 'DKS-Vision'], ms: 1 });
+    const root = document.createElement('div');
+    mountModelSection(root);
+    await flush();
+
+    expect(listModels).toHaveBeenCalledWith(
+      expect.objectContaining({ baseUrl: 'https://llm.example.test/v1' })
+    );
+    const options = [...root.querySelectorAll('#gateway-model-list option')].map(
+      (option) => (option as HTMLOptionElement).value
+    );
+    expect(options).toEqual(['DKS-Lynx', 'DKS-Leo-A', 'DKS-Vision']);
+    expect(inputByLabel(root, 'Модель').value).toBe('DKS-Lynx');
   });
 
   it('кнопка «Проверить» показывает результат и список моделей', async () => {

@@ -84,5 +84,9 @@
   "happy": {
     "ru": "радость",
     "alias": true
+  },
+  "dance": {
+    "ru": "танцует",
+    "emote": true
   }
 }

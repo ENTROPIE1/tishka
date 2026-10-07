@@ -15,11 +15,13 @@ export interface MoodTrack {
   reply(mood: Mood | undefined): void;   // настроение ответа в начале реплики
   mark(name: string): void;              // метка внутри реплики
   state(state: PetState): void;          // покой и уход сбрасывают эмоцию
+  hold(speaking: boolean): void;         // пока звучит речь, idle не сбрасывает лицо
   apply(): void;                         // вернуть текущую эмоцию новому лицу
 }
 
 export function createMoodTrack(target: MoodTarget): MoodTrack {
   let current: string | undefined;
+  let speaking = false;
 
   function set(name: string): void {
     if (current === name) {
@@ -32,7 +34,16 @@ export function createMoodTrack(target: MoodTarget): MoodTrack {
   return {
     reply: (mood) => set(mood ?? 'neutral'),
     mark: (name) => set(name),
+    hold: (on) => {
+      speaking = on;
+      if (!on) {
+        set('neutral');
+      }
+    },
     state: (state) => {
+      if (speaking) {
+        return;
+      }
       if (REST_STATES.includes(state)) {
         set('neutral');
       }

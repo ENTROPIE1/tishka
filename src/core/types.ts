@@ -169,7 +169,8 @@ export interface Config {
     wakeWords: string[];
     wakeEnabled: boolean;                // откликаться на имя
     talkByDefault: boolean;              // включать разговор при появлении по обращению
-    talkTimeoutSec: number;              // уход по тишине в режиме разговора
+    talkTimeoutSec: number;              // выключить микрофон по тишине в режиме разговора
+    idleLeaveSec: number;                // уйти с экрана после простоя вне разговора
     sensitivity: 'low' | 'normal' | 'high';   // осталось для совместимости, на порог не влияет
     mic: { threshold: number | null; noise: number | null; speech: number | null; calibratedAt: string | null };   // порог громкости и результат калибровки; threshold null — порог по умолчанию
     sttUrl: string;                      // адрес службы распознавания

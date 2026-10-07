@@ -35,6 +35,7 @@ export interface PetOpts {
   busy?: boolean;                // открыта карточка или пользователь вводит текст
   source?: TalkSource;           // 'chat' — реплика из окна чата основного окна
   ready?: boolean;               // служба распознавания готова: выбор приветствия
+  idleLeaveMs?: number;          // сколько ждать простоя перед уходом; нет — IDLE_LEAVE_MS
 }
 
 function isQuiet(opts: PetOpts): boolean {
@@ -51,7 +52,7 @@ const MOOD_MS = 1500;
 const TALK_BASE_MS = 1500;
 const TALK_PER_CHAR_MS = 60;
 const TALK_MAX_MS = 12000;
-const IDLE_LEAVE_MS = 30000;
+const IDLE_LEAVE_MS = 90_000;
 const IDLE_SLEEP_MS = 300000;
 // thinking и working не могут длиться дольше: молчание проверки не оставит Тишку «думающим».
 const BUSY_LIMIT_MS = 90_000;
@@ -127,11 +128,15 @@ export function onEvent(model: PetModel, event: TishkaEvent, now: number, opts: 
     case 'listen.end':
       return quiet && isAway(model) ? model : show(endGreeting(model), 'thinking', now);
     case 'think.start':
+      // Планшет MCP/сайта не сбрасываем, пока идут инструменты.
+      if (model.state === 'working') {
+        return model;
+      }
       return quiet && isAway(model) ? model : show(endGreeting(model), 'thinking', now);
     case 'tool.start':
       return quiet && isAway(model) ? model : show(endGreeting(model), 'working', now);
     case 'tool.end':
-      return quiet && isAway(model) ? model : show(endGreeting(model), 'thinking', now);
+      return quiet && isAway(model) ? model : model.state === 'working' ? model : show(endGreeting(model), 'thinking', now);
     case 'status':
       // Статус из окна чата ежу не показываем: эта строка живёт только в ленте
       // чата. Статус от самого ежа по-прежнему ложится в облачко.
@@ -217,7 +222,8 @@ export function onTick(model: PetModel, now: number, opts: PetOpts): PetModel {
       if (opts.busy === true) return model.since === now ? model : { ...model, since: now };
       if (model.leaving === true) return enter(model, 'leave', now);
       if (opts.petMode) return elapsed >= IDLE_SLEEP_MS ? enter(model, 'sleep', now) : model;
-      return elapsed >= IDLE_LEAVE_MS ? enter(model, 'leave', now) : model;
+      const leaveMs = opts.idleLeaveMs !== undefined && opts.idleLeaveMs > 0 ? opts.idleLeaveMs : IDLE_LEAVE_MS;
+      return elapsed >= leaveMs ? enter(model, 'leave', now) : model;
     }
     default:
       return model;

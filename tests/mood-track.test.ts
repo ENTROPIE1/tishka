@@ -43,6 +43,19 @@ describe('createMoodTrack', () => {
     expect(moods).toEqual(['confused', 'neutral']);
   });
 
+  it('пока звучит речь, idle не сбрасывает лицо', () => {
+    const { track: mood, moods } = track();
+
+    mood.reply('happy');
+    mood.hold(true);
+    mood.mark('joy');
+    mood.state('idle');
+    expect(moods).toEqual(['happy', 'joy']);
+
+    mood.hold(false);
+    expect(moods).toEqual(['happy', 'joy', 'neutral']);
+  });
+
   it('apply возвращает текущую эмоцию пересозданному лицу', () => {
     const { track: mood, moods } = track();
 

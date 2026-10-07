@@ -12,6 +12,13 @@ export interface GatewayCheckResult {
   ms: number;
 }
 
+export interface GatewayModelsResult {
+  ok: boolean;
+  models: string[];
+  error?: string;
+  ms: number;
+}
+
 export interface GatewayCheckRequest {
   baseUrl: string;
   model: string;
@@ -53,6 +60,25 @@ export async function checkGateway(
   const error = await probe(doFetch, normalized.value, req, timeoutMs, models.present);
   if (error !== undefined) {
     return { ok: false, models: models.models, error, ms: elapsed() };
+  }
+  return { ok: true, models: models.models, ms: elapsed() };
+}
+
+export async function listGatewayModels(
+  req: { baseUrl: string; apiKey: string },
+  options: GatewayCheckOptions = {}
+): Promise<GatewayModelsResult> {
+  const started = Date.now();
+  const elapsed = (): number => Date.now() - started;
+  const normalized = normalizeBaseUrl(req.baseUrl);
+  if (!normalized.ok) {
+    return { ok: false, models: [], error: normalized.error, ms: elapsed() };
+  }
+  const doFetch = options.fetch ?? fetch;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const models = await fetchModels(doFetch, normalized.value, req.apiKey, timeoutMs);
+  if (!models.ok) {
+    return { ok: false, models: [], error: models.error, ms: elapsed() };
   }
   return { ok: true, models: models.models, ms: elapsed() };
 }

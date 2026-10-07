@@ -689,16 +689,20 @@ window.RIG_FILE={
    "id": "bud_l",
    "src": "layers/bud_l.png",
    "bone": "ear_l",
-   "dx": 0,
-   "dy": 0,
+   "dx": -6,
+   "dy": 28,
+   "sx": 1.25,
+   "sy": 1.12,
    "buds": true
   },
   {
    "id": "bud_r",
    "src": "layers/bud_r.png",
    "bone": "ear_r",
-   "dx": 0,
-   "dy": 0,
+   "dx": 6,
+   "dy": 28,
+   "sx": 1.25,
+   "sy": 1.12,
    "buds": true
   },
   {
