@@ -19,7 +19,7 @@
         "subject": "{{inputs.topic}}",
         "start": "{{inputs.when}}",
         "end": "{{inputs.when}}",
-        "body": "Участник: {{inputs.who}}"
+        "to": "{{inputs.who}}"
       }
     },
     {

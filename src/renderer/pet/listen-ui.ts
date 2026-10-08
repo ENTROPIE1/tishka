@@ -32,7 +32,6 @@ export function createListenUi(
   onListeningChange: (listening: boolean) => void,
   getThreshold?: () => number | null
 ): ListenUi {
-  const level = document.getElementById('level') as HTMLElement;
   const levelFill = document.getElementById('level-fill') as HTMLElement;
   const mic = document.getElementById('mic') as HTMLElement;
   let listening = false;
@@ -40,7 +39,6 @@ export function createListenUi(
 
   function setListening(value: boolean): void {
     listening = value;
-    level.hidden = !value;
     if (!value) {
       levelFill.style.width = '0%';
     }
@@ -58,7 +56,11 @@ export function createListenUi(
     }
   });
 
-  mic.addEventListener('click', () => {
+  mic.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
     window.tishka.pet.conversationToggle();
   });
 

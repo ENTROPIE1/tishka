@@ -79,7 +79,12 @@ describe('fitMailDraftLink', () => {
 });
 
 describe('meetingDraftLink', () => {
-  it('даёт startdt и enddt в местном времени без часового пояса', () => {
+  function owaStamp(year: number, month: number, day: number, hour: number, minute: number): string {
+    const pad = (part: number): string => String(part).padStart(2, '0');
+    return encodeURIComponent(`${year}-${pad(month + 1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00`);
+  }
+
+  it('даёт startdt и enddt в местном времени, как 7 октября', () => {
     const start = new Date(2026, 9, 5, 9, 30, 0).toISOString();
     const end = new Date(2026, 9, 5, 10, 0, 0).toISOString();
 
@@ -94,12 +99,13 @@ describe('meetingDraftLink', () => {
     expect(url).toBe(
       'https://mail.example.org/owa/?path=/calendar/action/compose' +
         `&subject=${encodeURIComponent('Планёрка')}` +
-        '&startdt=2026-10-05T09%3A30%3A00' +
-        '&enddt=2026-10-05T10%3A00%3A00' +
+        `&startdt=${owaStamp(2026, 9, 5, 9, 30)}` +
+        `&enddt=${owaStamp(2026, 9, 5, 10, 0)}` +
         `&location=${encodeURIComponent('Переговорка 3')}` +
         `&body=${encodeURIComponent('Обсудим планы')}`
     );
     expect(url).not.toContain('Z');
+    expect(url).not.toContain('view/Month');
   });
 
   it('пропускает пустые параметры встречи', () => {
@@ -115,10 +121,42 @@ describe('meetingDraftLink', () => {
 
     expect(url).toBe(
       'https://mail.example.org/owa/?path=/calendar/action/compose' +
-        '&startdt=2026-10-05T09%3A00%3A00' +
-        '&enddt=2026-10-05T10%3A00%3A00'
+        `&startdt=${owaStamp(2026, 9, 5, 9, 0)}` +
+        `&enddt=${owaStamp(2026, 9, 5, 10, 0)}`
     );
     expect(url).not.toContain('subject=');
     expect(url).not.toContain('location=');
+  });
+
+  it('кладёт адреса в to, из текста с именами вытаскивает почту', () => {
+    const start = new Date(2026, 9, 5, 17, 0, 0).toISOString();
+    const end = new Date(2026, 9, 5, 18, 0, 0).toISOString();
+    const url = meetingDraftLink('https://mail.example.org/owa', {
+      subject: 'Встреча',
+      start,
+      end,
+      to: 'Иван — ivan@example.org, Мария maria@example.org'
+    });
+    expect(url).toContain('?path=/calendar/action/compose');
+    expect(url).toContain('to=ivan%40example.org%3Bmaria%40example.org');
+    expect(url).not.toContain('view/Month');
+    expect(url).not.toContain('ae=Item');
+  });
+
+  it('понимает «вторник 17:00» и ставит час, если конец совпадает с началом', () => {
+    const now = new Date(2026, 9, 3, 12, 0, 0);
+    const url = meetingDraftLink(
+      'https://mail.example.org/owa',
+      {
+        subject: 'Встреча',
+        start: 'вторник 17:00',
+        end: 'вторник 17:00',
+        to: 'ivan@example.org'
+      },
+      now
+    );
+    expect(url).toContain(`startdt=${owaStamp(2026, 9, 6, 17, 0)}`);
+    expect(url).toContain(`enddt=${owaStamp(2026, 9, 6, 18, 0)}`);
+    expect(url).toContain('to=ivan%40example.org');
   });
 });

@@ -145,6 +145,10 @@ export function createWakeFlow(deps: WakeFlowDeps): WakeFlow {
       state.transition('speak');
     } else if (event.type === 'speak.end') {
       state.transition('speech-end');
+      if (talk.isConversation()) {
+        state.transition('listen');
+        talk.arm();
+      }
     }
   });
 

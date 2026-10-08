@@ -22,8 +22,18 @@ export interface Meeting {
   cancelled?: boolean;  // отменена организатором
 }
 
+export interface MeetingDraftInput {
+  subject: string;
+  start: Date;
+  end: Date;
+  location?: string;
+  body?: string;
+  attendees: string[];
+}
+
 export interface ExchangeClient {
   listMeetings(from: Date, to: Date): Promise<Meeting[]>;
+  createMeetingDraft(input: MeetingDraftInput): Promise<{ id: string }>;
 }
 
 export function createExchangeClient(opts: {
@@ -40,6 +50,14 @@ export function createExchangeClient(opts: {
       return readCalendarItems(message)
         .map(toMeeting)
         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    },
+    async createMeetingDraft(input: MeetingDraftInput): Promise<{ id: string }> {
+      const message = await ews.call(buildCreateItemSoap(input), 'CreateItem');
+      const id = readCreatedItemId(message);
+      if (id === '') {
+        throw new Error('Exchange не вернул идентификатор черновика встречи');
+      }
+      return { id };
     }
   };
 }
@@ -108,6 +126,58 @@ function toMeeting(item: RawCalendarItem): Meeting {
 function findJoinUrl(location: string): string | undefined {
   const match = /https:\/\/\S+/.exec(location);
   return match === null ? undefined : match[0];
+}
+
+function xmlText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildCreateItemSoap(input: MeetingDraftInput): string {
+  const attendees = input.attendees
+    .map(
+      (email) => `<t:Attendee><t:Mailbox><t:EmailAddress>${xmlText(email)}</t:EmailAddress></t:Mailbox></t:Attendee>`
+    )
+    .join('');
+  const location =
+    input.location !== undefined && input.location.trim() !== ''
+      ? `<t:Location>${xmlText(input.location.trim())}</t:Location>`
+      : '';
+  const body =
+    input.body !== undefined && input.body.trim() !== ''
+      ? `<t:Body BodyType="Text">${xmlText(input.body.trim())}</t:Body>`
+      : '';
+  const required =
+    attendees === '' ? '' : `<t:RequiredAttendees>${attendees}</t:RequiredAttendees>`;
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+  <soap:Header>
+    <t:RequestServerVersion Version="Exchange2013" />
+  </soap:Header>
+  <soap:Body>
+    <m:CreateItem SendMeetingInvitations="SendToNone">
+      <m:Items>
+        <t:CalendarItem>
+          <t:Subject>${xmlText(input.subject)}</t:Subject>
+          ${body}
+          <t:Start>${input.start.toISOString()}</t:Start>
+          <t:End>${input.end.toISOString()}</t:End>
+          ${location}
+          ${required}
+        </t:CalendarItem>
+      </m:Items>
+    </m:CreateItem>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function readCreatedItemId(message: RawResponseMessage): string {
+  const items = message.Items as { CalendarItem?: RawCalendarItem | RawCalendarItem[] } | undefined;
+  const item = asArray(items?.CalendarItem)[0];
+  return asText(item?.ItemId?.['@_Id']);
 }
 
 interface RawMailbox {

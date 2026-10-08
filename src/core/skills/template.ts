@@ -36,12 +36,51 @@ function navigate(value: unknown, segments: string[], expression: string): unkno
   return current;
 }
 
+const WEEKDAY_INDEX: Record<string, number> = {
+  sun: 0,
+  sunday: 0,
+  mon: 1,
+  monday: 1,
+  tue: 2,
+  tuesday: 2,
+  wed: 3,
+  wednesday: 3,
+  thu: 4,
+  thursday: 4,
+  fri: 5,
+  friday: 5,
+  sat: 6,
+  saturday: 6
+};
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+// Ближайший такой день недели, включая сегодня, пока не наступил вечерний час 17.
+function nextWeekdayIso(now: Date, name: string): string {
+  const weekday = WEEKDAY_INDEX[name.trim().toLowerCase()];
+  if (weekday === undefined) {
+    throw unknownSubstitution(`next.${name}`);
+  }
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let add = (weekday - day.getDay() + 7) % 7;
+  if (add === 0 && (now.getHours() > 17 || (now.getHours() === 17 && now.getMinutes() > 0))) {
+    add = 7;
+  }
+  day.setDate(day.getDate() + add);
+  return `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}`;
+}
+
 function resolve(expression: string, ctx: TemplateContext): unknown {
   if (expression === 'now') {
     return ctx.now.toISOString();
   }
   if (expression === 'today') {
     return ctx.now.toISOString().slice(0, 10);
+  }
+  if (expression.startsWith('next.')) {
+    return nextWeekdayIso(ctx.now, expression.slice(5));
   }
 
   const parts = expression.split('.');

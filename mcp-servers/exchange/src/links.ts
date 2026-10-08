@@ -10,6 +10,7 @@ export interface MeetingDraftParams {
   end: string;
   location?: string;
   body?: string;
+  to?: string;   // участники: адреса в поле «Люди», не в описание
 }
 
 export const DRAFT_URL_LIMIT = 2000;
@@ -87,18 +88,48 @@ export function mailItemLink(owaUrl: string, itemId: string): string {
   return buildLink(owaUrl, '/mail/inbox', [['ItemID', itemId]]);
 }
 
-export function meetingDraftLink(owaUrl: string, params: MeetingDraftParams): string {
+export function calendarItemLink(owaUrl: string, itemId: string): string {
+  return buildLink(owaUrl, '/calendar/item', [['ItemID', itemId]]);
+}
+
+export function meetingDraftLink(owaUrl: string, params: MeetingDraftParams, now = new Date()): string {
+  const start = parseMeetingInstant(params.start, now);
+  let end = parseMeetingInstant(params.end ?? params.start, now);
+  if (end.getTime() <= start.getTime()) {
+    end = new Date(start.getTime() + 60 * 60 * 1000);
+  }
   return buildLink(
     owaUrl,
     '/calendar/action/compose',
     presentEntries([
+      ['to', attendeesParam(params.to)],
       ['subject', params.subject],
-      ['startdt', toLocalStamp(params.start)],
-      ['enddt', toLocalStamp(params.end)],
+      ['startdt', formatLocalStamp(start)],
+      ['enddt', formatLocalStamp(end)],
       ['location', params.location],
       ['body', params.body]
     ])
   );
+}
+
+function attendeesParam(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const emails = value.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g);
+  if (emails !== null && emails.length > 0) {
+    return emails.join(';');
+  }
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+export function attendeeEmails(value: string | undefined): string[] {
+  const packed = attendeesParam(value);
+  if (packed === undefined) {
+    return [];
+  }
+  return packed.split(';').map((item) => item.trim()).filter((item) => item !== '');
 }
 
 function presentEntries(entries: [string, string | undefined][]): [string, string][] {
@@ -117,11 +148,61 @@ function buildLink(owaUrl: string, path: string, entries: [string, string][]): s
   return query.length > 0 ? `${base}?path=${path}&${query}` : `${base}?path=${path}`;
 }
 
-function toLocalStamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`Некорректная дата: ${value}`);
-  }
+function formatLocalStamp(date: Date): string {
   const pad = (part: number): string => String(part).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+const WEEKDAY_RU: Record<string, number> = {
+  воскресенье: 0,
+  вс: 0,
+  понедельник: 1,
+  пн: 1,
+  вторник: 2,
+  вт: 2,
+  среда: 3,
+  ср: 3,
+  четверг: 4,
+  чт: 4,
+  пятница: 5,
+  пт: 5,
+  суббота: 6,
+  сб: 6
+};
+
+export function parseMeetingInstant(value: string, now = new Date()): Date {
+  const trimmed = value.trim();
+  const dated = trimmed.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2})[:.](\d{2})(?::(\d{2}))?)?$/);
+  if (dated !== null) {
+    const hour = dated[2] !== undefined ? Number(dated[2]) : 0;
+    const minute = dated[3] !== undefined ? Number(dated[3]) : 0;
+    const second = dated[4] !== undefined ? Number(dated[4]) : 0;
+    const [year, month, day] = dated[1].split('-').map(Number);
+    const local = new Date(year, month - 1, day, hour, minute, second);
+    if (!Number.isNaN(local.getTime())) {
+      return local;
+    }
+  }
+  const weekdayTime = trimmed.match(
+    /^(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье|пн|вт|ср|чт|пт|сб|вс)\s+(\d{1,2})[:.](\d{2})$/i
+  );
+  if (weekdayTime !== null) {
+    const weekday = WEEKDAY_RU[weekdayTime[1].toLowerCase()];
+    const hour = Number(weekdayTime[2]);
+    const minute = Number(weekdayTime[3]);
+    if (weekday !== undefined) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
+      let add = (weekday - day.getDay() + 7) % 7;
+      if (add === 0 && (now.getHours() > hour || (now.getHours() === hour && now.getMinutes() >= minute))) {
+        add = 7;
+      }
+      day.setDate(day.getDate() + add);
+      return day;
+    }
+  }
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  throw new Error(`Некорректная дата: ${value}`);
 }

@@ -33,10 +33,9 @@ export interface PhraseListenerOptions {
 export interface PhraseListener {
   start(): Promise<boolean>;
   pause(active: boolean): void;
-  // Сброс идущей записи, запаса перед речью и детектора — как при паузе,
-  // но микрофон остаётся открыт. Нужен при включении разговора, появлении
-  // ежа и окончании ответа: сказанное до этого репликой не становится.
-  reset(): void;
+  // Сброс записи. carry true (по умолчанию) — хвост той же фразы не станет новой
+  // репликой. false — после ответа Тишки сразу можно говорить.
+  reset(carry?: boolean): void;
   stop(): void;
 }
 
@@ -260,15 +259,15 @@ export function createPhraseListener(options: PhraseListenerOptions): PhraseList
     }
   }
 
-  function reset(): void {
+  function reset(carry = true): void {
     if (!active) {
       return;
     }
-    // Фраза шла в момент сброса: её начало запоминается, чтобы хвост не стал
-    // репликой нового разговора. Запись при этом отбрасывается, микрофон открыт.
-    if (capturing) {
+    if (carry && capturing) {
       carriedStartWallMs = phraseStartWallMs;
       carriedAtMs = Date.now();
+    } else {
+      carriedStartWallMs = undefined;
     }
     clearCapture();
   }

@@ -3,7 +3,7 @@
    то же с другой стороны. */
 .composer-host {
   position: relative;
-  z-index: 1;
+  z-index: 3;
 }
 
 .composer {

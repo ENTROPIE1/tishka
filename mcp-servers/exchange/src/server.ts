@@ -5,13 +5,21 @@ import {
   type CallToolResult,
   type Tool
 } from '@modelcontextprotocol/sdk/types.js';
-import type { Meeting } from './client';
-import { fitMailDraftLink, LONG_BODY_HINT, meetingDraftLink } from './links';
+import type { Meeting, MeetingDraftInput } from './client';
+import {
+  attendeeEmails,
+  calendarItemLink,
+  fitMailDraftLink,
+  LONG_BODY_HINT,
+  meetingDraftLink,
+  parseMeetingInstant
+} from './links';
 import type { ExchangeMail } from './mail';
 import { mailRuns } from './mail-server';
 
 export interface ExchangeCalendar {
   listMeetings(from: Date, to: Date): Promise<Meeting[]>;
+  createMeetingDraft?(input: MeetingDraftInput): Promise<{ id: string }>;
 }
 
 export interface ExchangeServerOptions {
@@ -74,8 +82,9 @@ const TOOLS: Tool[] = [
   {
     name: 'meeting_draft_link',
     description:
-      'Возвращает ссылку, которая открывает в веб-почте Outlook черновик встречи. ' +
-      'Ссылку нужно показать пользователю: черновик открывает и отправляет он сам.',
+      'Создаёт в календаре Exchange черновик встречи с участниками (приглашения не отправляет) ' +
+      'и возвращает ссылку, чтобы человек открыл её и отправил сам. ' +
+      'Участников передавай в to — почты через запятую или точку с запятой.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -83,11 +92,21 @@ const TOOLS: Tool[] = [
         start: { type: 'string', description: 'Начало встречи: дата или дата со временем' },
         end: { type: 'string', description: 'Конец встречи: дата или дата со временем' },
         location: { type: 'string', description: 'Место встречи' },
-        body: { type: 'string', description: 'Описание встречи' }
+        to: {
+          type: 'string',
+          description:
+            'Участники встречи: адреса почты через запятую или точку с запятой. ' +
+            'Попадают в поле «Люди» черновика, не в описание.'
+        },
+        attendees: {
+          type: 'string',
+          description: 'То же, что to: участники в поле «Люди»'
+        },
+        body: { type: 'string', description: 'Описание встречи, без списка участников' }
       },
       required: ['start', 'end']
     },
-    annotations: { readOnlyHint: true }
+    annotations: { readOnlyHint: false }
   },
   {
     name: 'mail_search',
@@ -210,15 +229,44 @@ function toolRuns(deps: ExchangeServerOptions): Record<string, ToolRun> {
       };
     },
     meeting_draft_link: async (args) => {
+      const start = parseMeetingInstant(requiredString(args, 'start'));
+      let end = parseMeetingInstant(requiredString(args, 'end'));
+      if (end.getTime() <= start.getTime()) {
+        end = new Date(start.getTime() + 60 * 60 * 1000);
+      }
+      const to = meetingAttendees(args);
+      const attendees = attendeeEmails(to);
+      const subject = optionalString(args, 'subject') ?? '';
+      const location = optionalString(args, 'location');
+      const body = optionalString(args, 'body');
+      const create = deps.calendar?.createMeetingDraft;
+      if (create !== undefined && attendees.length > 0) {
+        const created = await create({
+          subject,
+          start,
+          end,
+          location,
+          body,
+          attendees
+        });
+        const owaUrl = deps.owaUrl;
+        return {
+          url: owaUrl !== undefined && owaUrl.trim() !== '' ? calendarItemLink(owaUrl, created.id) : created.id,
+          id: created.id,
+          created: true
+        };
+      }
       const owaUrl = requireOwaUrl(deps);
       return {
         url: meetingDraftLink(owaUrl, {
-          subject: optionalString(args, 'subject'),
-          start: requiredString(args, 'start'),
-          end: requiredString(args, 'end'),
-          location: optionalString(args, 'location'),
-          body: optionalString(args, 'body')
-        })
+          subject,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          location,
+          to,
+          body
+        }),
+        created: false
       };
     }
   };
@@ -299,6 +347,10 @@ function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
+}
+
+function meetingAttendees(args: Record<string, unknown>): string | undefined {
+  return optionalString(args, 'to') ?? optionalString(args, 'attendees');
 }
 
 function optionalString(args: Record<string, unknown>, name: string): string | undefined {

@@ -74,4 +74,13 @@ describe('renderTemplate', () => {
     const ctx = makeContext({ steps: { first: { content: 'ок' } } });
     expect(() => renderTemplate('{{steps.first.data.x}}', ctx)).toThrow(/steps\.first\.data\.x/);
   });
+
+  it('next.tue — ближайший вторник, сегодня если ещё не 17:00', () => {
+    const saturday = makeContext({ now: new Date(2026, 9, 3, 12, 0, 0) });
+    expect(renderTemplate('{{next.tue}}', saturday)).toBe('2026-10-06');
+    const tuesdayMorning = makeContext({ now: new Date(2026, 9, 6, 10, 0, 0) });
+    expect(renderTemplate('{{next.tue}}', tuesdayMorning)).toBe('2026-10-06');
+    const tuesdayEvening = makeContext({ now: new Date(2026, 9, 6, 18, 0, 0) });
+    expect(renderTemplate('{{next.tue}}', tuesdayEvening)).toBe('2026-10-13');
+  });
 });

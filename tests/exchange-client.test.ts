@@ -8,7 +8,8 @@ import {
   splitUser,
   type EwsPost,
   type ExchangeClient,
-  type Meeting
+  type Meeting,
+  type MeetingDraftInput
 } from '../mcp-servers/exchange/src/client';
 import {
   createExchangeServer,
@@ -357,6 +358,38 @@ describe('createExchangeClient', () => {
     expect(splitUser('DOMAIN\\ivan')).toEqual({ domain: 'DOMAIN', username: 'ivan' });
     expect(splitUser('ivan@example.org')).toEqual({ domain: '', username: 'ivan@example.org' });
   });
+
+  it('createMeetingDraft пишет участников в RequiredAttendees и не рассылает приглашения', async () => {
+    const { client, calls } = setup(`<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" xmlns:m="http://schemas.microsoft.com/exchange/services/2006/messages" xmlns:t="http://schemas.microsoft.com/exchange/services/2006/types">
+  <s:Body>
+    <m:CreateItemResponse>
+      <m:ResponseMessages>
+        <m:CreateItemResponseMessage ResponseClass="Success">
+          <m:ResponseCode>NoError</m:ResponseCode>
+          <m:Items>
+            <t:CalendarItem>
+              <t:ItemId Id="AAMk-draft" ChangeKey="CQAA" />
+            </t:CalendarItem>
+          </m:Items>
+        </m:CreateItemResponseMessage>
+      </m:ResponseMessages>
+    </m:CreateItemResponse>
+  </s:Body>
+</s:Envelope>`);
+    const created = await client.createMeetingDraft({
+      subject: 'Планёрка',
+      start: new Date('2026-10-14T14:00:00Z'),
+      end: new Date('2026-10-14T15:00:00Z'),
+      location: 'Переговорка',
+      attendees: ['ivan@example.org', 'maria@example.org']
+    });
+    expect(created.id).toBe('AAMk-draft');
+    expect(calls[0].soapBody).toContain('SendMeetingInvitations="SendToNone"');
+    expect(calls[0].soapBody).toContain('ivan@example.org');
+    expect(calls[0].soapBody).toContain('maria@example.org');
+    expect(calls[0].soapBody).toContain('RequiredAttendees');
+  });
 });
 
 type Session = { client: Client; close: () => Promise<void> };
@@ -417,7 +450,11 @@ describe('createExchangeServer', () => {
         'next_meeting'
       ]);
       for (const tool of tools) {
-        expect(tool.annotations?.readOnlyHint).toBe(true);
+        if (tool.name === 'meeting_draft_link') {
+          expect(tool.annotations?.readOnlyHint).toBe(false);
+        } else {
+          expect(tool.annotations?.readOnlyHint).toBe(true);
+        }
       }
     } finally {
       await session.close();
@@ -541,13 +578,49 @@ describe('createExchangeServer', () => {
       const result = await callTool(session, 'meeting_draft_link', {
         subject: 'Встреча',
         start: '2026-10-05T09:00:00Z',
-        end: '2026-10-05T10:00:00Z'
+        end: '2026-10-05T10:00:00Z',
+        to: 'ivan@example.org'
       });
       expect(result.isError).toBeUndefined();
       const data = JSON.parse(textOf(result)) as { url: string };
       expect(data.url).toContain('?path=/calendar/action/compose');
       expect(data.url).toContain('startdt=');
       expect(data.url).toContain('enddt=');
+      expect(data.url).toContain('to=ivan%40example.org');
+    } finally {
+      await session.close();
+    }
+  });
+
+  it('meeting_draft_link с EWS создаёт встречу с участниками и отдаёт ссылку на элемент', async () => {
+    const created: MeetingDraftInput[] = [];
+    const calendar: ExchangeCalendar = {
+      listMeetings: async () => [],
+      createMeetingDraft: async (input) => {
+        created.push(input);
+        return { id: 'ITEM-1' };
+      }
+    };
+    const session = await connect(
+      createExchangeServer({ calendar, owaUrl: 'https://mail.example.org/owa' })
+    );
+    try {
+      const result = await callTool(session, 'meeting_draft_link', {
+        subject: 'Встреча',
+        start: '2026-10-14T17:00:00',
+        end: '2026-10-14T18:00:00',
+        to: 'ivan@example.org;maria@example.org',
+        location: 'Переговорка'
+      });
+      expect(result.isError).toBeUndefined();
+      const data = JSON.parse(textOf(result)) as { url: string; id: string; created: boolean };
+      expect(data.created).toBe(true);
+      expect(data.id).toBe('ITEM-1');
+      expect(data.url).toContain('?path=/calendar/item');
+      expect(data.url).toContain('ItemID=ITEM-1');
+      expect(created).toHaveLength(1);
+      expect(created[0].attendees).toEqual(['ivan@example.org', 'maria@example.org']);
+      expect(created[0].subject).toBe('Встреча');
     } finally {
       await session.close();
     }

@@ -94,7 +94,11 @@ export function createComposer(actions: ComposerActions): Composer {
   speaker.title = 'Говорит вслух';
   speaker.setAttribute('aria-label', 'Говорит вслух');
   speaker.append(svgIcon('mic-icon', SPEAKER_PATHS));
-  speaker.addEventListener('click', () => {
+  speaker.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
     actions.onSpeakToggle?.();
   });
 

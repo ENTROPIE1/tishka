@@ -18,7 +18,7 @@ export interface WakeListener {
   setActive(active: boolean): void;
   setRecorderListening(listening: boolean): void;
   // Сброс идущей записи: появление ежа или конец ответа.
-  reset(): void;
+  reset(carry?: boolean): void;
   keyboard(): void;
   inputFocus(): void;
   inputBlur(): void;
@@ -111,8 +111,9 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
   }
 
   function applyUi(): void {
-    // Полоска уровня видна, пока микрофон действительно пишет: разговор или разовая запись.
-    const capturing = (active && conversation) || recorderListening;
+    // Полоска видна, как только микрофон разговора включён: не ждём, пока служба
+    // поставит active, иначе после выкл/вкл бегунок не появляется.
+    const capturing = conversation || recorderListening;
     if (level !== null) {
       level.hidden = !capturing;
     }
@@ -169,8 +170,8 @@ export function createWakeListener(deps: WakeListenerDeps = {}): WakeListener {
       recorderListening = value;
       applyUi();
     },
-    reset(): void {
-      listener?.reset();
+    reset(carry): void {
+      listener?.reset(carry);
     },
     keyboard(): void {
       pause.hold('typing', TYPING_RESUME_MS);

@@ -305,7 +305,7 @@ window.tishka.onEvent((event) => {
     listen.setError(event.message);
   } else if (event.type === 'speak.end') {
     faceMood.hold(false);
-    wake.reset();
+    wake.reset(false);
   } else if (event.type === 'wake' || event.type === 'idle') {
     wake.reset();
   }
